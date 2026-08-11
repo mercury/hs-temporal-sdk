@@ -8,8 +8,8 @@ module Temporal.WorkflowInstance (
   WorkflowExecutionContext (..),
   workflowExecutionContextKey,
   create,
-  advanceWorkflow,
   activate,
+  addCommand,
   nextActivitySequence,
   nextChildWorkflowSequence,
   nextExternalCancelSequence,
@@ -104,13 +104,13 @@ import Temporal.Workflow.Types
 import UnliftIO
 
 
-{- | Restores a workflow's ambient execution context for one activation.
+{- | Restores an instance's ambient execution context around one activation.
 
-Interceptors install this in the per-instance vault.  The worker invokes it
-when it resumes a saved workflow continuation on a later activation.
+Interceptors install this in the per-instance vault. The workflow executor uses
+it whenever a later activation resumes the saved continuation.
 -}
 newtype WorkflowExecutionContext = WorkflowExecutionContext
-  { runWorkflowExecutionContext :: IO () -> IO ()
+  { runWorkflowExecutionContext :: forall a. IO a -> IO a
   }
 
 
@@ -124,7 +124,7 @@ create
   => (Core.WorkflowActivationCompletion -> IO (Either Core.WorkerError ()))
   -> (Vector Payload -> IO (Either String (Workflow Payload)))
   -> Maybe Int
-  -- ^ deadlock timeout in seconds
+  -- ^ Deadlock timeout in seconds.
   -> [ApplicationFailureHandler]
   -> WorkflowInboundInterceptor
   -> WorkflowOutboundInterceptor
@@ -133,9 +133,8 @@ create
   -> Info
   -> InitializeWorkflow
   -> [SignalWorkflow]
-  -- ^ Signals delivered in the same activation as the start job (e.g. via
-  -- @signalWithStart@). Buffered before the workflow body runs; see 'applyStartWorkflow'.
-  -> m (WorkflowInstance, Maybe WorkflowActivation -> IO ())
+  -- ^ Signals delivered with the start job, buffered before the workflow body runs.
+  -> m (WorkflowInstance, IO ())
 create
   workflowCompleteActivation
   workflowFn
@@ -180,115 +179,139 @@ create
     workflowInstanceContinuationEnv <- ContinuationEnv <$> newIORef JobNil
     workflowCancellationVar <- newIVar
     workflowVault <- newIORef baseWorkflowVault
-    workflowAdvance <- newIORef (error "Workflow continuation not initialized")
+    activationChannel <- newTQueueIO
+    executionThread <- newIORef (error "Workflow thread not yet started")
+    executionCancelled <- newIORef False
+    -- The instance and its execution thread refer to each other. The start
+    -- barrier keeps the instance inaccessible until 'executionThread' is set.
     let inst = WorkflowInstance {..}
-    exec <- liftIO $ runInstanceM inst $ setUpWorkflowExecution start
-    initialStep <-
-      liftIO . E.try @SomeException $
-        interceptWorkflow inboundInterceptor exec $ \exec' ->
-          runInstanceM inst $ do
-            Logging.logDebug "Executing workflow"
-            wf <- applyStartWorkflow initialSignals exec' workflowFn
-            resume wf
-    pure (inst, runInstanceM inst . startWorkflow initialStep)
+    -- The workflow thread must start only after the worker has registered built-ins and
+    -- published this instance. Later activations can then enqueue immediately, while this
+    -- thread remains their sole executor after initial evaluation reaches a suspension.
+    -- Crucially, no worker-poller thread waits on this barrier.
+    startWorker <- newEmptyMVar
+    liftIO $ E.mask_ $ do
+      workerThread <- async $ do
+        readMVar startWorker
+        result <-
+          E.try @SomeException $
+            runInstanceM inst $ do
+              exec <- setUpWorkflowExecution start
+              res <-
+                liftIO $
+                  interceptWorkflow inboundInterceptor exec $ \exec' ->
+                    runInstanceM inst $ runTopLevel $ do
+                      Logging.logDebug "Executing workflow"
+                      wf <- applyStartWorkflow initialSignals exec' workflowFn
+                      runWorkflowToCompletion wf
+              finishWorkflow res
+        case result of
+          Left err -> do
+            cancelled <- readIORef executionCancelled
+            case (cancelled, E.fromException err :: Maybe E.SomeAsyncException) of
+              (True, _) -> pure ()
+              (_, Just _) -> E.throwIO err
+              _ -> runInstanceM inst $ failWorkflowActivation err
+          Right () -> pure ()
+      link workerThread
+      writeIORef executionThread workerThread
+    let releaseStart = putMVar startWorker ()
+    pure (inst, releaseStart)
 
 
-startWorkflow
-  :: Either SomeException (Either (Await [ActivationResult] (SuspendableWorkflowExecution Payload)) Payload)
-  -> Maybe WorkflowActivation
-  -> InstanceM ()
-startWorkflow initialStep = \case
-  Nothing -> initializeWorkflowContinuation initialStep
-  Just activation -> do
-    initializeWorkflowContinuationWithoutFlush initialStep
-    advanceWorkflow activation
-
-
-initializeWorkflowContinuation
-  :: Either SomeException (Either (Await [ActivationResult] (SuspendableWorkflowExecution Payload)) Payload)
-  -> InstanceM ()
-initializeWorkflowContinuation = \case
-  Left err -> do
-    rethrowAsyncExceptions err
-    finishWorkflow $ workflowExitFromException err
-  Right (Right result) -> finishWorkflow $ WorkflowExitSuccess result
-  Right (Left suspension) -> suspendWorkflow suspension
-
-
-initializeWorkflowContinuationWithoutFlush
-  :: Either SomeException (Either (Await [ActivationResult] (SuspendableWorkflowExecution Payload)) Payload)
-  -> InstanceM ()
-initializeWorkflowContinuationWithoutFlush = \case
-  Left err -> do
-    rethrowAsyncExceptions err
-    finishWorkflow $ workflowExitFromException err
-  Right (Right result) -> finishWorkflow $ WorkflowExitSuccess result
-  Right (Left suspension) -> installWorkflowSuspension suspension
-
-
-advanceWorkflow :: WorkflowActivation -> InstanceM ()
-advanceWorkflow activation = do
+failWorkflowActivation :: SomeException -> InstanceM ()
+failWorkflowActivation err = do
+  Logging.logWarn ("Failed activation on workflow: " <> Text.pack (show err))
   inst <- ask
-  vault <- liftIO $ readIORef inst.workflowVault
-  case Vault.lookup workflowExecutionContextKey vault of
-    Nothing -> advanceWorkflowWithoutContext activation
-    Just WorkflowExecutionContext {runWorkflowExecutionContext} ->
-      liftIO $ runWorkflowExecutionContext $ runInstanceM inst $ advanceWorkflowWithoutContext activation
-
-
-advanceWorkflowWithoutContext :: WorkflowActivation -> InstanceM ()
-advanceWorkflowWithoutContext activation = do
-  inst <- ask
-  liftIO (readIORef inst.workflowAdvance) >>= ($ activation)
-
-
-installWorkflowSuspension :: Await [ActivationResult] (SuspendableWorkflowExecution Payload) -> InstanceM ()
-installWorkflowSuspension suspension = do
-  inst <- ask
-  liftIO $ writeIORef inst.workflowAdvance $ advanceSuspension suspension
-
-
-suspendWorkflow :: Await [ActivationResult] (SuspendableWorkflowExecution Payload) -> InstanceM ()
-suspendWorkflow suspension = do
-  installWorkflowSuspension suspension
-  flushCommands
-
-
-advanceSuspension :: Await [ActivationResult] (SuspendableWorkflowExecution Payload) -> WorkflowActivation -> InstanceM ()
-advanceSuspension suspension activation = do
-  next <- runIdentity <$> activate activation (Identity suspension)
-  step <- Catch.try @InstanceM @SomeException $ resume next
-  initializeWorkflowContinuation step
+  info <- liftIO $ readIORef inst.workflowInstanceInfo
+  let failure =
+        defMessage
+          & Completion.failure .~ (defMessage & Failure.message .~ Text.pack (show err))
+      completion =
+        defMessage
+          & Completion.runId .~ rawRunId info.runId
+          & Completion.failed .~ failure
+  liftIO (inst.workflowCompleteActivation completion >>= either throwIO pure)
 
 
 finishWorkflow :: WorkflowExitVariant Payload -> InstanceM ()
 finishWorkflow res = do
   inst <- ask
-  liftIO $ writeIORef inst.workflowAdvance handleCompletedActivation
-  let finalize = liftIO $ do
-        finalizeWorkflowExecution inst.inboundInterceptor inst (Just res)
+  let finalize = liftIO $ finalizeWorkflowExecution inst.inboundInterceptor inst (Just res)
   (`Catch.finally` finalize) do
     Logging.logDebug "Workflow execution completed"
     addCommand =<< convertExitVariantToCommand res
     flushCommands
+    Logging.logDebug "Handling leftover queries"
+    handleQueriesAfterCompletion
 
 
-handleCompletedActivation :: WorkflowActivation -> InstanceM ()
-handleCompletedActivation activation = do
-  w <- ask
-  completion <- UnliftIO.try $ activate activation Proxy
+runWithWorkflowExecutionContext :: WorkflowInstance -> InstanceM a -> InstanceM a
+runWithWorkflowExecutionContext inst action = do
+  vault <- liftIO $ readIORef inst.workflowVault
+  case Vault.lookup workflowExecutionContextKey vault of
+    Nothing -> action
+    Just WorkflowExecutionContext {runWorkflowExecutionContext} ->
+      liftIO $ runWorkflowExecutionContext $ runInstanceM inst action
+
+
+runWorkflowToCompletion :: HasCallStack => SuspendableWorkflowExecution Payload -> InstanceM Payload
+runWorkflowToCompletion wf = do
+  inst <- ask
+  let resumeWithDeadline current =
+        case inst.workflowDeadlockTimeout of
+          Nothing -> resume current
+          Just timeoutDuration -> do
+            result <- UnliftIO.timeout timeoutDuration (resume current)
+            case result of
+              Nothing -> throwIO $ LogicBug WorkflowActivationDeadlock
+              Just step -> pure step
+
+      completeStep suspension = do
+        Logging.logDebug "Awaiting activation results from workflow"
+        activation <- join $ atomically $ do
+          mActivation <- tryReadTQueue inst.activationChannel
+          case mActivation of
+            Nothing -> do
+              pure $ do
+                flushCommands
+                atomically $ readTQueue inst.activationChannel
+            Just act -> pure $ pure act
+        runWithWorkflowExecutionContext inst $ fmap runIdentity $ activate activation $ Identity suspension
+
+      runSteps current = do
+        step <- resumeWithDeadline current
+        case step of
+          Right result -> pure result
+          Left suspension -> completeStep suspension >>= runSteps
+  runSteps wf
+
+
+{- | Handle queries received after workflow completion until eviction cancels
+the instance executor.
+
+Each completed query flushes its response before the next activation. Cancellation
+may still interrupt a query that is in progress during eviction.
+-}
+handleQueriesAfterCompletion :: InstanceM ()
+handleQueriesAfterCompletion = forever $ do
+  inst <- ask
+  activation <- atomically $ readTQueue inst.activationChannel
+  completion <- runWithWorkflowExecutionContext inst $ UnliftIO.try $ activate activation Proxy
   case completion of
     Left err -> do
       Logging.logDebug ("Workflow failure: " <> Text.pack (show err))
-      let appFailure = mkApplicationFailure err w.errorConverters
+      let appFailure = mkApplicationFailure err inst.errorConverters
           enrichedApplicationFailure = applicationFailureToFailureProto appFailure
+
           failureProto :: Completion.Failure
           failureProto = defMessage & Completion.failure .~ enrichedApplicationFailure
+
           completionMessage =
             defMessage
               & Completion.runId .~ (activation ^. Activation.runId)
               & Completion.failed .~ failureProto
-      liftIO (w.workflowCompleteActivation completionMessage >>= either throwIO pure)
+      liftIO (inst.workflowCompleteActivation completionMessage >>= either throwIO pure)
     Right Proxy -> flushCommands
 
 
@@ -381,8 +404,8 @@ addBuiltinQueryHandlers inst = do
     sdkVersion = Text.pack (showVersion version)
 
 
--- This should never raise an exception, but instead catch all exceptions
--- and set as completion failure.
+-- Exceptions escape to the instance executor, which owns the sole failed
+-- activation completion path.
 activate
   :: Functor f
   => WorkflowActivation
@@ -390,14 +413,13 @@ activate
   -> InstanceM (f (SuspendableWorkflowExecution Payload))
 activate act suspension = do
   inst <- ask
-  info <- atomicModifyIORef' inst.workflowInstanceInfo $ \info ->
+  _ <- atomicModifyIORef' inst.workflowInstanceInfo $ \info ->
     let info' =
           info
             { historyLength = act ^. Activation.historyLength
             , continueAsNewSuggested = act ^. Activation.continueAsNewSuggested
             }
     in (info', info')
-  let completionBase = defMessage & Completion.runId .~ rawRunId info.runId
   writeIORef inst.workflowTime (act ^. Activation.timestamp . to timespecFromTimestamp)
   writeIORef inst.workflowIsReplaying (act ^. Activation.isReplaying)
   eResult <- case inst.workflowDeadlockTimeout of
@@ -405,28 +427,9 @@ activate act suspension = do
     Just timeoutDuration -> do
       res <- UnliftIO.timeout timeoutDuration $ applyJobs (act ^. Activation.vec'jobs) suspension
       case res of
-        Nothing -> do
-          Logging.logError "Deadlock detected"
-          pure $ Left $ toException $ LogicBug WorkflowActivationDeadlock
+        Nothing -> pure $ Left $ toException $ LogicBug WorkflowActivationDeadlock
         Just res' -> pure res'
-  -- TODO: Can the completion send both successful commands and a failure
-  -- message at the same time? In theory we can make partial progress on
-  -- a workflow, but still fail at some point?
-  case eResult of
-    Left err -> do
-      Logging.logWarn "Failed activation on workflow" -- <> toLogStr (show $ workflowType info) <> " with ID " <> toLogStr (workflowId info) <> " and run ID " <> toLogStr (runId info))
-      -- TODO, failures should have source / stack trace info
-      -- TODO, convert failure type using a supplied payload converter
-      let failure =
-            defMessage
-              & Completion.failure .~ (defMessage & Failure.message .~ Text.pack (show err))
-          completion =
-            completionBase
-              & Completion.failed .~ failure
-      liftIO (inst.workflowCompleteActivation completion >>= either throwIO pure)
-      -- I think it's morally okay to crash the worker thread here.
-      throwIO err
-    Right f -> pure f
+  either throwIO pure eResult
 
 
 -- | This gives us the basic state for a workflow instance prior to initial evaluation.
@@ -1039,3 +1042,9 @@ workflowExitFromException err
   | Just continueAsNew <- E.fromException err = WorkflowExitContinuedAsNew continueAsNew
   | Just cancelled <- E.fromException err = WorkflowExitCancelled cancelled
   | otherwise = WorkflowExitFailed err
+
+
+runTopLevel :: InstanceM Payload -> InstanceM (WorkflowExitVariant Payload)
+runTopLevel m =
+  (WorkflowExitSuccess <$> m)
+    `Catch.catches` [Catch.Handler $ \err -> rethrowAsyncExceptions err >> pure (workflowExitFromException err)]
