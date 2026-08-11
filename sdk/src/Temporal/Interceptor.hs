@@ -67,8 +67,10 @@ module Temporal.Interceptor (
   ScheduleClientInterceptors (..),
   StartWorkflowOptions (..),
   interceptorConvertChildWorkflowHandle,
+  workflowInstanceInterceptorVault,
 ) where
 
+import Data.IORef (IORef)
 import Data.Vault.Strict
 import Temporal.Client.Types
 import Temporal.Payload
@@ -145,3 +147,13 @@ instance Monoid ScheduleClientInterceptors where
     ScheduleClientInterceptors
       { scheduleWorkflowAction = \opts _ -> return opts
       }
+
+
+{- | Per-workflow storage shared between inbound interceptor callbacks.
+
+Store values during 'executeWorkflow' and retrieve them from
+'finalizeWorkflow'. The SDK clears the vault when the workflow instance is
+finalized.
+-}
+workflowInstanceInterceptorVault :: WorkflowInstance -> IORef Vault
+workflowInstanceInterceptorVault = (.workflowVault)
