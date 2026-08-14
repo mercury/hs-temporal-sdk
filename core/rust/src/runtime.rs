@@ -164,6 +164,23 @@ pub struct HsCallback<A, E> {
     pub error_slot: *mut *mut E,
 }
 
+// The raw pointers in an 'HsCallback' are owned by the Haskell thread that is
+// parked on 'mvar', which keeps them alive until it is woken. Moving the
+// callback onto a Tokio task is therefore safe, and is required so that
+// 'future_result_into_hs' can spawn rather than block the calling thread.
+unsafe impl<A, E> Send for HsCallback<A, E> {}
+
+/// Carries an FFI result across a task boundary.
+///
+/// The `#[repr(C)]` result types are not `Send` because they contain raw
+/// pointers, but a completed FFI result is unaliased and its ownership moves
+/// with the value -- it is produced by the Tokio task and then handed to
+/// exactly one Haskell caller. Wrapping it lets the result travel from the task
+/// to the thread that fills the caller's MVar.
+struct FfiResult<T>(T);
+
+unsafe impl<T> Send for FfiResult<T> {}
+
 impl<A, E> HsCallback<A, E> {
     pub(crate) fn put_success(self, runtime: &Runtime, result: A)
     where
@@ -200,16 +217,49 @@ impl<A, E> HsCallback<A, E> {
 }
 
 impl Runtime {
+    /// Drive `fut` on the Tokio runtime and hand its result back to the Haskell
+    /// thread parked on `callback.mvar`.
+    ///
+    /// This must `spawn` rather than `block_on`. The Haskell side of the bridge
+    /// ('makeTokioAsyncCall') hands us a 'StablePtr PrimMVar' precisely so that
+    /// the foreign call can return immediately and the Haskell thread can park
+    /// on an *interruptible* 'takeMVar'. Blocking here instead pins the calling
+    /// GHC worker thread inside the foreign call for the whole duration of the
+    /// future, which makes every Temporal call uninterruptible from Haskell:
+    /// 'timeout' and 'killThread' cannot touch a thread in a foreign call, so a
+    /// long poll (or a hung one) becomes unkillable and takes any thunk it was
+    /// evaluating -- e.g. a shared CAF of workflow definitions -- down with it.
+    /// That was the root cause of the STAB-681 CI wedges.
     pub fn future_result_into_hs<F, T, E>(&self, callback: HsCallback<T, E>, fut: F)
     where
         F: Future<Output = Result<T, E>> + Send + 'static,
-        T: RawPointerConverter<T>,
-        E: RawPointerConverter<E>,
+        T: RawPointerConverter<T> + 'static,
+        E: RawPointerConverter<E> + 'static,
     {
+        let runtime = self.clone();
         let handle = self.core.tokio_handle();
-        let _guard = handle.enter();
-        let result = handle.block_on(fut);
-        callback.put_result(self, result);
+        let task = handle.spawn(async move { FfiResult(fut.await) });
+        // Tokio swallows task panics, which would leave the Haskell thread
+        // parked on its MVar forever. Joining the task lets us notice a panic
+        // (or a cancellation) and fail loudly instead of hanging, matching the
+        // previous behaviour of a panic unwinding across the FFI boundary.
+        handle.spawn(async move {
+            match task.await {
+                Ok(FfiResult(result)) => callback.put_result(&runtime, result),
+                Err(err) if err.is_panic() => {
+                    eprintln!(
+                        "hs-temporal-sdk: panic in the Tokio task servicing a Haskell call; \
+                         aborting rather than leaving the caller blocked forever"
+                    );
+                    std::process::abort();
+                }
+                // The task was cancelled, which only happens when the runtime
+                // is being torn down. The caller's MVar is left unfilled
+                // deliberately: the process is going away, and aborting here
+                // would turn an ordinary shutdown into a crash.
+                Err(_) => {}
+            }
+        });
     }
 
     pub fn put_mvar(&self, capability: Capability, mvar: *mut MVar) {

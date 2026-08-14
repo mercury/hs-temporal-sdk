@@ -136,6 +136,7 @@ import qualified Data.UUID as UUID
 import Data.UUID.V4 (nextRandom)
 import Data.Word
 import Lens.Family2
+import qualified OpenTelemetry.Context.ThreadLocal as OTContext
 import OpenTelemetry.Trace.Core hiding (inSpan)
 import qualified OpenTelemetry.Trace.Core as OT
 import OpenTelemetry.Trace.Monad
@@ -958,9 +959,33 @@ __NOTE__: It is /very important/ that the Temporal server is notified of task
 cancelation before this function completes; if we were to exit before the
 server is informed that a task has been canceled, it won't "notice" that the
 activity has ended until the next hearbeat interval.
+
+Both blocking phases below are bounded by a 'timeout'. Because 'shutdown' is
+normally called from a cleanup handler -- and @unliftio@'s and
+@safe-exceptions@' 'bracket' run cleanup under 'uninterruptibleMask' -- those
+timeouts are run on a dedicated unmasked thread rather than inline. Running them
+inline would inherit the caller's masking state, leaving the timeouts unable to
+deliver their exception and making 'shutdown' unbounded. The caller then waits
+on an 'MVar' that the worker thread always fills, so the wait is bounded even
+when the caller itself cannot be interrupted.
 -}
 shutdown :: (MonadUnliftIO m) => Temporal.Worker.Worker actEnv -> m ()
-shutdown worker@Temporal.Worker.Worker {workerCore, workerTracer} = OT.inSpan workerTracer "shutdown" defaultSpanArguments $ UnliftIO.mask $ \restore -> do
+shutdown worker = UnliftIO.withRunInIO $ \runInIO -> do
+  resultVar <- UnliftIO.newEmptyMVar
+  -- Carry the caller's trace context over so the spans below still parent
+  -- correctly; the thread-local context does not follow a 'forkIO'.
+  callerContext <- OTContext.getContext
+  _ <- forkIOWithUnmask $ \unmask ->
+    UnliftIO.putMVar resultVar
+      =<< UnliftIO.try @IO @SomeException
+        ( unmask (OTContext.attachContext callerContext *> runInIO (shutdownBounded worker))
+        )
+  UnliftIO.takeMVar resultVar >>= either UnliftIO.throwIO pure
+
+
+-- | The bounded shutdown sequence. Must be run unmasked; see 'shutdown'.
+shutdownBounded :: (MonadUnliftIO m) => Temporal.Worker.Worker actEnv -> m ()
+shutdownBounded worker@Temporal.Worker.Worker {workerCore, workerTracer} = OT.inSpan workerTracer "shutdown" defaultSpanArguments $ UnliftIO.mask $ \restore -> do
   OT.inSpan workerTracer "initiateShutdown" defaultSpanArguments $ liftIO $ Core.initiateShutdown workerCore
 
   -- Add 1s of buffer time to the graceful shutdown timeout so the Rust SDK

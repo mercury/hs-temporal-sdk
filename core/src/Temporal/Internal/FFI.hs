@@ -71,34 +71,39 @@ for automatic memory management and exception safety.
 makeTokioAsyncCall
   :: TokioCall err res
   -> IO (Either (Ptr err) (Ptr res))
-makeTokioAsyncCall call = bracket
-  (do
-    errorSlot <- malloc
-    resultSlot <- malloc
-    poke errorSlot nullPtr
-    poke resultSlot nullPtr
-    return (errorSlot, resultSlot))
-  (\(errorSlot, resultSlot) -> do
-    free errorSlot
-    free resultSlot)
-  (\(errorSlot, resultSlot) -> uninterruptibleMask $ \restore -> do
-    mvar <- newEmptyMVar
-    sp <- newStablePtrPrimMVar mvar
-    (cap, _) <- threadCapability =<< myThreadId
-    call sp cap errorSlot resultSlot
+makeTokioAsyncCall call = mask $ \restore -> do
+  -- These slots must outlive an interrupted wait: the Tokio task writes into
+  -- them when it finishes, which may be long after an async exception has
+  -- unwound this call. So they are 'malloc'ed (never 'alloca'ed) and freed only
+  -- once the task is known to be done -- here, or by the reaper thread below.
+  errorSlot <- malloc
+  resultSlot <- malloc
+  poke errorSlot nullPtr
+  poke resultSlot nullPtr
+  mvar <- newEmptyMVar
+  sp <- newStablePtrPrimMVar mvar
+  (cap, _) <- threadCapability =<< myThreadId
+  let freeSlots = free errorSlot *> free resultSlot
+      -- On interruption, hand ownership of the slots to a thread that waits for
+      -- the task to finish. Freeing them here would let Rust write into freed
+      -- memory. Any result the task produces is leaked, since this low-level
+      -- entry point does not know how to drop it -- 'withTokioAsyncCall' does.
+      reapAfterInterrupt = void $ forkIO $ takeMVar mvar *> freeSlots
+  call sp cap errorSlot resultSlot `onException` freeSlots
 
-    -- Wait for completion
-    () <- restore (takeMVar mvar)
-
-    -- Read results before slots are freed
-    errPtr <- peek errorSlot
-    if errPtr /= nullPtr
-      then return (Left errPtr)
-      else do
-        resPtr <- peek resultSlot
-        if resPtr /= nullPtr
-          then return (Right resPtr)
-          else error "Both error and result are null from Tokio call")
+  -- Only the wait itself hands ownership off: once 'takeMVar' has returned, the
+  -- task is done and this thread owns the slots again, so a failure after that
+  -- point must not also be reaped (that would double-free).
+  () <- restore (takeMVar mvar) `onException` reapAfterInterrupt
+  errPtr <- peek errorSlot
+  resPtr <- peek resultSlot
+  freeSlots
+  if errPtr /= nullPtr
+    then return (Left errPtr)
+    else
+      if resPtr /= nullPtr
+        then return (Right resPtr)
+        else error "Both error and result are null from Tokio call"
 
 
 {- | Exception-safe wrapper for Tokio async calls.
@@ -121,41 +126,49 @@ withTokioAsyncCall
   -> (Ptr res -> IO a)   -- ^ Process result
   -> IO (Either e a)
 withTokioAsyncCall call freeErr freeRes processErr processRes =
-  mask $ \restore ->
-    alloca $ \errorSlot -> alloca $ \resultSlot -> do
-      poke errorSlot nullPtr
-      poke resultSlot nullPtr
-      mvar <- newEmptyMVar
-      sp <- newStablePtrPrimMVar mvar
-      (cap, _) <- threadCapability =<< myThreadId
-      call sp cap errorSlot resultSlot
+  mask $ \restore -> do
+    -- 'malloc', not 'alloca': an interrupted wait unwinds this frame while the
+    -- Tokio task may still be pending, and the task writes into these slots
+    -- when it completes. Stack-allocated slots would be popped underneath it.
+    errorSlot <- malloc
+    resultSlot <- malloc
+    poke errorSlot nullPtr
+    poke resultSlot nullPtr
+    mvar <- newEmptyMVar
+    sp <- newStablePtrPrimMVar mvar
+    (cap, _) <- threadCapability =<< myThreadId
+    let freeSlots = free errorSlot *> free resultSlot
+    call sp cap errorSlot resultSlot `onException` freeSlots
 
-      -- Wait for Rust to complete, but spawn cleanup thread if interrupted
-      let spawnCleanupThread = void $ forkIO $ do
-            -- Wait for Rust to finish and clean up
-            _ <- takeMVar mvar
-            errPtr <- peek errorSlot
-            resPtr <- peek resultSlot
-            when (errPtr /= nullPtr) (freeErr errPtr)
-            when (resPtr /= nullPtr) (freeRes resPtr)
+    -- If the wait is interrupted, ownership of the slots and of whatever the
+    -- task eventually produces passes to this thread, so nothing is freed while
+    -- Rust may still be writing and nothing is leaked once it is done.
+    let reapAfterInterrupt = void $ forkIO $ do
+          _ <- takeMVar mvar
+          errPtr <- peek errorSlot
+          resPtr <- peek resultSlot
+          when (errPtr /= nullPtr) (freeErr errPtr)
+          when (resPtr /= nullPtr) (freeRes resPtr)
+          freeSlots
 
-      (do
-        -- Allow interruption during the wait
-        _ <- restore (takeMVar mvar)
+    -- Only the wait hands ownership off. Once 'takeMVar' returns, the task is
+    -- done and this thread owns the slots again, so a later failure must not
+    -- also be reaped -- that would double-free.
+    _ <- restore (takeMVar mvar) `onException` reapAfterInterrupt
 
-        -- Now process the result, masked
-        errPtr <- peek errorSlot
-        if errPtr /= nullPtr
+    -- Completed: process the result masked, then release everything.
+    errPtr <- peek errorSlot
+    resPtr <- peek resultSlot
+    freeSlots
+    if errPtr /= nullPtr
+      then do
+        result <- processErr errPtr
+        freeErr errPtr
+        return (Left result)
+      else
+        if resPtr /= nullPtr
           then do
-            result <- processErr errPtr
-            freeErr errPtr
-            return (Left result)
-          else do
-            resPtr <- peek resultSlot
-            if resPtr /= nullPtr
-              then do
-                result <- processRes resPtr
-                freeRes resPtr
-                return (Right result)
-              else error "Both error and result are null from Tokio call"
-        ) `onException` spawnCleanupThread
+            result <- processRes resPtr
+            freeRes resPtr
+            return (Right result)
+          else error "Both error and result are null from Tokio call"
