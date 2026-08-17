@@ -161,6 +161,7 @@ import Temporal.Payload (PayloadProcessor (..))
 import Temporal.Runtime
 import Temporal.Worker.Types
 import Temporal.Workflow.Definition
+import qualified Temporal.Workflow.Internal.ActivationLoop as ActivationLoop
 import Temporal.Workflow.Types (NexusClient (..), makeNexusClient)
 import qualified Temporal.Workflow.Worker as Workflow
 import UnliftIO
@@ -557,7 +558,8 @@ Haskell the ability to have multiple Worker Entities in a single Worker Process.
 
 A single Worker Entity can listen to only a single Task Queue. But if a Worker Process has multiple Worker Entities, the Worker Process could be listening to multiple Task Queues.
 -}
-data Worker env = forall ty.
+data Worker env
+  = forall ty.
   Core.KnownWorkerType ty =>
   Worker
   { workerType :: !(Core.SWorkerType ty)
@@ -579,6 +581,8 @@ startReplayWorker rt conf = provideCallStack $ runWorkerContext conf $ do
   Logging.logDebug "Instantiated core"
   workerEvictionEmitter <- newBroadcastTChanIO
   runningWorkflows <- liftIO StmMap.newIO
+  workerActivationLoop <- liftIO $ newTVarIO ActivationLoop.initialActivationLoop
+  workerActivationTails <- liftIO StmMap.newIO
   uuid <- liftIO nextRandom
   let workerWorkflowFunctions = conf.wfDefs
       workerTaskQueue = TaskQueue (Core.taskQueue conf.coreConfig <> "-" <> UUID.toText uuid)
@@ -736,6 +740,8 @@ startWorker client conf = provideCallStack $ runWorkerContext conf $ inSpan "sta
     Left err -> throwIO err
     Right () -> pure ()
   runningWorkflows <- liftIO StmMap.newIO
+  workerActivationLoop <- liftIO $ newTVarIO ActivationLoop.initialActivationLoop
+  workerActivationTails <- liftIO StmMap.newIO
   runningActivities <- liftIO StmMap.newIO
   activityEnv <- newIORef conf.actEnv
   let errorConverters = mkAnnotatedHandlers conf.applicationErrorConverters

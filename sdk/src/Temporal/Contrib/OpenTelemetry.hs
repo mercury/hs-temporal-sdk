@@ -149,6 +149,8 @@ headersBaggagePropagator =
     }
 #endif
 
+
+restoreContext :: Maybe Context -> IO ()
 #if MIN_VERSION_hs_opentelemetry_api(1,0,0)
 restoreContext = void . detachContext
 #else
@@ -312,12 +314,14 @@ makeOpenTelemetryInterceptor = do
                         --   ]
                         }
                 ctxt <- extract headersPropagator input.handleQueryInputHeaders Ctxt.empty
-                _ <- attachContext ctxt
-                case Ctxt.lookupSpan ctxt of
-                  Nothing -> next input
-                  Just _ ->
-                    inSpan'' tracer ("HandleQuery:" <> input.handleQueryInputType) spanArgs $ \_ -> do
-                      next input
+                priorContext <- attachContext ctxt
+                ( case Ctxt.lookupSpan ctxt of
+                    Nothing -> next input
+                    Just _ ->
+                      inSpan'' tracer ("HandleQuery:" <> input.handleQueryInputType) spanArgs $ \_ -> do
+                        next input
+                  )
+                  `finally` restoreContext priorContext
             , handleUpdate = \input next -> do
                 -- Only trace this if there is a header, and make that span the parent.
                 -- We do not put anything that happens in an update handler on the workflow
@@ -331,22 +335,21 @@ makeOpenTelemetryInterceptor = do
                         , attributes = mempty
                         }
                 ctxt <- performUnsafeNonDeterministicIO $ extract headersPropagator input.handleUpdateInputHeaders Ctxt.empty
-                _ <- performUnsafeNonDeterministicIO $ attachContext ctxt
-                case Ctxt.lookupSpan ctxt of
+                priorContext <- performUnsafeNonDeterministicIO $ attachContext ctxt
+                result <- try @_ @SomeException $ case Ctxt.lookupSpan ctxt of
                   Nothing -> next input
                   Just _ -> do
                     span <- performUnsafeNonDeterministicIO $ createSpan tracer ctxt ("HandleUpdate:" <> input.handleUpdateInputType) spanArgs
-                    result <- try $ next input
-                    case result of
+                    updateResult <- try @_ @SomeException $ next input
+                    performUnsafeNonDeterministicIO $ case updateResult of
                       Left err -> do
-                        performUnsafeNonDeterministicIO do
-                          setStatus span (Error $ T.pack $ show err)
-                          recordException span mempty Nothing err
-                          endSpan span Nothing
-                        throwM (err :: SomeException)
-                      Right res -> do
-                        performUnsafeNonDeterministicIO $ endSpan span Nothing
-                        pure res
+                        setStatus span (Error $ T.pack $ show err)
+                        recordException span mempty Nothing err
+                        endSpan span Nothing
+                      Right _ -> endSpan span Nothing
+                    either throwM pure updateResult
+                performUnsafeNonDeterministicIO $ restoreContext priorContext
+                either throwM pure result
             , validateUpdate = \input next -> do
                 let spanArgs =
                       defaultSpanArguments
@@ -354,12 +357,14 @@ makeOpenTelemetryInterceptor = do
                         , attributes = mempty
                         }
                 ctxt <- extract headersPropagator input.handleUpdateInputHeaders Ctxt.empty
-                _ <- attachContext ctxt
-                case Ctxt.lookupSpan ctxt of
-                  Nothing -> next input
-                  Just _ ->
-                    inSpan'' tracer ("ValidateUpdate:" <> input.handleUpdateInputType) spanArgs $ \_ -> do
-                      next input
+                priorContext <- attachContext ctxt
+                ( case Ctxt.lookupSpan ctxt of
+                    Nothing -> next input
+                    Just _ ->
+                      inSpan'' tracer ("ValidateUpdate:" <> input.handleUpdateInputType) spanArgs $ \_ -> do
+                        next input
+                  )
+                  `finally` restoreContext priorContext
             }
       , workflowOutboundInterceptors =
           WorkflowOutboundInterceptor
@@ -420,9 +425,9 @@ makeOpenTelemetryInterceptor = do
                         }
 
                 ctxt <- extract headersPropagator input.activityHeaders Ctxt.empty
-                _ <- attachContext ctxt
-                inSpan'' tracer ("RunActivity:" <> input.activityInfo.activityType) spanArgs $ \_span -> do
-                  next env input
+                priorContext <- attachContext ctxt
+                inSpan'' tracer ("RunActivity:" <> input.activityInfo.activityType) spanArgs (\_span -> next env input)
+                  `finally` restoreContext priorContext
             }
       , activityOutboundInterceptors = ActivityOutboundInterceptor
       , clientInterceptors =
