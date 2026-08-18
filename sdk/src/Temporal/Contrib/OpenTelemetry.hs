@@ -33,7 +33,11 @@ import Data.Word (Word32)
 import GHC.IO (unsafePerformIO)
 import OpenTelemetry.Context (Context)
 import qualified OpenTelemetry.Context as Ctxt
+#if MIN_VERSION_hs_opentelemetry_api(1,0,0)
+import OpenTelemetry.Context.ThreadLocal (Token, attachContext, detachContext, getContext)
+#else
 import OpenTelemetry.Context.ThreadLocal (attachContext, detachContext, getContext)
+#endif
 import OpenTelemetry.Propagator
 import OpenTelemetry.Propagator.W3CBaggage (decodeBaggage, encodeBaggage)
 import OpenTelemetry.Propagator.W3CTraceContext (decodeSpanContext, encodeSpanContext)
@@ -150,10 +154,11 @@ headersBaggagePropagator =
 #endif
 
 
-restoreContext :: Maybe Context -> IO ()
 #if MIN_VERSION_hs_opentelemetry_api(1,0,0)
-restoreContext = void . detachContext
+restoreContext :: Token -> IO ()
+restoreContext = detachContext
 #else
+restoreContext :: Maybe Context -> IO ()
 restoreContext = \case
   Nothing -> void detachContext
   Just prior -> void $ attachContext prior
