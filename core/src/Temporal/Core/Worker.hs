@@ -65,6 +65,7 @@ module Temporal.Core.Worker (
 ) where
 
 import Control.Concurrent (forkIO)
+import qualified Control.Concurrent
 import Control.Exception
 import Control.Monad
 import Data.Aeson
@@ -82,6 +83,7 @@ import Foreign.Marshal hiding (void)
 import Foreign.Ptr
 import Foreign.StablePtr
 import Foreign.Storable
+import qualified GHC.Conc.Sync
 import Proto.Temporal.Api.History.V1.Message (History)
 import Proto.Temporal.Sdk.Core.ActivityTask.ActivityTask (ActivityTask)
 import Proto.Temporal.Sdk.Core.CoreInterface (ActivityHeartbeat, ActivityTaskCompletion)
@@ -94,6 +96,22 @@ import Temporal.Internal.FFI
 import Temporal.Runtime
 import UnliftIO (liftIO)
 import qualified UnliftIO
+
+
+-- | Run an action with the calling thread's label temporarily replaced.
+--
+-- The remaining synchronous (non-Tokio) foreign calls in this module cannot be
+-- interrupted while they run, so a thread stuck inside one is invisible to
+-- ordinary Haskell-level diagnostics. Relabelling the thread for the duration
+-- of the call makes such a thread identify itself in a thread dump
+-- ('GHC.Conc.listThreads' + 'GHC.Conc.Sync.threadLabel'), which is how the STAB-681
+-- CI wedges are attributed.
+withFfiThreadLabel :: String -> IO a -> IO a
+withFfiThreadLabel lbl act = do
+  tid <- Control.Concurrent.myThreadId
+  prev <- GHC.Conc.Sync.threadLabel tid
+  GHC.Conc.Sync.labelThread tid lbl
+  act `finally` GHC.Conc.Sync.labelThread tid (maybe "" id prev)
 
 
 data WorkerType = Real | Replay
@@ -657,7 +675,8 @@ newWorker c wc = withClient c $ \cPtr -> do
         poke errPtrPtr nullPtr
 
         mask_ $ do
-          raw_newWorker cPtr wcPtr wPtrPtr errPtrPtr
+          withFfiThreadLabel "temporal/ffi/new_worker" $
+            raw_newWorker cPtr wcPtr wPtrPtr errPtrPtr
           errPtr <- peek errPtrPtr
           if errPtr == nullPtr
             then do
@@ -681,7 +700,8 @@ instance Exception WorkerAlreadyClosed
 closeWorker :: Worker ty -> IO ()
 closeWorker (Worker w _ _ _) = mask_ $ do
   wp <- liftIO $ atomicModifyIORefCAS w $ \wp -> (throw WorkerAlreadyClosed, wp)
-  raw_closeWorker wp
+  withFfiThreadLabel "temporal/ffi/drop_worker" $
+    raw_closeWorker wp
 
 
 foreign import ccall "hs_temporal_new_replay_worker" raw_newReplayWorker :: Ptr Runtime -> Ptr (CArray Word8) -> Ptr (Ptr (Worker 'Replay)) -> Ptr (Ptr HistoryPusher) -> Ptr (Ptr CWorkerError) -> IO ()
@@ -808,7 +828,8 @@ recordActivityHeartbeat w p = withWorker w $ \wp ->
       alloca $ \resPtrPtr -> mask_ $ do
         poke errPtrPtr nullPtr
         poke resPtrPtr nullPtr
-        raw_recordActivityHeartbeat wp pPtr errPtrPtr resPtrPtr
+        withFfiThreadLabel "temporal/ffi/record_activity_heartbeat" $
+          raw_recordActivityHeartbeat wp pPtr errPtrPtr resPtrPtr
         errPtr <- peek errPtrPtr
         if errPtr == nullPtr
           then do
@@ -824,7 +845,8 @@ foreign import ccall "hs_temporal_worker_request_workflow_eviction" raw_requestW
 requestWorkflowEviction :: KnownWorkerType ty => Worker ty -> RunId -> IO ()
 requestWorkflowEviction w r = withWorker w $ \wp ->
   withCArrayBS r $ \rPtr -> do
-    raw_requestWorkflowEviction wp rPtr
+    withFfiThreadLabel "temporal/ffi/request_workflow_eviction" $
+      raw_requestWorkflowEviction wp rPtr
 
 
 foreign import ccall "hs_temporal_worker_initiate_shutdown" raw_initiateShutdown :: Ptr (Worker ty) -> IO ()
@@ -832,7 +854,9 @@ foreign import ccall "hs_temporal_worker_initiate_shutdown" raw_initiateShutdown
 
 -- | Initiate shutdown.
 initiateShutdown :: KnownWorkerType ty => Worker ty -> IO ()
-initiateShutdown w = withWorker w raw_initiateShutdown
+initiateShutdown w = withWorker w $ \wp ->
+  withFfiThreadLabel "temporal/ffi/initiate_shutdown" $
+    raw_initiateShutdown wp
 
 
 foreign import ccall "hs_temporal_worker_finalize_shutdown" raw_finalizeShutdown :: Ptr (Worker ty) -> TokioCall CWorkerError CUnit

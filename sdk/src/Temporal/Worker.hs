@@ -135,6 +135,7 @@ import qualified Data.Text.Encoding as T
 import qualified Data.UUID as UUID
 import Data.UUID.V4 (nextRandom)
 import Data.Word
+import qualified GHC.Conc.Sync
 import Lens.Family2
 import qualified OpenTelemetry.Context.ThreadLocal as OTContext
 import OpenTelemetry.Trace.Core hiding (inSpan)
@@ -975,7 +976,11 @@ shutdown worker = UnliftIO.withRunInIO $ \runInIO -> do
   -- Carry the caller's trace context over so the spans below still parent
   -- correctly; the thread-local context does not follow a 'forkIO'.
   callerContext <- OTContext.getContext
-  _ <- forkIOWithUnmask $ \unmask ->
+  _ <- forkIOWithUnmask $ \unmask -> do
+    -- Identify this thread in dumps: an abandoned shutdown parks here, and the
+    -- label (together with the temporal/ffi/* labels in Temporal.Core.Worker)
+    -- shows which phase it is stuck in.
+    Control.Concurrent.myThreadId >>= \tid -> GHC.Conc.Sync.labelThread tid "temporal/worker/shutdownBounded"
     UnliftIO.putMVar resultVar
       =<< UnliftIO.try @IO @SomeException
         ( unmask (OTContext.attachContext callerContext *> runInIO (shutdownBounded worker))
