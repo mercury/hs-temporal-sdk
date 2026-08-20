@@ -38,8 +38,9 @@ withCArrayText txt f = Text.withCStringLen txt $ \(bytes, len) ->
   Marshal.with (CArray (castPtr bytes) (fromIntegral len)) f
 
 
--- | Peek the result from a Tokio slot. Returns the raw pointer or Nothing.
--- The caller is responsible for freeing the pointer using the appropriate drop function.
+{- | Peek the result from a Tokio slot. Returns the raw pointer or Nothing.
+The caller is responsible for freeing the pointer using the appropriate drop function.
+-}
 peekTokioResult :: TokioSlot a -> IO (Maybe (Ptr a))
 peekTokioResult slot = do
   inner <- peek slot
@@ -137,10 +138,14 @@ Parameters:
 -}
 withTokioAsyncCall
   :: TokioCall err res
-  -> (Ptr err -> IO ())  -- ^ Free error
-  -> (Ptr res -> IO ())  -- ^ Free result
-  -> (Ptr err -> IO e)   -- ^ Process error
-  -> (Ptr res -> IO a)   -- ^ Process result
+  -> (Ptr err -> IO ())
+  -- ^ Free error
+  -> (Ptr res -> IO ())
+  -- ^ Free result
+  -> (Ptr err -> IO e)
+  -- ^ Process error
+  -> (Ptr res -> IO a)
+  -- ^ Process result
   -> IO (Either e a)
 withTokioAsyncCall call freeErr freeRes processErr processRes =
   mask $ \restore -> do
@@ -155,8 +160,9 @@ withTokioAsyncCall call freeErr freeRes processErr processRes =
     call sp cap errorSlot resultSlot `onException` freeSlots
 
     -- If the wait is interrupted, ownership of the slots and of whatever the
-    -- task eventually produces passes to this thread, so nothing is freed while
-    -- Rust may still be writing and nothing is leaked once it is done.
+    -- task eventually produces passes to this thread. The Rust bridge keeps its
+    -- runtime alive through the callback, so this thread does not release the
+    -- slots or any Rust-owned result until the MVar has been filled.
     let reapAfterInterrupt = void $ forkIO $ do
           _ <- takeMVar mvar
           errPtr <- peek errorSlot

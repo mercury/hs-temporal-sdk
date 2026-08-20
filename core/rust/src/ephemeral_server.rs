@@ -2,7 +2,7 @@ use crate::runtime::{Capability, HsCallback, MVar, Runtime, RuntimeRef};
 use crate::worker::{CUnit, Unit};
 use ffi_convert::*;
 use serde::Deserialize;
-use std::ffi::{c_char, CStr};
+use std::ffi::{CStr, c_char};
 use std::time::Duration;
 use temporalio_sdk_core::ephemeral_server::*;
 
@@ -46,7 +46,7 @@ pub enum EphemeralExeDef {
         version: EphemeralExeVersion,
         /// Destination directory or the user temp directory if none set.
         dest_dir: Option<String>,
-        ttl: Option<Duration>
+        ttl: Option<Duration>,
     },
 }
 
@@ -103,7 +103,10 @@ pub unsafe extern "C" fn hs_temporal_start_dev_server(
     result_slot: *mut *mut EphemeralServerRef,
 ) {
     let runtime_ref = unsafe { runtime.as_ref().unwrap() };
-    let runtime = &runtime_ref.runtime;
+    // The spawned future can outlive this C call and its borrowed `RuntimeRef`.
+    // Capture an owned runtime before constructing the future so creating the
+    // returned server never dereferences the raw FFI pointer after an await.
+    let server_runtime = runtime_ref.runtime.clone();
     let mut de = serde_json::Deserializer::from_str(unsafe {
         std::str::from_utf8_unchecked(CStr::from_ptr(json_string).to_bytes())
     });
@@ -115,12 +118,12 @@ pub unsafe extern "C" fn hs_temporal_start_dev_server(
         error_slot,
         result_slot,
     };
-    runtime.future_result_into_hs(hs, async move {
+    runtime_ref.runtime.future_result_into_hs(hs, async move {
         let result = conf.start_server().await;
         match result {
             Ok(server) => Ok(EphemeralServerRef {
                 server,
-                runtime: runtime.clone(),
+                runtime: server_runtime,
             }),
             Err(e) => Err(
                 CArray::c_repr_of(format!("Failed to start server: {}", e).into_bytes())
@@ -189,7 +192,9 @@ pub unsafe extern "C" fn hs_temporal_start_test_server(
     result_slot: *mut *mut EphemeralServerRef,
 ) {
     let runtime_ref = unsafe { runtime.as_ref().unwrap() };
-    let runtime = &runtime_ref.runtime;
+    // See `hs_temporal_start_dev_server`: the future must not retain a borrow
+    // derived from the raw runtime pointer after this C call returns.
+    let server_runtime = runtime_ref.runtime.clone();
     let mut de = serde_json::Deserializer::from_str(unsafe {
         std::str::from_utf8_unchecked(CStr::from_ptr(json_string).to_bytes())
     });
@@ -200,12 +205,12 @@ pub unsafe extern "C" fn hs_temporal_start_test_server(
         error_slot,
         result_slot,
     };
-    runtime.future_result_into_hs(hs, async move {
+    runtime_ref.runtime.future_result_into_hs(hs, async move {
         let result = conf.start_server().await;
         match result {
             Ok(server) => Ok(EphemeralServerRef {
                 server,
-                runtime: runtime.clone(),
+                runtime: server_runtime,
             }),
             Err(e) => Err(
                 CArray::c_repr_of(format!("Failed to start server: {}", e).into_bytes())

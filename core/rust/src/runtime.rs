@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::net::SocketAddr;
 use std::os::raw::c_int;
-use std::sync::Arc;
+use std::sync::{Arc, mpsc};
 use std::time::{Duration, SystemTime};
 use temporalio_common::telemetry::metrics::{CoreMeter, NoOpCoreMeter};
 use temporalio_common::telemetry::{
@@ -24,6 +24,53 @@ pub struct RuntimeRef {
 pub(crate) struct Runtime {
     pub(crate) core: Arc<CoreRuntime>,
     pub(crate) try_put_mvar: extern "C" fn(capability: Capability, mvar: *mut MVar) -> (),
+    core_runtime_dropper: mpsc::Sender<Arc<CoreRuntime>>,
+}
+
+/// Drops task-owned Core runtime references outside the Tokio runtime they keep alive.
+///
+/// A spawned bridge call may hold the final `Arc<CoreRuntime>` after Haskell destroys
+/// its runtime handle. Dropping that reference inside the call's Tokio task would make
+/// Tokio try to shut itself down from one of its own workers. Each Runtime has
+/// a non-Tokio dropper thread on which spawned calls release their keepalives.
+fn spawn_core_runtime_dropper() -> mpsc::Sender<Arc<CoreRuntime>> {
+    let (tx, rx) = mpsc::channel::<Arc<CoreRuntime>>();
+    std::thread::Builder::new()
+        .name("temporal-core-runtime-dropper".to_owned())
+        .spawn(move || {
+            while let Ok(runtime) = rx.recv() {
+                drop(runtime);
+            }
+        })
+        .expect("failed to start the Core runtime dropper");
+    tx
+}
+
+struct CoreRuntimeKeepAlive {
+    runtime: Option<Arc<CoreRuntime>>,
+    dropper: mpsc::Sender<Arc<CoreRuntime>>,
+}
+
+impl CoreRuntimeKeepAlive {
+    fn new(runtime: Arc<CoreRuntime>, dropper: mpsc::Sender<Arc<CoreRuntime>>) -> Self {
+        Self {
+            runtime: Some(runtime),
+            dropper,
+        }
+    }
+}
+
+impl Drop for CoreRuntimeKeepAlive {
+    fn drop(&mut self) {
+        let runtime = self.runtime.take().unwrap();
+        if let Err(runtime) = self.dropper.send(runtime) {
+            // Do not unwind and drop `runtime` on a Tokio worker. Losing the
+            // Runtime's dropper is an internal lifecycle invariant failure.
+            std::mem::forget(runtime);
+            eprintln!("hs-temporal-sdk: Core runtime dropper exited unexpectedly; aborting");
+            std::process::abort();
+        }
+    }
 }
 
 fn init_runtime(
@@ -81,6 +128,7 @@ fn init_runtime(
         runtime: Runtime {
             core: Arc::new(runtime),
             try_put_mvar,
+            core_runtime_dropper: spawn_core_runtime_dropper(),
         },
     })
 }
@@ -225,14 +273,18 @@ impl Runtime {
     {
         let handle = self.core.tokio_handle();
         let try_put_mvar = self.try_put_mvar;
+        let runtime =
+            CoreRuntimeKeepAlive::new(self.core.clone(), self.core_runtime_dropper.clone());
         let task = handle.spawn(async move {
             callback.put_result(try_put_mvar, fut.await);
         });
 
         // Detached Tokio tasks do not propagate panics. Supervise this one so
         // a panic remains fail-fast, as it was when `block_on` ran inside the C
-        // ABI call, rather than leaving the Haskell waiter blocked forever.
+        // ABI call, rather than leaving the Haskell waiter blocked forever. The
+        // supervisor also keeps Tokio alive until the callback has completed.
         handle.spawn(async move {
+            let _runtime = runtime;
             match task.await {
                 Ok(()) => {}
                 Err(err) if err.is_panic() => {
@@ -242,11 +294,16 @@ impl Runtime {
                     );
                     std::process::abort();
                 }
-                // This handle is not exposed, so cancellation is possible only
-                // while the Tokio runtime itself is shutting down. In that
-                // case the supervisor is shutting down too and cannot safely
-                // call back into Haskell.
-                Err(_) => {}
+                // The task handle is not exposed, and `_runtime` prevents
+                // runtime shutdown while the task is pending. Cancellation
+                // would strand the Haskell callback and its cleanup thread.
+                Err(_) => {
+                    eprintln!(
+                        "hs-temporal-sdk: Tokio task servicing a Haskell call was cancelled; \
+                         aborting rather than leaving the caller blocked forever"
+                    );
+                    std::process::abort();
+                }
             }
         });
     }
@@ -263,15 +320,18 @@ mod tests {
     }
 
     #[test]
-    fn future_result_into_hs_returns_before_the_future_completes() {
+    fn future_result_into_hs_returns_early_and_keeps_runtime_alive() {
         let core = CoreRuntime::new(
             RuntimeOptions::builder().build().unwrap(),
             TokioRuntimeBuilder::default(),
         )
         .unwrap();
+        let core = Arc::new(core);
+        let core_weak = Arc::downgrade(&core);
         let runtime = Runtime {
-            core: Arc::new(core),
+            core,
             try_put_mvar: notify_haskell,
+            core_runtime_dropper: spawn_core_runtime_dropper(),
         };
 
         let (completed_tx, completed_rx) = mpsc::channel::<()>();
@@ -298,6 +358,9 @@ mod tests {
             release_rx.await.unwrap();
             Ok::<_, CArray<u8>>(CArray::c_repr_of(vec![1_u8]).unwrap())
         });
+        // Simulate an interrupted Haskell caller leaving `bracketRuntime` while
+        // the Tokio operation and its cleanup callback are still pending.
+        drop(runtime);
         let _ = returned_tx.send(());
 
         let returned_before_release = releaser.join().unwrap();
@@ -308,8 +371,14 @@ mod tests {
             drop(CArray::from_raw_pointer_mut(result_slot).unwrap());
         }
 
+        let drop_deadline = std::time::Instant::now() + Duration::from_secs(1);
+        while core_weak.strong_count() != 0 && std::time::Instant::now() < drop_deadline {
+            std::thread::yield_now();
+        }
+
         assert!(returned_before_release);
         assert!(error_slot.is_null());
+        assert_eq!(core_weak.strong_count(), 0);
     }
 }
 
