@@ -47,12 +47,15 @@ module Temporal.Core.Worker (
   historyProtoToJson,
   closeHistory,
   KnownWorkerType (..),
+
   -- * Resource-safe wrappers
   bracketWorker,
+
   -- * Worker tuner configuration
   TunerConfig (..),
   SlotSupplierConfig (..),
   ResourceBasedTunerConfig (..),
+
   -- * Custom slot supplier
   CustomSlotSupplier (..),
   SlotReservationContext (..),
@@ -64,17 +67,15 @@ module Temporal.Core.Worker (
   freeCustomSlotSupplierHandle,
 ) where
 
-import Control.Concurrent (forkIO)
+import Control.Concurrent (MVar, forkIO)
 import qualified Control.Concurrent
 import Control.Exception
 import Control.Monad
 import Data.Aeson
 import Data.Aeson.TH
-import Data.Atomics (atomicModifyIORefCAS)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
-import Data.IORef
 import Data.Maybe (fromMaybe)
 import Data.ProtoLens.Encoding (decodeMessageOrDie, encodeMessage)
 import Data.Text (Text)
@@ -95,7 +96,6 @@ import Temporal.Core.CTypes
 import Temporal.Core.Client
 import Temporal.Internal.FFI
 import Temporal.Runtime
-import UnliftIO (liftIO)
 import qualified UnliftIO
 
 
@@ -144,8 +144,23 @@ instance KnownWorkerType 'Replay where
   knownWorkerType = SReplay
 
 
+data WorkerAlreadyClosed = WorkerAlreadyClosed
+  deriving stock (Show)
+
+
+instance Exception WorkerAlreadyClosed
+
+
+data WorkerLifecycle (ty :: WorkerType)
+  = WorkerOpen !(Ptr (Worker ty))
+  | WorkerFinalizing
+      !(Ptr (Worker ty))
+      !(MVar (Either SomeException (Either WorkerError ())))
+  | WorkerClosed
+
+
 data Worker (ty :: WorkerType) = Worker
-  { workerPtr :: {-# UNPACK #-} !(IORef (Ptr (Worker ty)))
+  { workerLifecycle :: {-# UNPACK #-} !(MVar (WorkerLifecycle ty))
   , workerConfig :: !WorkerConfig
   , workerClient :: !(InactiveForReplay ty Client)
   , workerRuntime :: {-# UNPACK #-} !Runtime
@@ -154,7 +169,11 @@ data Worker (ty :: WorkerType) = Worker
 
 withWorker :: forall ty a. KnownWorkerType ty => Worker ty -> (Ptr (Worker ty) -> IO a) -> IO a
 withWorker w f = withRuntime w.workerRuntime $ \_ -> do
-  ptr <- readIORef w.workerPtr
+  ptr <-
+    Control.Concurrent.withMVar w.workerLifecycle $ \case
+      WorkerOpen ptr -> pure ptr
+      WorkerFinalizing {} -> throwIO WorkerAlreadyClosed
+      WorkerClosed -> throwIO WorkerAlreadyClosed
   f ptr
 
 
@@ -242,14 +261,15 @@ instance FromJSON ReleaseSlotContext where
 -- Custom slot supplier
 -- ---------------------------------------------------------------------------
 
--- | User-provided callbacks for a custom slot supplier.
---
--- @reserveSlot@ blocks until a slot is available. Called from Rust async context;
--- the implementation may block freely (it runs in a forked Haskell thread).
---
--- @tryReserveSlot@ must return immediately. Returns 'True' if a slot was granted.
---
--- @markSlotUsed@ and @releaseSlot@ are fire-and-forget notifications.
+{- | User-provided callbacks for a custom slot supplier.
+
+@reserveSlot@ blocks until a slot is available. Called from Rust async context;
+the implementation may block freely (it runs in a forked Haskell thread).
+
+@tryReserveSlot@ must return immediately. Returns 'True' if a slot was granted.
+
+@markSlotUsed@ and @releaseSlot@ are fire-and-forget notifications.
+-}
 data CustomSlotSupplier = CustomSlotSupplier
   { reserveSlot :: SlotReservationContext -> IO ()
   , tryReserveSlot :: SlotReservationContext -> IO Bool
@@ -258,8 +278,9 @@ data CustomSlotSupplier = CustomSlotSupplier
   }
 
 
--- | Opaque handle to a Rust-side custom slot supplier.
--- Must be freed with 'freeCustomSlotSupplierHandle' when no longer needed.
+{- | Opaque handle to a Rust-side custom slot supplier.
+Must be freed with 'freeCustomSlotSupplierHandle' when no longer needed.
+-}
 data CustomSlotSupplierHandle = CustomSlotSupplierHandle
   { unCustomSlotSupplierHandle :: !(Ptr CustomSlotSupplierHandle)
   , customSlotSupplierCleanup :: !(IO ())
@@ -287,8 +308,14 @@ foreign import ccall "hs_temporal_slot_reserve_complete"
 -- Callback types matching the Rust function pointer signatures.
 -- ctx_ptr and ctx_len borrow JSON bytes that MUST be copied before returning.
 type ReserveSlotCallback = Ptr Word8 -> CSize -> Ptr () -> IO ()
+
+
 type TryReserveSlotCallback = Ptr Word8 -> CSize -> IO CInt
+
+
 type MarkSlotUsedCallback = Ptr Word8 -> CSize -> IO ()
+
+
 type ReleaseSlotCallback = Ptr Word8 -> CSize -> IO ()
 
 
@@ -296,18 +323,22 @@ type ReleaseSlotCallback = Ptr Word8 -> CSize -> IO ()
 foreign import ccall "wrapper"
   mkReserveSlotFunPtr :: ReserveSlotCallback -> IO (FunPtr ReserveSlotCallback)
 
+
 foreign import ccall "wrapper"
   mkTryReserveSlotFunPtr :: TryReserveSlotCallback -> IO (FunPtr TryReserveSlotCallback)
 
+
 foreign import ccall "wrapper"
   mkMarkSlotUsedFunPtr :: MarkSlotUsedCallback -> IO (FunPtr MarkSlotUsedCallback)
+
 
 foreign import ccall "wrapper"
   mkReleaseSlotFunPtr :: ReleaseSlotCallback -> IO (FunPtr ReleaseSlotCallback)
 
 
--- | Decode a JSON payload from a Rust-owned (ptr, len) borrow.
--- Copies the bytes immediately so the pointer can be freed by Rust after return.
+{- | Decode a JSON payload from a Rust-owned (ptr, len) borrow.
+Copies the bytes immediately so the pointer can be freed by Rust after return.
+-}
 unsafeDecodeJSON :: FromJSON a => Ptr Word8 -> CSize -> IO a
 unsafeDecodeJSON ptr len = do
   bs <- BS.packCStringLen (castPtr ptr, fromIntegral len)
@@ -316,9 +347,10 @@ unsafeDecodeJSON ptr len = do
     Right v -> pure v
 
 
--- | Create a Rust-side custom slot supplier handle backed by Haskell callbacks.
--- The returned handle can be embedded in a 'SlotSupplierConfig' via
--- 'CustomSlotSupplierConfig'. Free with 'freeCustomSlotSupplierHandle'.
+{- | Create a Rust-side custom slot supplier handle backed by Haskell callbacks.
+The returned handle can be embedded in a 'SlotSupplierConfig' via
+'CustomSlotSupplierConfig'. Free with 'freeCustomSlotSupplierHandle'.
+-}
 newCustomSlotSupplierHandle :: CustomSlotSupplier -> IO CustomSlotSupplierHandle
 newCustomSlotSupplierHandle css = do
   stablePtr <- newStablePtr css
@@ -602,8 +634,9 @@ data WorkerConfig = WorkerConfig
 deriveJSON (defaultOptions {fieldLabelModifier = camelTo2 '_'}) ''WorkerConfig
 
 
--- | Sensible defaults for 'WorkerConfig'; where possible they should reflect
--- the default values specified by the [Rust SDK](https://github.com/temporalio/sdk-core/blob/master/crates/sdk-core/src/worker/mod.rs).
+{- | Sensible defaults for 'WorkerConfig'; where possible they should reflect
+the default values specified by the [Rust SDK](https://github.com/temporalio/sdk-core/blob/master/crates/sdk-core/src/worker/mod.rs).
+-}
 
 -- /NOTE/: 'maxOutstandingWorkflowTasks', 'maxOutstandingActivity', and
 -- 'maxOutstandingLocalActivities' default to @1000@ in lieu of there being
@@ -649,7 +682,7 @@ validateWorker w = withWorker w $ \wp ->
     (raw_validateWorker wp)
     rust_dropWorkerValidationError
     rust_dropUnit
-    (\errPtr -> peek errPtr >>= peekWorkerValidationError)
+    (peek >=> peekWorkerValidationError)
     (\_ -> return ())
 
 
@@ -680,25 +713,27 @@ newWorker c wc = withClient c $ \cPtr -> do
           if errPtr == nullPtr
             then do
               wPtr <- peek wPtrPtr
-              wPtrRef <- newIORef wPtr
-              pure $ Right $ Worker wPtrRef wc c (clientRuntime c)
+              lifecycle <- Control.Concurrent.newMVar (WorkerOpen wPtr)
+              pure $ Right $ Worker lifecycle wc c (clientRuntime c)
             else Left <$> getWorkerError errPtr
 
 
-data WorkerAlreadyClosed = WorkerAlreadyClosed
-  deriving stock (Show)
+{- | Explicitly close a worker.
 
-
-instance Exception WorkerAlreadyClosed
-
-
--- | Explicitly close a worker.
---
--- Explicitly close a worker, freeing its resources immediately.
--- After calling this, the worker must not be used again.
+Explicitly close a worker, freeing its resources immediately.
+After calling this, the worker must not be used again.
+-}
 closeWorker :: Worker ty -> IO ()
-closeWorker (Worker w _ _ _) = mask_ $ do
-  wp <- liftIO $ atomicModifyIORefCAS w $ \wp -> (throw WorkerAlreadyClosed, wp)
+closeWorker (Worker lifecycle _ _ _) = mask_ $ do
+  wp <-
+    Control.Concurrent.modifyMVar lifecycle $ \case
+      WorkerOpen ptr -> pure (WorkerClosed, ptr)
+      WorkerFinalizing ptr resultVar -> do
+        -- Finalization owns the inner worker after its FFI call starts. Wait for
+        -- that one-shot operation before freeing the outer WorkerRef box.
+        _ <- Control.Concurrent.readMVar resultVar
+        pure (WorkerClosed, ptr)
+      WorkerClosed -> throwIO WorkerAlreadyClosed
   withFfiThreadLabel "temporal/ffi/drop_worker" $
     raw_closeWorker wp
 
@@ -723,8 +758,8 @@ newReplayWorker r conf = withRuntime r $ \rPtr -> do
             then do
               wPtr <- peek wPtrPtr
               hpPtr <- peek hpPtrPtr
-              wRef <- newIORef wPtr
-              pure $ Right (Worker wRef conf () r, HistoryPusher hpPtr)
+              lifecycle <- Control.Concurrent.newMVar (WorkerOpen wPtr)
+              pure $ Right (Worker lifecycle conf () r, HistoryPusher hpPtr)
             else Left <$> getWorkerError errPtr
 
 
@@ -737,11 +772,12 @@ pollWorkflowActivation w = withWorker w $ \wp ->
     (raw_pollWorkflowActivation wp)
     rust_dropWorkerError
     rust_dropByteArray
-    (\errPtr -> peek errPtr >>= peekWorkerError)
-    (\resPtr -> do
-      arr <- peek resPtr
-      bs <- cArrayToByteString arr
-      return (decodeMessageOrDie bs))
+    (peek >=> peekWorkerError)
+    ( \resPtr -> do
+        arr <- peek resPtr
+        bs <- cArrayToByteString arr
+        return (decodeMessageOrDie bs)
+    )
 
 
 foreign import ccall "hs_temporal_worker_poll_activity_task" raw_pollActivityTask :: Ptr (Worker ty) -> TokioCall CWorkerError (CArray Word8)
@@ -753,11 +789,12 @@ pollActivityTask w = withWorker w $ \wp ->
     (raw_pollActivityTask wp)
     rust_dropWorkerError
     rust_dropByteArray
-    (\errPtr -> peek errPtr >>= peekWorkerError)
-    (\resPtr -> do
-      arr <- peek resPtr
-      bs <- cArrayToByteString arr
-      return (decodeMessageOrDie bs))
+    (peek >=> peekWorkerError)
+    ( \resPtr -> do
+        arr <- peek resPtr
+        bs <- cArrayToByteString arr
+        return (decodeMessageOrDie bs)
+    )
 
 
 foreign import ccall "hs_temporal_worker_complete_workflow_activation" raw_completeWorkflowActivation :: Ptr (Worker ty) -> Ptr (CArray Word8) -> TokioCall CWorkerError CUnit
@@ -770,7 +807,7 @@ completeWorkflowActivation w p = withWorker w $ \wp ->
       (raw_completeWorkflowActivation wp pPtr)
       rust_dropWorkerError
       rust_dropUnit
-      (\errPtr -> peek errPtr >>= peekWorkerError)
+      (peek >=> peekWorkerError)
       (\_ -> return ())
 
 
@@ -784,7 +821,7 @@ completeActivityTask w p = withWorker w $ \wp ->
       (raw_completeActivityTask wp pPtr)
       rust_dropWorkerError
       rust_dropUnit
-      (\errPtr -> peek errPtr >>= peekWorkerError)
+      (peek >=> peekWorkerError)
       (\_ -> return ())
 
 
@@ -797,11 +834,12 @@ pollNexusTask w = withWorker w $ \wp ->
     (raw_pollNexusTask wp)
     rust_dropWorkerError
     rust_dropByteArray
-    (\errPtr -> peek errPtr >>= peekWorkerError)
-    (\resPtr -> do
-      arr <- peek resPtr
-      bs <- cArrayToByteString arr
-      return (decodeMessageOrDie bs))
+    (peek >=> peekWorkerError)
+    ( \resPtr -> do
+        arr <- peek resPtr
+        bs <- cArrayToByteString arr
+        return (decodeMessageOrDie bs)
+    )
 
 
 foreign import ccall "hs_temporal_worker_complete_nexus_task" raw_completeNexusTask :: Ptr (Worker ty) -> Ptr (CArray Word8) -> TokioCall CWorkerError CUnit
@@ -814,7 +852,7 @@ completeNexusTask w p = withWorker w $ \wp ->
       (raw_completeNexusTask wp pPtr)
       rust_dropWorkerError
       rust_dropUnit
-      (\errPtr -> peek errPtr >>= peekWorkerError)
+      (peek >=> peekWorkerError)
       (\_ -> return ())
 
 
@@ -854,9 +892,17 @@ foreign import ccall "hs_temporal_worker_initiate_shutdown" raw_initiateShutdown
 
 -- | Initiate shutdown.
 initiateShutdown :: KnownWorkerType ty => Worker ty -> IO ()
-initiateShutdown w = withWorker w $ \wp ->
-  withFfiThreadLabel "temporal/ffi/initiate_shutdown" $
-    raw_initiateShutdown wp
+initiateShutdown w = withRuntime w.workerRuntime $ \_ -> do
+  workerPtr <-
+    Control.Concurrent.withMVar w.workerLifecycle $ \case
+      WorkerOpen ptr -> pure (Just ptr)
+      -- A repeated shutdown may arrive after finalization has consumed the
+      -- inner worker. The original operation is still running or has finished.
+      WorkerFinalizing {} -> pure Nothing
+      WorkerClosed -> throwIO WorkerAlreadyClosed
+  forM_ workerPtr $ \wp ->
+    withFfiThreadLabel "temporal/ffi/initiate_shutdown" $
+      raw_initiateShutdown wp
 
 
 foreign import ccall "hs_temporal_worker_finalize_shutdown" raw_finalizeShutdown :: Ptr (Worker ty) -> TokioCall CWorkerError CUnit
@@ -870,13 +916,35 @@ This should be called only after 'initiateShutdown' has resolved and/or both pol
 functions have returned `ShutDown` errors.
 -}
 finalizeShutdown :: KnownWorkerType ty => Worker ty -> IO (Either WorkerError ())
-finalizeShutdown w = withWorker w $ \wp ->
-  withTokioAsyncCall
-    (raw_finalizeShutdown wp)
-    rust_dropWorkerError
-    rust_dropUnit
-    (\errPtr -> peek errPtr >>= peekWorkerError)
-    (\_ -> return ())
+finalizeShutdown w = mask $ \restore -> do
+  (shouldStart, workerPtr, resultVar) <-
+    Control.Concurrent.modifyMVar w.workerLifecycle $ \case
+      WorkerOpen ptr -> do
+        resultVar <- Control.Concurrent.newEmptyMVar
+        pure (WorkerFinalizing ptr resultVar, (True, ptr, resultVar))
+      state@(WorkerFinalizing ptr resultVar) ->
+        pure (state, (False, ptr, resultVar))
+      WorkerClosed -> throwIO WorkerAlreadyClosed
+
+  when shouldStart $ do
+    spawned <-
+      try $
+        forkIO $ do
+          outcome <-
+            try $
+              withRuntime w.workerRuntime $ \_ ->
+                withTokioAsyncCall
+                  (raw_finalizeShutdown workerPtr)
+                  rust_dropWorkerError
+                  rust_dropUnit
+                  (peek >=> peekWorkerError)
+                  (\_ -> return ())
+          Control.Concurrent.putMVar resultVar outcome
+    case spawned of
+      Left err -> Control.Concurrent.putMVar resultVar (Left err)
+      Right _ -> pure ()
+
+  restore (Control.Concurrent.readMVar resultVar) >>= either throwIO pure
 
 
 foreign import ccall "hs_temporal_history_pusher_push_history" raw_pushHistory :: Ptr HistoryPusher -> Ptr (CArray Word8) -> Ptr (CArray Word8) -> TokioCall CWorkerError CUnit
@@ -890,16 +958,17 @@ pushHistory (HistoryPusher hp) wf p =
         (raw_pushHistory hp wfPtr pPtr)
         rust_dropWorkerError
         rust_dropUnit
-        (\errPtr -> peek errPtr >>= peekWorkerError)
+        (peek >=> peekWorkerError)
         (\_ -> return ())
 
 
 foreign import ccall "hs_temporal_history_pusher_push_history_json" raw_pushHistoryJson :: Ptr HistoryPusher -> Ptr (CArray Word8) -> Ptr (CArray Word8) -> TokioCall CWorkerError CUnit
 
 
--- | Push a workflow history in protobuf canonical JSON format to a replay worker.
--- The JSON is deserialized on the Rust side, bypassing proto-lens's incomplete
--- JSON support.
+{- | Push a workflow history in protobuf canonical JSON format to a replay worker.
+The JSON is deserialized on the Rust side, bypassing proto-lens's incomplete
+JSON support.
+-}
 pushHistoryJson :: HistoryPusher -> WorkflowId -> ByteString -> IO (Either WorkerError ())
 pushHistoryJson (HistoryPusher hp) wf jsonBytes =
   withCArrayBS wf $ \wfPtr ->
@@ -908,16 +977,17 @@ pushHistoryJson (HistoryPusher hp) wf jsonBytes =
         (raw_pushHistoryJson hp wfPtr jsonPtr)
         rust_dropWorkerError
         rust_dropUnit
-        (\errPtr -> peek errPtr >>= peekWorkerError)
+        (peek >=> peekWorkerError)
         (\_ -> return ())
 
 
 foreign import ccall "hs_temporal_history_proto_to_json" raw_historyProtoToJson :: Ptr (CArray Word8) -> Ptr (Ptr (CArray Word8)) -> Ptr (Ptr (CArray Word8)) -> IO ()
 
 
--- | Convert protobuf-encoded History bytes to canonical protobuf JSON.
--- The conversion is performed on the Rust side via prost + serde.
--- Useful for testing the JSON replay path.
+{- | Convert protobuf-encoded History bytes to canonical protobuf JSON.
+The conversion is performed on the Rust side via prost + serde.
+Useful for testing the JSON replay path.
+-}
 historyProtoToJson :: ByteString -> IO (Either String ByteString)
 historyProtoToJson protoBytes =
   withCArrayBS protoBytes $ \protoPtr ->
@@ -949,16 +1019,17 @@ closeHistory hp =
   raw_closeHistoryPusher hp.historyPusher
 
 
--- | Bracket-style wrapper for Worker that ensures proper cleanup.
---
--- Example:
---
--- @
--- result <- newWorker client workerConfig
--- case result of
---   Left err -> error $ show err
---   Right worker -> bracketWorker worker $ \\w -> do
---     ...
--- @
+{- | Bracket-style wrapper for Worker that ensures proper cleanup.
+
+Example:
+
+@
+result <- newWorker client workerConfig
+case result of
+  Left err -> error $ show err
+  Right worker -> bracketWorker worker $ \\w -> do
+    ...
+@
+-}
 bracketWorker :: Worker ty -> (Worker ty -> IO a) -> IO a
 bracketWorker worker = UnliftIO.bracket (return worker) closeWorker

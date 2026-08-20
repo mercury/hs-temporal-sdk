@@ -9,12 +9,13 @@ import Data.ProtoLens.Encoding (encodeMessage)
 import qualified Data.Text as Text
 import qualified GHC.Conc.Sync as Conc
 import RequireCallStack (provideCallStack)
-import System.Directory (getTemporaryDirectory, removeFile)
+import System.Directory (findExecutable, getTemporaryDirectory, removeFile)
 import System.Timeout (timeout)
 import Temporal.Activity
 import qualified Temporal.Client as C
 import qualified Temporal.Core.Worker as Core
 import Temporal.Duration
+import qualified Temporal.EphemeralServer as Ephemeral
 import Temporal.Payload
 import Temporal.Replay (readHistoryProtobufFile, writeHistoryProtobufFile)
 import Temporal.Worker
@@ -40,7 +41,25 @@ spec = do
             | Just Async.AsyncCancelled <- fromException err -> pure ()
           outcome -> expectationFailure $ "expected AsyncCancelled, got " <> show outcome
 
-  withTestServer_ tests
+    specify "shares repeated worker finalization" $
+      bracket newIdleReplayWorker shutdownIdleReplayWorker $
+        const $
+          pure ()
+
+  describe "Ephemeral server shutdown" $ do
+    specify "shares repeated shutdown results" $
+      bracket newEphemeralServer (void . Ephemeral.shutdownEphemeralServer) $ \server -> do
+        first <- Ephemeral.shutdownEphemeralServer server
+        second <- Ephemeral.shutdownEphemeralServer server
+        first `shouldBe` Right ()
+        second `shouldBe` first
+
+  withTestServer_ $ do
+    describe "Worker shutdown" $ do
+      specify "shares repeated high-level shutdown" $ \TestEnv {baseConf, coreClient} ->
+        bracket (startWorker coreClient $ configure () replayActivityDef baseConf) shutdown shutdown
+
+    tests
 
 
 newIdleReplayWorker :: IO (Core.Worker 'Core.Replay, Core.HistoryPusher)
@@ -54,9 +73,32 @@ shutdownIdleReplayWorker :: (Core.Worker 'Core.Replay, Core.HistoryPusher) -> IO
 shutdownIdleReplayWorker (worker, historyPusher) = do
   Core.closeHistory historyPusher
   Core.initiateShutdown worker
+  expectFinalized worker
+  expectFinalized worker
+  Core.closeWorker worker
+
+
+expectFinalized :: Core.Worker 'Core.Replay -> IO ()
+expectFinalized worker =
   Core.finalizeShutdown worker >>= \case
     Left err -> error $ "failed to finalize replay worker: " <> show err
     Right () -> pure ()
+
+
+newEphemeralServer :: IO Ephemeral.EphemeralServer
+newEphemeralServer = do
+  freePort <- Ephemeral.getFreePort
+  temporalPath <-
+    findExecutable "temporal" >>= \case
+      Nothing -> error "Could not find the 'temporal' executable in PATH"
+      Just path -> pure path
+  let serverConfig =
+        Ephemeral.TemporalDevServerConfig
+          { Ephemeral.exe = Ephemeral.ExistingPath temporalPath
+          , Ephemeral.port = Just $ fromIntegral freePort
+          , Ephemeral.extraArgs = []
+          }
+  Ephemeral.launchDevServer globalRuntime serverConfig >>= either (error . show) pure
 
 
 waitUntilBlockedOnMVar :: Conc.ThreadId -> IO ()
@@ -291,7 +333,7 @@ tests = describe "Workflow Replay" $ do
           C.waitWorkflowResult wfHandle
           C.fetchHistory wfHandle
 
-      Right jsonBytes <- pure =<< Core.historyProtoToJson (encodeMessage history)
+      Right jsonBytes <- Core.historyProtoToJson (encodeMessage history)
       result <- runReplayHistoryJson globalRuntime conf (WorkflowId "replay-json") jsonBytes
       result `shouldSatisfy` isRight
 
@@ -311,7 +353,7 @@ tests = describe "Workflow Replay" $ do
           C.waitWorkflowResult wfHandle
           C.fetchHistory wfHandle
 
-      Right jsonBytes <- pure =<< Core.historyProtoToJson (encodeMessage history)
+      Right jsonBytes <- Core.historyProtoToJson (encodeMessage history)
       result <- runReplayHistoryJson globalRuntime conf (WorkflowId "replay-json-act") jsonBytes
       result `shouldSatisfy` isRight
 

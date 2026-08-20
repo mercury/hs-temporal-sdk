@@ -59,6 +59,42 @@ type TokioSlot a = Ptr (Ptr a)
 type TokioResult a = Ptr (Ptr a)
 
 
+{- | A one-shot IO action whose result is shared by every caller.
+
+The first caller starts the action on a masked child thread. Interrupting any
+caller abandons only that caller's 'readMVar'; the action continues and later
+callers join the same result. This is useful for FFI operations that consume a
+raw handle as soon as they are scheduled and therefore must never be retried.
+-}
+newtype SingleFlight a = SingleFlight (MVar (Maybe (MVar (Either SomeException a))))
+
+
+newSingleFlight :: IO (SingleFlight a)
+newSingleFlight = SingleFlight <$> newMVar Nothing
+
+
+runSingleFlight :: SingleFlight a -> IO a -> IO a
+runSingleFlight (SingleFlight state) action = mask $ \restore -> do
+  (shouldStart, resultVar) <-
+    modifyMVar state $ \case
+      Nothing -> do
+        resultVar <- newEmptyMVar
+        pure (Just resultVar, (True, resultVar))
+      Just resultVar -> pure (Just resultVar, (False, resultVar))
+
+  when shouldStart $ do
+    spawned <-
+      try $
+        forkIO $ do
+          outcome <- try action
+          putMVar resultVar outcome
+    case spawned of
+      Left err -> putMVar resultVar (Left err)
+      Right _ -> pure ()
+
+  restore (readMVar resultVar) >>= either throwIO pure
+
+
 allocateTokioSlots :: IO (TokioSlot err, TokioSlot res)
 allocateTokioSlots = mask_ $ do
   errorSlot <- malloc
@@ -101,7 +137,7 @@ makeTokioAsyncCall call freeErr freeRes = mask $ \restore -> do
       -- memory. The cleanup functions release whichever Rust result the task
       -- eventually produces.
       reapAfterInterrupt = void $ forkIO $ do
-        _ <- takeMVar mvar
+        _ <- readMVar mvar
         errPtr <- peek errorSlot
         resPtr <- peek resultSlot
         when (errPtr /= nullPtr) (freeErr errPtr)
@@ -109,10 +145,10 @@ makeTokioAsyncCall call freeErr freeRes = mask $ \restore -> do
         freeSlots
   call sp cap errorSlot resultSlot `onException` freeSlots
 
-  -- Only the wait itself hands ownership off: once 'takeMVar' has returned, the
-  -- task is done and this thread owns the slots again, so a failure after that
-  -- point must not also be reaped (that would double-free).
-  () <- restore (takeMVar mvar) `onException` reapAfterInterrupt
+  -- 'readMVar' is deliberately non-destructive. If an asynchronous exception
+  -- arrives after observing completion but before masking is restored, the
+  -- reaper can observe the same notification and reclaim the result.
+  () <- restore (readMVar mvar) `onException` reapAfterInterrupt
   errPtr <- peek errorSlot
   resPtr <- peek resultSlot
   freeSlots
@@ -189,7 +225,7 @@ withTokioAsyncCallWithAbandon call freeErr freeRes abandonRes processErr process
     -- runtime alive through the callback, so this thread does not release the
     -- slots or any Rust-owned result until the MVar has been filled.
     let reapAfterInterrupt = void $ forkIO $ do
-          _ <- takeMVar mvar
+          _ <- readMVar mvar
           errPtr <- peek errorSlot
           resPtr <- peek resultSlot
           ( do
@@ -198,10 +234,9 @@ withTokioAsyncCallWithAbandon call freeErr freeRes abandonRes processErr process
             )
             `finally` freeSlots
 
-    -- Only the wait hands ownership off. Once 'takeMVar' returns, the task is
-    -- done and this thread owns the slots again, so a later failure must not
-    -- also be reaped -- that would double-free.
-    _ <- restore (takeMVar mvar) `onException` reapAfterInterrupt
+    -- Keep the notification available to the reaper across the narrow window
+    -- between observing completion and restoring the masked state.
+    _ <- restore (readMVar mvar) `onException` reapAfterInterrupt
 
     -- Completed: the slot storage can be released before processing the
     -- Rust-owned result. Bracket that result so a decoder exception cannot

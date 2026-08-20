@@ -559,6 +559,11 @@ Haskell the ability to have multiple Worker Entities in a single Worker Process.
 
 A single Worker Entity can listen to only a single Task Queue. But if a Worker Process has multiple Worker Entities, the Worker Process could be listening to multiple Task Queues.
 -}
+data WorkerShutdownState
+  = WorkerShutdownNotStarted
+  | WorkerShutdownStarted !(Control.Concurrent.MVar (Either SomeException ()))
+
+
 data Worker env = forall ty.
   Core.KnownWorkerType ty =>
   Worker
@@ -570,6 +575,7 @@ data Worker env = forall ty.
   , workerCore :: !(Core.Worker ty)
   , workerTracer :: !Tracer
   , workerEvictionEmitter :: !(TChan Workflow.EvictionWithRunID)
+  , workerShutdownState :: !(Control.Concurrent.MVar WorkerShutdownState)
   }
 
 
@@ -580,6 +586,7 @@ startReplayWorker rt conf = provideCallStack $ runWorkerContext conf $ do
   (workerCore, replay) <- either throwIO pure =<< liftIO (Core.newReplayWorker rt coreConfig')
   Logging.logDebug "Instantiated core"
   workerEvictionEmitter <- newBroadcastTChanIO
+  workerShutdownState <- UnliftIO.newMVar WorkerShutdownNotStarted
   runningWorkflows <- liftIO StmMap.newIO
   uuid <- liftIO nextRandom
   let workerWorkflowFunctions = conf.wfDefs
@@ -734,6 +741,7 @@ startWorker client conf = provideCallStack $ runWorkerContext conf $ inSpan "sta
       (either throwIO pure =<< liftIO (Core.newWorker client conf.coreConfig))
   validationRes <- liftIO $ Core.validateWorker workerCore
   workerEvictionEmitter <- newBroadcastTChanIO
+  workerShutdownState <- UnliftIO.newMVar WorkerShutdownNotStarted
   case validationRes of
     Left err -> throwIO err
     Right () -> pure ()
@@ -970,19 +978,33 @@ deliver their exception. The worker thread reports its result through an 'MVar',
 allowing the timeouts to remain effective even when the caller is masked.
 -}
 shutdown :: (MonadUnliftIO m) => Temporal.Worker.Worker actEnv -> m ()
-shutdown worker = UnliftIO.withRunInIO $ \runInIO -> do
-  resultVar <- UnliftIO.newEmptyMVar
-  -- Carry the caller's trace context over so the spans below still parent
-  -- correctly; the thread-local context does not follow a 'forkIO'.
-  callerContext <- OTContext.getContext
-  _ <- forkIOWithUnmask $ \unmask ->
-    UnliftIO.putMVar resultVar
-      =<< UnliftIO.try @IO @SomeException do
-        -- This label distinguishes a synchronous shutdown call from either of
-        -- the interruptible waits in 'shutdownBounded'.
-        Control.Concurrent.myThreadId >>= \tid -> GHC.Conc.Sync.labelThread tid "temporal/worker/shutdownBounded"
-        unmask (OTContext.attachContext callerContext *> runInIO (shutdownBounded worker))
-  UnliftIO.takeMVar resultVar >>= either UnliftIO.throwIO pure
+shutdown worker@Temporal.Worker.Worker {workerShutdownState} = UnliftIO.withRunInIO $ \runInIO -> UnliftIO.mask $ \restore -> do
+  (shouldStart, resultVar) <-
+    UnliftIO.modifyMVar workerShutdownState $ \case
+      WorkerShutdownNotStarted -> do
+        resultVar <- UnliftIO.newEmptyMVar
+        pure (WorkerShutdownStarted resultVar, (True, resultVar))
+      shutdownState@(WorkerShutdownStarted resultVar) ->
+        pure (shutdownState, (False, resultVar))
+
+  when shouldStart $ do
+    -- Carry the first caller's trace context to the single shutdown thread;
+    -- thread-local context does not follow 'forkIO'.
+    callerContext <- OTContext.getContext
+    spawned <-
+      UnliftIO.try @IO @SomeException $
+        forkIOWithUnmask $ \unmask ->
+          UnliftIO.putMVar resultVar
+            =<< UnliftIO.try @IO @SomeException do
+              -- Distinguish the synchronous shutdown call from the
+              -- interruptible waits in 'shutdownBounded'.
+              Control.Concurrent.myThreadId >>= \tid -> GHC.Conc.Sync.labelThread tid "temporal/worker/shutdownBounded"
+              unmask (OTContext.attachContext callerContext *> runInIO (shutdownBounded worker))
+    case spawned of
+      Left err -> UnliftIO.putMVar resultVar (Left err)
+      Right _ -> pure ()
+
+  restore (UnliftIO.readMVar resultVar) >>= either UnliftIO.throwIO pure
 
 
 -- | The bounded shutdown sequence. Must be run unmasked; see 'shutdown'.

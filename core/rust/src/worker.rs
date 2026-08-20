@@ -6,7 +6,6 @@ use std::marker::PhantomData;
 use std::str;
 use std::sync::Arc;
 use std::time::Duration;
-use temporalio_common::Worker;
 use temporalio_common::errors::{PollError, WorkflowErrorType};
 use temporalio_common::protos::coresdk::nexus::NexusTaskCompletion;
 use temporalio_common::protos::coresdk::workflow_completion::WorkflowActivationCompletion;
@@ -16,12 +15,13 @@ use temporalio_common::worker::{
     PollerBehavior, SlotInfoTrait, SlotKind, SlotMarkUsedContext, SlotReleaseContext,
     SlotReservationContext, SlotSupplier, SlotSupplierPermit, WorkerVersioningStrategy,
 };
+use temporalio_common::Worker;
 use temporalio_sdk_core::replay::{HistoryForReplay, ReplayWorkerInput};
 use temporalio_sdk_core::{
     FixedSizeSlotSupplier, ResourceBasedSlotsOptions, ResourceSlotOptions, SlotSupplierOptions,
     TunerBuilder, TunerHolder, TunerHolderOptions,
 };
-use tokio::sync::mpsc::{Sender, channel};
+use tokio::sync::mpsc::{channel, Sender};
 use tokio_stream::wrappers::ReceiverStream;
 
 use crate::client;
@@ -970,12 +970,24 @@ impl WorkerRef {
     }
 
     fn initiate_shutdown(&self) {
-        let worker = self.worker.as_ref().unwrap().clone();
-        worker.initiate_shutdown();
+        // Finalization consumes the inner worker. Treat a repeated shutdown
+        // request as complete instead of panicking across the C ABI boundary.
+        if let Some(worker) = &self.worker {
+            worker.initiate_shutdown();
+        }
     }
 
     fn finalize_shutdown(&mut self, hs: HsCallback<CUnit, CWorkerError>) {
-        let core_worker = self.worker.take().unwrap();
+        let Some(core_worker) = self.worker.take() else {
+            self.runtime.future_result_into_hs(hs, async {
+                Err(CWorkerError::c_repr_of(WorkerError {
+                    code: WorkerErrorCode::SDKError,
+                    message: "Worker finalization has already started".to_string(),
+                })
+                .unwrap())
+            });
+            return;
+        };
         self.runtime.future_result_into_hs(hs, async move {
             // An interrupted Haskell wait does not cancel its Tokio task. Wait
             // for Core shutdown before unwrapping so any outstanding poll or

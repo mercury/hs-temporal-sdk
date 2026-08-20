@@ -103,7 +103,14 @@ defaultTemporalDevServerConfig =
     }
 
 
-newtype EphemeralServer = EphemeralServer {ephemeralServerPtr :: Ptr EphemeralServer}
+data EphemeralServer = EphemeralServer
+  { ephemeralServerPtr :: !(Ptr EphemeralServer)
+  , ephemeralServerShutdown :: !(SingleFlight (Either ByteString ()))
+  }
+
+
+newEphemeralServer :: Ptr EphemeralServer -> IO EphemeralServer
+newEphemeralServer ptr = EphemeralServer ptr <$> newSingleFlight
 
 
 foreign import ccall "hs_temporal_start_dev_server"
@@ -125,23 +132,24 @@ startDevServer r c = withRuntime r $ \rp -> useAsCString (BL.toStrict (encode c)
         arr <- peek errPtr
         cArrayToByteString arr
     )
-    (pure . EphemeralServer)
+    newEphemeralServer
 
 
 foreign import ccall "hs_temporal_shutdown_ephemeral_server" raw_shutdownEphemeralServer :: Ptr EphemeralServer -> TokioCall (CArray Word8) CUnit
 
 
 shutdownEphemeralServer :: EphemeralServer -> IO (Either ByteString ())
-shutdownEphemeralServer (EphemeralServer ep) =
-  withTokioAsyncCall
-    (raw_shutdownEphemeralServer ep)
-    rust_dropByteArray
-    rust_dropUnit
-    ( \errPtr -> do
-        arr <- peek errPtr
-        cArrayToByteString arr
-    )
-    (\_ -> return ())
+shutdownEphemeralServer EphemeralServer {ephemeralServerPtr, ephemeralServerShutdown} =
+  runSingleFlight ephemeralServerShutdown $
+    withTokioAsyncCall
+      (raw_shutdownEphemeralServer ephemeralServerPtr)
+      rust_dropByteArray
+      rust_dropUnit
+      ( \errPtr -> do
+          arr <- peek errPtr
+          cArrayToByteString arr
+      )
+      (\_ -> return ())
 
 
 {- | A completed server start transfers ownership to Haskell. If the waiting
@@ -150,8 +158,9 @@ the regular shutdown operation so the child process is stopped as well as
 the Rust allocation being released.
 -}
 shutdownAbandonedEphemeralServer :: Ptr EphemeralServer -> IO ()
-shutdownAbandonedEphemeralServer ep =
-  void $ shutdownEphemeralServer (EphemeralServer ep)
+shutdownAbandonedEphemeralServer ep = do
+  server <- newEphemeralServer ep
+  void $ shutdownEphemeralServer server
 
 
 -- TODO
@@ -186,4 +195,4 @@ startTestServer r conf = withRuntime r $ \rp -> useAsCString (BL.toStrict $ enco
         arr <- peek errPtr
         cArrayToByteString arr
     )
-    (pure . EphemeralServer)
+    newEphemeralServer
