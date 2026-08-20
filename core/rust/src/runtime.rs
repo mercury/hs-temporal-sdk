@@ -164,88 +164,77 @@ pub struct HsCallback<A, E> {
     pub error_slot: *mut *mut E,
 }
 
-// The raw pointers in an 'HsCallback' are owned by the Haskell thread that is
-// parked on 'mvar', which keeps them alive until it is woken. Moving the
-// callback onto a Tokio task is therefore safe, and is required so that
-// 'future_result_into_hs' can spawn rather than block the calling thread.
+// SAFETY: Haskell allocates the two result slots before constructing this
+// callback and keeps them alive until `hs_try_putmvar` wakes either the caller
+// or its cleanup thread. The callback is their only writer. `mvar` is a
+// `StablePtr PrimMVar`; `hs_try_putmvar` may be called from any OS thread and
+// consumes that stable pointer. Moving these pointer values does not move or
+// concurrently access their pointees.
 unsafe impl<A, E> Send for HsCallback<A, E> {}
 
-/// Carries an FFI result across a task boundary.
-///
-/// The `#[repr(C)]` result types are not `Send` because they contain raw
-/// pointers, but a completed FFI result is unaliased and its ownership moves
-/// with the value -- it is produced by the Tokio task and then handed to
-/// exactly one Haskell caller. Wrapping it lets the result travel from the task
-/// to the thread that fills the caller's MVar.
-struct FfiResult<T>(T);
-
-unsafe impl<T> Send for FfiResult<T> {}
-
 impl<A, E> HsCallback<A, E> {
-    pub(crate) fn put_success(self, runtime: &Runtime, result: A)
+    pub(crate) fn put_success(self, try_put_mvar: extern "C" fn(Capability, *mut MVar), result: A)
     where
         A: RawPointerConverter<A>,
     {
         unsafe {
             *self.result_slot = result.into_raw_pointer_mut();
             *self.error_slot = std::ptr::null_mut();
-            runtime.put_mvar(self.cap, self.mvar);
+            try_put_mvar(self.cap, self.mvar);
         }
     }
 
-    pub(crate) fn put_failure(self, runtime: &Runtime, error: E)
+    pub(crate) fn put_failure(self, try_put_mvar: extern "C" fn(Capability, *mut MVar), error: E)
     where
         E: RawPointerConverter<E>,
     {
         unsafe {
             *self.error_slot = error.into_raw_pointer_mut();
             *self.result_slot = std::ptr::null_mut();
-            runtime.put_mvar(self.cap, self.mvar);
+            try_put_mvar(self.cap, self.mvar);
         }
     }
 
-    pub(crate) fn put_result(self, runtime: &Runtime, result: Result<A, E>)
-    where
+    pub(crate) fn put_result(
+        self,
+        try_put_mvar: extern "C" fn(Capability, *mut MVar),
+        result: Result<A, E>,
+    ) where
         A: RawPointerConverter<A>,
         E: RawPointerConverter<E>,
     {
         match result {
-            Ok(result) => self.put_success(runtime, result),
-            Err(error) => self.put_failure(runtime, error),
+            Ok(result) => self.put_success(try_put_mvar, result),
+            Err(error) => self.put_failure(try_put_mvar, error),
         }
     }
 }
 
 impl Runtime {
-    /// Drive `fut` on the Tokio runtime and hand its result back to the Haskell
-    /// thread parked on `callback.mvar`.
+    /// Schedule `fut` on Tokio and report its result through `callback`.
     ///
-    /// This must `spawn` rather than `block_on`. The Haskell side of the bridge
-    /// ('makeTokioAsyncCall') hands us a 'StablePtr PrimMVar' precisely so that
-    /// the foreign call can return immediately and the Haskell thread can park
-    /// on an *interruptible* 'takeMVar'. Blocking here instead pins the calling
-    /// GHC worker thread inside the foreign call for the whole duration of the
-    /// future, which makes every Temporal call uninterruptible from Haskell:
-    /// 'timeout' and 'killThread' cannot touch a thread in a foreign call, so a
-    /// long poll (or a hung one) becomes unkillable and takes any thunk it was
-    /// evaluating -- e.g. a shared CAF of workflow definitions -- down with it.
-    /// That was the root cause of the STAB-681 CI wedges.
+    /// The C ABI entry point must return after scheduling. Haskell then waits on
+    /// an interruptible `takeMVar`; using `block_on` here would instead keep it
+    /// inside the foreign call until the future completed, preventing
+    /// `timeout` and `killThread` from interrupting the wait.
     pub fn future_result_into_hs<F, T, E>(&self, callback: HsCallback<T, E>, fut: F)
     where
         F: Future<Output = Result<T, E>> + Send + 'static,
         T: RawPointerConverter<T> + 'static,
         E: RawPointerConverter<E> + 'static,
     {
-        let runtime = self.clone();
         let handle = self.core.tokio_handle();
-        let task = handle.spawn(async move { FfiResult(fut.await) });
-        // Tokio swallows task panics, which would leave the Haskell thread
-        // parked on its MVar forever. Joining the task lets us notice a panic
-        // (or a cancellation) and fail loudly instead of hanging, matching the
-        // previous behaviour of a panic unwinding across the FFI boundary.
+        let try_put_mvar = self.try_put_mvar;
+        let task = handle.spawn(async move {
+            callback.put_result(try_put_mvar, fut.await);
+        });
+
+        // Detached Tokio tasks do not propagate panics. Supervise this one so
+        // a panic remains fail-fast, as it was when `block_on` ran inside the C
+        // ABI call, rather than leaving the Haskell waiter blocked forever.
         handle.spawn(async move {
             match task.await {
-                Ok(FfiResult(result)) => callback.put_result(&runtime, result),
+                Ok(()) => {}
                 Err(err) if err.is_panic() => {
                     eprintln!(
                         "hs-temporal-sdk: panic in the Tokio task servicing a Haskell call; \
@@ -253,17 +242,74 @@ impl Runtime {
                     );
                     std::process::abort();
                 }
-                // The task was cancelled, which only happens when the runtime
-                // is being torn down. The caller's MVar is left unfilled
-                // deliberately: the process is going away, and aborting here
-                // would turn an ordinary shutdown into a crash.
+                // This handle is not exposed, so cancellation is possible only
+                // while the Tokio runtime itself is shutting down. In that
+                // case the supervisor is shutting down too and cannot safely
+                // call back into Haskell.
                 Err(_) => {}
             }
         });
     }
+}
 
-    pub fn put_mvar(&self, capability: Capability, mvar: *mut MVar) {
-        (self.try_put_mvar)(capability, mvar);
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::mpsc;
+
+    extern "C" fn notify_haskell(_: Capability, mvar: *mut MVar) {
+        let sender = unsafe { &*mvar.cast::<mpsc::Sender<()>>() };
+        sender.send(()).unwrap();
+    }
+
+    #[test]
+    fn future_result_into_hs_returns_before_the_future_completes() {
+        let core = CoreRuntime::new(
+            RuntimeOptions::builder().build().unwrap(),
+            TokioRuntimeBuilder::default(),
+        )
+        .unwrap();
+        let runtime = Runtime {
+            core: Arc::new(core),
+            try_put_mvar: notify_haskell,
+        };
+
+        let (completed_tx, completed_rx) = mpsc::channel::<()>();
+        let completed_tx = Box::into_raw(Box::new(completed_tx));
+        let mut result_slot: *mut CArray<u8> = std::ptr::null_mut();
+        let mut error_slot: *mut CArray<u8> = std::ptr::null_mut();
+        let callback = HsCallback {
+            cap: Capability { cap_num: -1 },
+            mvar: completed_tx.cast(),
+            result_slot: &mut result_slot,
+            error_slot: &mut error_slot,
+        };
+
+        let (returned_tx, returned_rx) = mpsc::channel();
+        let (release_tx, release_rx) = tokio::sync::oneshot::channel();
+        let releaser = std::thread::spawn(move || {
+            let returned_before_release =
+                returned_rx.recv_timeout(Duration::from_millis(250)).is_ok();
+            release_tx.send(()).unwrap();
+            returned_before_release
+        });
+
+        runtime.future_result_into_hs(callback, async move {
+            release_rx.await.unwrap();
+            Ok::<_, CArray<u8>>(CArray::c_repr_of(vec![1_u8]).unwrap())
+        });
+        let _ = returned_tx.send(());
+
+        let returned_before_release = releaser.join().unwrap();
+        completed_rx.recv_timeout(Duration::from_secs(1)).unwrap();
+
+        unsafe {
+            drop(Box::from_raw(completed_tx));
+            drop(CArray::from_raw_pointer_mut(result_slot).unwrap());
+        }
+
+        assert!(returned_before_release);
+        assert!(error_slot.is_null());
     }
 }
 

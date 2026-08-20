@@ -51,7 +51,7 @@ updateTests = describe "Update" $ do
             h <- C.start UpdateWithValidator "startUpdate-rejects" opts
             C.startUpdate h testUpdate updateOpts (-12)
           ) `shouldThrow` \case
-            UpdateFailure _ -> True
+            UpdateFailure failure -> failure ^. Failure.message == "in a bad state!!!"
 
     it "propagates validation exceptions" $ \TestEnv {..} -> do
       let conf = updateConf baseConf

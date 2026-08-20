@@ -297,7 +297,11 @@ connectClient rt conf = do
   _ <- withRunInIO $ \runInIO -> do
     forkIO $ runInIO $ do
       liftIO $ withRuntime rt $ \rtPtr -> BS.useAsCString (BL.toStrict $ encode conf') $ \confPtr -> do
-        let tryConnect = makeTokioAsyncCall (raw_connectClient rtPtr confPtr)
+        let tryConnect =
+              makeTokioAsyncCall
+                (raw_connectClient rtPtr confPtr)
+                rust_dropByteArray
+                raw_freeClient
             go attempt = do
               result <- tryConnect
               case result of

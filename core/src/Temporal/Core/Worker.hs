@@ -75,6 +75,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import Data.IORef
+import Data.Maybe (fromMaybe)
 import Data.ProtoLens.Encoding (decodeMessageOrDie, encodeMessage)
 import Data.Text (Text)
 import Data.Word
@@ -98,20 +99,18 @@ import UnliftIO (liftIO)
 import qualified UnliftIO
 
 
--- | Run an action with the calling thread's label temporarily replaced.
---
--- The remaining synchronous (non-Tokio) foreign calls in this module cannot be
--- interrupted while they run, so a thread stuck inside one is invisible to
--- ordinary Haskell-level diagnostics. Relabelling the thread for the duration
--- of the call makes such a thread identify itself in a thread dump
--- ('GHC.Conc.listThreads' + 'GHC.Conc.Sync.threadLabel'), which is how the STAB-681
--- CI wedges are attributed.
+{- | Temporarily identify a synchronous worker FFI call in thread dumps.
+
+GHC cannot deliver an asynchronous exception while one of these calls is in
+progress. Replacing the label for the duration of the call makes the blocked
+operation visible through 'GHC.Conc.Sync.threadLabel'.
+-}
 withFfiThreadLabel :: String -> IO a -> IO a
-withFfiThreadLabel lbl act = do
+withFfiThreadLabel lbl act = mask $ \restore -> do
   tid <- Control.Concurrent.myThreadId
   prev <- GHC.Conc.Sync.threadLabel tid
   GHC.Conc.Sync.labelThread tid lbl
-  act `finally` GHC.Conc.Sync.labelThread tid (maybe "" id prev)
+  restore act `finally` GHC.Conc.Sync.labelThread tid (fromMaybe "" prev)
 
 
 data WorkerType = Real | Replay
@@ -712,12 +711,13 @@ newReplayWorker r conf = withRuntime r $ \rPtr -> do
   alloca $ \wPtrPtr -> do
     alloca $ \hpPtrPtr -> do
       withCArrayBS (BL.toStrict $ encode conf) $ \confPtr -> do
-        alloca $ \errPtrPtr -> do
+        alloca $ \errPtrPtr -> mask_ $ do
           poke wPtrPtr nullPtr
           poke hpPtrPtr nullPtr
           poke errPtrPtr nullPtr
 
-          raw_newReplayWorker rPtr confPtr wPtrPtr hpPtrPtr errPtrPtr
+          withFfiThreadLabel "temporal/ffi/new_replay_worker" $
+            raw_newReplayWorker rPtr confPtr wPtrPtr hpPtrPtr errPtrPtr
           errPtr <- peek errPtrPtr
           if errPtr == nullPtr
             then do

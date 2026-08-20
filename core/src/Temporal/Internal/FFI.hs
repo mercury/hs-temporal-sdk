@@ -58,6 +58,15 @@ type TokioSlot a = Ptr (Ptr a)
 type TokioResult a = Ptr (Ptr a)
 
 
+allocateTokioSlots :: IO (TokioSlot err, TokioSlot res)
+allocateTokioSlots = mask_ $ do
+  errorSlot <- malloc
+  resultSlot <- malloc `onException` free errorSlot
+  let freeSlots = free errorSlot *> free resultSlot
+  (poke errorSlot nullPtr *> poke resultSlot nullPtr) `onException` freeSlots
+  pure (errorSlot, resultSlot)
+
+
 {- | Make an async call to Rust via Tokio. Returns raw Ptr that MUST be freed by the caller
 using the appropriate drop function.
 
@@ -65,30 +74,38 @@ The caller is responsible for:
 1. Calling the appropriate rust_drop* function on the result
 2. Not using the pointer after freeing it
 
+The cleanup functions are used only when the wait is interrupted, after Rust
+has finished writing the result. On normal return, ownership of the returned
+pointer passes to the caller.
+
 IMPORTANT: This is a low-level function. Prefer using withTokioAsyncCall
 for automatic memory management and exception safety.
 -}
 makeTokioAsyncCall
   :: TokioCall err res
+  -> (Ptr err -> IO ())
+  -> (Ptr res -> IO ())
   -> IO (Either (Ptr err) (Ptr res))
-makeTokioAsyncCall call = mask $ \restore -> do
-  -- These slots must outlive an interrupted wait: the Tokio task writes into
-  -- them when it finishes, which may be long after an async exception has
-  -- unwound this call. So they are 'malloc'ed (never 'alloca'ed) and freed only
-  -- once the task is known to be done -- here, or by the reaper thread below.
-  errorSlot <- malloc
-  resultSlot <- malloc
-  poke errorSlot nullPtr
-  poke resultSlot nullPtr
+makeTokioAsyncCall call freeErr freeRes = mask $ \restore -> do
+  -- The slots must outlive an interrupted wait because Rust may write to them
+  -- after this call has unwound. Heap allocation lets the cleanup thread take
+  -- ownership in that case.
+  (errorSlot, resultSlot) <- allocateTokioSlots
   mvar <- newEmptyMVar
   sp <- newStablePtrPrimMVar mvar
   (cap, _) <- threadCapability =<< myThreadId
   let freeSlots = free errorSlot *> free resultSlot
       -- On interruption, hand ownership of the slots to a thread that waits for
       -- the task to finish. Freeing them here would let Rust write into freed
-      -- memory. Any result the task produces is leaked, since this low-level
-      -- entry point does not know how to drop it -- 'withTokioAsyncCall' does.
-      reapAfterInterrupt = void $ forkIO $ takeMVar mvar *> freeSlots
+      -- memory. The cleanup functions release whichever Rust result the task
+      -- eventually produces.
+      reapAfterInterrupt = void $ forkIO $ do
+        _ <- takeMVar mvar
+        errPtr <- peek errorSlot
+        resPtr <- peek resultSlot
+        when (errPtr /= nullPtr) (freeErr errPtr)
+        when (resPtr /= nullPtr) (freeRes resPtr)
+        freeSlots
   call sp cap errorSlot resultSlot `onException` freeSlots
 
   -- Only the wait itself hands ownership off: once 'takeMVar' has returned, the
@@ -127,13 +144,10 @@ withTokioAsyncCall
   -> IO (Either e a)
 withTokioAsyncCall call freeErr freeRes processErr processRes =
   mask $ \restore -> do
-    -- 'malloc', not 'alloca': an interrupted wait unwinds this frame while the
-    -- Tokio task may still be pending, and the task writes into these slots
-    -- when it completes. Stack-allocated slots would be popped underneath it.
-    errorSlot <- malloc
-    resultSlot <- malloc
-    poke errorSlot nullPtr
-    poke resultSlot nullPtr
+    -- The slots must outlive an interrupted wait because Rust may write to them
+    -- after this call has unwound. Heap allocation lets the cleanup thread take
+    -- ownership in that case.
+    (errorSlot, resultSlot) <- allocateTokioSlots
     mvar <- newEmptyMVar
     sp <- newStablePtrPrimMVar mvar
     (cap, _) <- threadCapability =<< myThreadId
@@ -156,19 +170,15 @@ withTokioAsyncCall call freeErr freeRes processErr processRes =
     -- also be reaped -- that would double-free.
     _ <- restore (takeMVar mvar) `onException` reapAfterInterrupt
 
-    -- Completed: process the result masked, then release everything.
+    -- Completed: the slot storage can be released before processing the
+    -- Rust-owned result. Bracket that result so a decoder exception cannot
+    -- leak it.
     errPtr <- peek errorSlot
     resPtr <- peek resultSlot
     freeSlots
     if errPtr /= nullPtr
-      then do
-        result <- processErr errPtr
-        freeErr errPtr
-        return (Left result)
+      then Left <$> bracket (pure errPtr) freeErr processErr
       else
         if resPtr /= nullPtr
-          then do
-            result <- processRes resPtr
-            freeRes resPtr
-            return (Right result)
+          then Right <$> bracket (pure resPtr) freeRes processRes
           else error "Both error and result are null from Tokio call"

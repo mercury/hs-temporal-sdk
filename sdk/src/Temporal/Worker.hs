@@ -966,9 +966,8 @@ normally called from a cleanup handler -- and @unliftio@'s and
 @safe-exceptions@' 'bracket' run cleanup under 'uninterruptibleMask' -- those
 timeouts are run on a dedicated unmasked thread rather than inline. Running them
 inline would inherit the caller's masking state, leaving the timeouts unable to
-deliver their exception and making 'shutdown' unbounded. The caller then waits
-on an 'MVar' that the worker thread always fills, so the wait is bounded even
-when the caller itself cannot be interrupted.
+deliver their exception. The worker thread reports its result through an 'MVar',
+allowing the timeouts to remain effective even when the caller is masked.
 -}
 shutdown :: (MonadUnliftIO m) => Temporal.Worker.Worker actEnv -> m ()
 shutdown worker = UnliftIO.withRunInIO $ \runInIO -> do
@@ -976,15 +975,13 @@ shutdown worker = UnliftIO.withRunInIO $ \runInIO -> do
   -- Carry the caller's trace context over so the spans below still parent
   -- correctly; the thread-local context does not follow a 'forkIO'.
   callerContext <- OTContext.getContext
-  _ <- forkIOWithUnmask $ \unmask -> do
-    -- Identify this thread in dumps: an abandoned shutdown parks here, and the
-    -- label (together with the temporal/ffi/* labels in Temporal.Core.Worker)
-    -- shows which phase it is stuck in.
-    Control.Concurrent.myThreadId >>= \tid -> GHC.Conc.Sync.labelThread tid "temporal/worker/shutdownBounded"
+  _ <- forkIOWithUnmask $ \unmask ->
     UnliftIO.putMVar resultVar
-      =<< UnliftIO.try @IO @SomeException
-        ( unmask (OTContext.attachContext callerContext *> runInIO (shutdownBounded worker))
-        )
+      =<< UnliftIO.try @IO @SomeException do
+        -- This label distinguishes a synchronous shutdown call from either of
+        -- the interruptible waits in 'shutdownBounded'.
+        Control.Concurrent.myThreadId >>= \tid -> GHC.Conc.Sync.labelThread tid "temporal/worker/shutdownBounded"
+        unmask (OTContext.attachContext callerContext *> runInIO (shutdownBounded worker))
   UnliftIO.takeMVar resultVar >>= either UnliftIO.throwIO pure
 
 
