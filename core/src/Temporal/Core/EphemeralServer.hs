@@ -6,6 +6,7 @@
 
 module Temporal.Core.EphemeralServer where
 
+import Control.Monad (void)
 import Data.Aeson
 import Data.Aeson.TH
 import Data.ByteString (ByteString, useAsCString)
@@ -114,14 +115,17 @@ foreign import ccall "hs_temporal_start_dev_server"
 
 startDevServer :: Runtime -> TemporalDevServerConfig -> IO (Either ByteString EphemeralServer)
 startDevServer r c = withRuntime r $ \rp -> useAsCString (BL.toStrict (encode c)) $ \cstr ->
-  withTokioAsyncCall
+  withTokioAsyncCallWithAbandon
     (raw_startDevServer rp cstr)
     rust_dropByteArray
-    (\_ -> pure ())  -- Server pointer doesn't need freeing here (managed by Rust)
-    (\errPtr -> do
-      arr <- peek errPtr
-      cArrayToByteString arr)
-    (\srvPtr -> pure $ EphemeralServer srvPtr)
+    -- Normal completion transfers this pointer to 'EphemeralServer'.
+    (\_ -> pure ())
+    shutdownAbandonedEphemeralServer
+    ( \errPtr -> do
+        arr <- peek errPtr
+        cArrayToByteString arr
+    )
+    (pure . EphemeralServer)
 
 
 foreign import ccall "hs_temporal_shutdown_ephemeral_server" raw_shutdownEphemeralServer :: Ptr EphemeralServer -> TokioCall (CArray Word8) CUnit
@@ -133,10 +137,21 @@ shutdownEphemeralServer (EphemeralServer ep) =
     (raw_shutdownEphemeralServer ep)
     rust_dropByteArray
     rust_dropUnit
-    (\errPtr -> do
-      arr <- peek errPtr
-      cArrayToByteString arr)
+    ( \errPtr -> do
+        arr <- peek errPtr
+        cArrayToByteString arr
+    )
     (\_ -> return ())
+
+
+{- | A completed server start transfers ownership to Haskell. If the waiting
+Haskell thread has already been interrupted, consume that pointer through
+the regular shutdown operation so the child process is stopped as well as
+the Rust allocation being released.
+-}
+shutdownAbandonedEphemeralServer :: Ptr EphemeralServer -> IO ()
+shutdownAbandonedEphemeralServer ep =
+  void $ shutdownEphemeralServer (EphemeralServer ep)
 
 
 -- TODO
@@ -161,11 +176,14 @@ foreign import ccall "hs_temporal_start_test_server"
 
 startTestServer :: Runtime -> TemporalTestServerConfig -> IO (Either ByteString EphemeralServer)
 startTestServer r conf = withRuntime r $ \rp -> useAsCString (BL.toStrict $ encode conf) $ \cstr ->
-  withTokioAsyncCall
+  withTokioAsyncCallWithAbandon
     (raw_startTestServer rp cstr)
     rust_dropByteArray
-    (\_ -> pure ())  -- Server pointer doesn't need freeing here (managed by Rust)
-    (\errPtr -> do
-      arr <- peek errPtr
-      cArrayToByteString arr)
-    (\srvPtr -> pure $ EphemeralServer srvPtr)
+    -- Normal completion transfers this pointer to 'EphemeralServer'.
+    (\_ -> pure ())
+    shutdownAbandonedEphemeralServer
+    ( \errPtr -> do
+        arr <- peek errPtr
+        cArrayToByteString arr
+    )
+    (pure . EphemeralServer)

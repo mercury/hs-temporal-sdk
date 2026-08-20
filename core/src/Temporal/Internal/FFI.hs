@@ -147,7 +147,32 @@ withTokioAsyncCall
   -> (Ptr res -> IO a)
   -- ^ Process result
   -> IO (Either e a)
-withTokioAsyncCall call freeErr freeRes processErr processRes =
+withTokioAsyncCall call freeErr freeRes =
+  withTokioAsyncCallWithAbandon call freeErr freeRes freeRes
+
+
+{- | Exception-safe wrapper for a Tokio call whose successful result has
+different cleanup requirements depending on whether the caller receives it.
+
+Most Tokio results use the same destructor in both cases; use
+'withTokioAsyncCall' for those. This variant is for ownership-transferring
+results: @freeRes@ runs after normal processing, while @abandonRes@ runs if an
+async exception interrupts the wait and the Rust task later succeeds.
+-}
+withTokioAsyncCallWithAbandon
+  :: TokioCall err res
+  -> (Ptr err -> IO ())
+  -- ^ Free an error result
+  -> (Ptr res -> IO ())
+  -- ^ Free a normally processed result
+  -> (Ptr res -> IO ())
+  -- ^ Clean up a successful result produced after an interrupted wait
+  -> (Ptr err -> IO e)
+  -- ^ Process error
+  -> (Ptr res -> IO a)
+  -- ^ Process result
+  -> IO (Either e a)
+withTokioAsyncCallWithAbandon call freeErr freeRes abandonRes processErr processRes =
   mask $ \restore -> do
     -- The slots must outlive an interrupted wait because Rust may write to them
     -- after this call has unwound. Heap allocation lets the cleanup thread take
@@ -167,9 +192,11 @@ withTokioAsyncCall call freeErr freeRes processErr processRes =
           _ <- takeMVar mvar
           errPtr <- peek errorSlot
           resPtr <- peek resultSlot
-          when (errPtr /= nullPtr) (freeErr errPtr)
-          when (resPtr /= nullPtr) (freeRes resPtr)
-          freeSlots
+          ( do
+              when (errPtr /= nullPtr) (freeErr errPtr)
+              when (resPtr /= nullPtr) (abandonRes resPtr)
+            )
+            `finally` freeSlots
 
     -- Only the wait hands ownership off. Once 'takeMVar' returns, the task is
     -- done and this thread owns the slots again, so a later failure must not

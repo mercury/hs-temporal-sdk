@@ -1,11 +1,16 @@
 module ReplaySpec where
 
+import Control.Concurrent (yield)
+import qualified Control.Concurrent.Async as Async
+import Control.Exception (bracket, fromException)
 import Control.Monad (void, when)
 import Data.Either (isLeft, isRight)
 import Data.ProtoLens.Encoding (encodeMessage)
 import qualified Data.Text as Text
+import qualified GHC.Conc.Sync as Conc
 import RequireCallStack (provideCallStack)
 import System.Directory (getTemporaryDirectory, removeFile)
+import System.Timeout (timeout)
 import Temporal.Activity
 import qualified Temporal.Client as C
 import qualified Temporal.Core.Worker as Core
@@ -19,7 +24,48 @@ import TestHelpers
 
 
 spec :: Spec
-spec = withTestServer_ tests
+spec = do
+  describe "Tokio FFI interruption" $ do
+    specify "interrupts a blocked poll and reaps its eventual result" $
+      bracket newIdleReplayWorker shutdownIdleReplayWorker $ \(worker, _) -> do
+        poller <- Async.async $ Core.pollWorkflowActivation worker
+
+        blocked <- timeout 5_000_000 $ waitUntilBlockedOnMVar (Async.asyncThreadId poller)
+        blocked `shouldBe` Just ()
+
+        cancelled <- timeout 5_000_000 $ Async.cancel poller
+        cancelled `shouldBe` Just ()
+        Async.waitCatch poller >>= \case
+          Left err
+            | Just Async.AsyncCancelled <- fromException err -> pure ()
+          outcome -> expectationFailure $ "expected AsyncCancelled, got " <> show outcome
+
+  withTestServer_ tests
+
+
+newIdleReplayWorker :: IO (Core.Worker 'Core.Replay, Core.HistoryPusher)
+newIdleReplayWorker =
+  Core.newReplayWorker globalRuntime Core.defaultWorkerConfig >>= \case
+    Left err -> error $ "failed to create replay worker: " <> show err
+    Right resources -> pure resources
+
+
+shutdownIdleReplayWorker :: (Core.Worker 'Core.Replay, Core.HistoryPusher) -> IO ()
+shutdownIdleReplayWorker (worker, historyPusher) = do
+  Core.closeHistory historyPusher
+  Core.initiateShutdown worker
+  Core.finalizeShutdown worker >>= \case
+    Left err -> error $ "failed to finalize replay worker: " <> show err
+    Right () -> pure ()
+
+
+waitUntilBlockedOnMVar :: Conc.ThreadId -> IO ()
+waitUntilBlockedOnMVar threadId =
+  Conc.threadStatus threadId >>= \case
+    Conc.ThreadBlocked Conc.BlockedOnMVar -> pure ()
+    Conc.ThreadFinished -> error "poll finished before blocking"
+    Conc.ThreadDied -> error "poll died before blocking"
+    _ -> yield *> waitUntilBlockedOnMVar threadId
 
 
 replayActivity :: Activity () Int
