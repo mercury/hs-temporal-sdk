@@ -16,6 +16,7 @@ import qualified Temporal.Client as C
 import qualified Temporal.Core.Worker as Core
 import Temporal.Duration
 import qualified Temporal.EphemeralServer as Ephemeral
+import qualified Temporal.EphemeralServer as TemporalDevServerConfig (TemporalDevServerConfig (..))
 import Temporal.Payload
 import Temporal.Replay (readHistoryProtobufFile, writeHistoryProtobufFile)
 import Temporal.Worker
@@ -93,10 +94,10 @@ newEphemeralServer = do
       Nothing -> error "Could not find the 'temporal' executable in PATH"
       Just path -> pure path
   let serverConfig =
-        Ephemeral.TemporalDevServerConfig
-          { Ephemeral.exe = Ephemeral.ExistingPath temporalPath
-          , Ephemeral.port = Just $ fromIntegral freePort
-          , Ephemeral.extraArgs = []
+        Ephemeral.defaultTemporalDevServerConfig
+          { TemporalDevServerConfig.exe = Ephemeral.ExistingPath temporalPath
+          , TemporalDevServerConfig.port = Just $ fromIntegral freePort
+          , TemporalDevServerConfig.extraArgs = []
           }
   Ephemeral.launchDevServer globalRuntime serverConfig >>= either (error . show) pure
 
