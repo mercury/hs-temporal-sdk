@@ -38,9 +38,8 @@ withCArrayText txt f = Text.withCStringLen txt $ \(bytes, len) ->
   Marshal.with (CArray (castPtr bytes) (fromIntegral len)) f
 
 
-{- | Peek the result from a Tokio slot. Returns the raw pointer or Nothing.
-The caller is responsible for freeing the pointer using the appropriate drop function.
--}
+-- | Peek the result from a Tokio slot. Returns the raw pointer or Nothing.
+-- The caller is responsible for freeing the pointer using the appropriate drop function.
 peekTokioResult :: TokioSlot a -> IO (Maybe (Ptr a))
 peekTokioResult slot = do
   inner <- peek slot
@@ -174,14 +173,10 @@ Parameters:
 -}
 withTokioAsyncCall
   :: TokioCall err res
-  -> (Ptr err -> IO ())
-  -- ^ Free error
-  -> (Ptr res -> IO ())
-  -- ^ Free result
-  -> (Ptr err -> IO e)
-  -- ^ Process error
-  -> (Ptr res -> IO a)
-  -- ^ Process result
+  -> (Ptr err -> IO ())  -- ^ Free error
+  -> (Ptr res -> IO ())  -- ^ Free result
+  -> (Ptr err -> IO e)   -- ^ Process error
+  -> (Ptr res -> IO a)   -- ^ Process result
   -> IO (Either e a)
 withTokioAsyncCall call freeErr freeRes =
   withTokioAsyncCallWithAbandon call freeErr freeRes freeRes
@@ -197,16 +192,11 @@ async exception interrupts the wait and the Rust task later succeeds.
 -}
 withTokioAsyncCallWithAbandon
   :: TokioCall err res
-  -> (Ptr err -> IO ())
-  -- ^ Free an error result
-  -> (Ptr res -> IO ())
-  -- ^ Free a normally processed result
-  -> (Ptr res -> IO ())
-  -- ^ Clean up a successful result produced after an interrupted wait
-  -> (Ptr err -> IO e)
-  -- ^ Process error
-  -> (Ptr res -> IO a)
-  -- ^ Process result
+  -> (Ptr err -> IO ())  -- ^ Free an error result
+  -> (Ptr res -> IO ())  -- ^ Free a normally processed result
+  -> (Ptr res -> IO ())  -- ^ Clean up a successful result produced after an interrupted wait
+  -> (Ptr err -> IO e)   -- ^ Process error
+  -> (Ptr res -> IO a)   -- ^ Process result
   -> IO (Either e a)
 withTokioAsyncCallWithAbandon call freeErr freeRes abandonRes processErr processRes =
   mask $ \restore -> do
