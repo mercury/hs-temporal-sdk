@@ -18,9 +18,11 @@ the interceptor to your Temporal client and worker configuration.
 -}
 module Temporal.Contrib.OpenTelemetry where
 
+import Control.Monad (forM_, void)
 import Control.Monad.Catch
 import Control.Monad.IO.Class
 import qualified Data.HashMap.Strict as HashMap
+import Data.IORef
 import Data.Int
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -29,11 +31,15 @@ import qualified Data.Text as T
 import qualified Data.Vault.Strict as Vault
 import Data.Word (Word32)
 import GHC.IO (unsafePerformIO)
-import OpenTelemetry.Propagator.W3CBaggage (decodeBaggage, encodeBaggage) 
 import OpenTelemetry.Context (Context)
 import qualified OpenTelemetry.Context as Ctxt
-import OpenTelemetry.Context.ThreadLocal (attachContext, getContext)
+#if MIN_VERSION_hs_opentelemetry_api(1,0,0)
+import OpenTelemetry.Context.ThreadLocal (Token, attachContext, detachContext, getContext)
+#else
+import OpenTelemetry.Context.ThreadLocal (attachContext, detachContext, getContext)
+#endif
 import OpenTelemetry.Propagator
+import OpenTelemetry.Propagator.W3CBaggage (decodeBaggage, encodeBaggage)
 import OpenTelemetry.Propagator.W3CTraceContext (decodeSpanContext, encodeSpanContext)
 import OpenTelemetry.Trace.Core
 import Temporal.Activity.Types
@@ -44,18 +50,11 @@ import Temporal.Duration
 import Temporal.Interceptor
 import Temporal.Payload (Payload (..))
 import Temporal.Workflow ()
+import Temporal.Workflow.Internal.Monad (WorkflowInstance (..))
 import Temporal.Workflow.Types
 import Temporal.Workflow.Unsafe
+import Temporal.WorkflowInstance (WorkflowExecutionContext (..), workflowExecutionContextKey)
 import Prelude hiding (span)
-
-
--- The 'Propagator' record field @propagatorNames@ was renamed to
--- @propagatorFields@ in hs-opentelemetry-api 1.0.
-#if MIN_VERSION_hs_opentelemetry_api(1,0,0)
-#define PROPAGATOR_FIELDS propagatorFields
-#else
-#define PROPAGATOR_FIELDS propagatorNames
-#endif
 
 
 -- | "_tracer-data"
@@ -76,11 +75,11 @@ defaultOpenTelemetryInterceptorOptions =
     , headerKey = defaultHeaderKey
     }
 
-
+#if MIN_VERSION_hs_opentelemetry_api(1,0,0)
 headersPropagator :: Propagator Context (Map Text Payload) (Map Text Payload)
 headersPropagator =
   Propagator
-    { PROPAGATOR_FIELDS = ["tracecontext"]
+    { propagatorFields = ["tracecontext"]
     , extractor = \hs c -> do
         let traceParentHeader = payloadData <$> Map.lookup "traceparent" hs
             traceStateHeader = payloadData <$> Map.lookup "tracestate" hs
@@ -97,11 +96,34 @@ headersPropagator =
             . Map.insert "tracestate" (Payload traceStateHeader mempty)
             $ hs
     }
+#else
+headersPropagator :: Propagator Context (Map Text Payload) (Map Text Payload)
+headersPropagator =
+  Propagator
+    { propagatorNames = ["tracecontext"]
+    , extractor = \hs c -> do
+        let traceParentHeader = payloadData <$> Map.lookup "traceparent" hs
+            traceStateHeader = payloadData <$> Map.lookup "tracestate" hs
+            mspanContext = decodeSpanContext traceParentHeader traceStateHeader
+        pure $! case mspanContext of
+          Nothing -> c
+          Just s -> Ctxt.insertSpan (wrapSpanContext (s {isRemote = True})) c
+    , injector = \c hs -> case Ctxt.lookupSpan c of
+        Nothing -> pure hs
+        Just s -> do
+          (traceParentHeader, traceStateHeader) <- encodeSpanContext s
+          pure
+            . Map.insert "traceparent" (Payload traceParentHeader mempty)
+            . Map.insert "tracestate" (Payload traceStateHeader mempty)
+            $ hs
+    }
+#endif
 
+#if MIN_VERSION_hs_opentelemetry_api(1,0,0)
 headersBaggagePropagator :: Propagator Context (Map Text Payload) (Map Text Payload)
 headersBaggagePropagator =
   Propagator
-    { PROPAGATOR_FIELDS = ["baggage"]
+    { propagatorFields = ["baggage"]
     , extractor = \headers ctxt ->
         let payload = payloadData <$> Map.lookup "baggage" headers
         in pure $! case payload >>= decodeBaggage of
@@ -113,10 +135,44 @@ headersBaggagePropagator =
           let payload = Payload (encodeBaggage baggage) mempty
           in Map.insert "baggage" payload headers
     }
+#else
+headersBaggagePropagator :: Propagator Context (Map Text Payload) (Map Text Payload)
+headersBaggagePropagator =
+  Propagator
+    { propagatorNames = ["baggage"]
+    , extractor = \headers ctxt ->
+        let payload = payloadData <$> Map.lookup "baggage" headers
+        in pure $! case payload >>= decodeBaggage of
+          Nothing -> ctxt
+          Just baggage -> Ctxt.insertBaggage baggage ctxt
+    , injector = \ctxt headers -> pure $! case Ctxt.lookupBaggage ctxt of
+        Nothing -> headers
+        Just baggage ->
+          let payload = Payload (encodeBaggage baggage) mempty
+          in Map.insert "baggage" payload headers
+    }
+#endif
+
+
+#if MIN_VERSION_hs_opentelemetry_api(1,0,0)
+restoreContext :: Token -> IO ()
+restoreContext = detachContext
+#else
+restoreContext :: Maybe Context -> IO ()
+restoreContext = \case
+  Nothing -> void detachContext
+  Just prior -> void $ attachContext prior
+#endif
+
 
 tracerKey :: Vault.Key Tracer
 tracerKey = unsafePerformIO Vault.newKey
 {-# NOINLINE tracerKey #-}
+
+
+workflowSpanKey :: Vault.Key Span
+workflowSpanKey = unsafePerformIO Vault.newKey
+{-# NOINLINE workflowSpanKey #-}
 
 
 --    * Workflow is scheduled by a client
@@ -149,8 +205,8 @@ tracerKey = unsafePerformIO Vault.newKey
 --    */
 -- CONTINUE_AS_NEW = 'ContinueAsNew',
 
--- TODO, we will need to account for replays when we support them
 makeOpenTelemetryInterceptor :: MonadIO m => m (Interceptors env)
+-- TODO, we will need to account for replays when we support them
 makeOpenTelemetryInterceptor = do
   tracerProvider <- getGlobalTracerProvider
   let tracer =
@@ -158,13 +214,25 @@ makeOpenTelemetryInterceptor = do
           tracerProvider
           "temporal-sdk"
           tracerOptions
+      finalizeWorkflow inst result = do
+        mSpan <-
+          atomicModifyIORef' inst.workflowVault $ \vault ->
+            let found = Vault.lookup workflowSpanKey vault
+                cleared = Vault.delete workflowExecutionContextKey $ Vault.delete workflowSpanKey vault
+            in (cleared, found)
+        forM_ mSpan $ \span -> do
+          forM_ result $ \case
+            WorkflowExitFailed err -> do
+              setStatus span (Error $ T.pack $ show err)
+              recordException span mempty Nothing err
+            _ -> pure ()
+          endSpan span Nothing
   pure $
     Interceptors
       { workflowInboundInterceptors =
           WorkflowInboundInterceptor
             { executeWorkflow = \input next -> do
                 ctxt <- extract headersPropagator input.executeWorkflowInputHeaders Ctxt.empty
-                _ <- attachContext ctxt
                 let spanArgs =
                       defaultSpanArguments
                         { kind = Server
@@ -220,15 +288,19 @@ makeOpenTelemetryInterceptor = do
                                     input.executeWorkflowInputInfo.retryPolicy
                                 ]
                         }
-                inSpan'' tracer ("RunWorkflow:" <> rawWorkflowType input.executeWorkflowInputType) spanArgs $ \span -> do
-                  execution <- next input
-                  case execution of
-                    WorkflowExitFailed e -> do
-                      -- TODO use our enrichment handlers here
-                      setStatus span (Error $ T.pack $ show e)
-                      recordException span mempty Nothing e
-                    _ -> pure ()
-                  pure execution
+                span <- createSpan tracer ctxt ("RunWorkflow:" <> rawWorkflowType input.executeWorkflowInputType) spanArgs
+                let workflowContext = Ctxt.insertSpan span ctxt
+                    withWorkflowContext :: IO a -> IO a
+                    withWorkflowContext action = do
+                      priorContext <- attachContext workflowContext
+                      action `finally` restoreContext priorContext
+                atomicModifyIORef' input.executeWorkflowInputVault $ \vault ->
+                  ( Vault.insert workflowExecutionContextKey (WorkflowExecutionContext withWorkflowContext) $
+                      Vault.insert workflowSpanKey span vault
+                  , ()
+                  )
+                withWorkflowContext $ next input
+            , finalizeWorkflow = finalizeWorkflow
             , handleQuery = \input next -> do
                 -- Only trace this if there is a header, and make that span the parent.
                 -- We do not put anything that happens in a query handler on the workflow
@@ -247,12 +319,14 @@ makeOpenTelemetryInterceptor = do
                         --   ]
                         }
                 ctxt <- extract headersPropagator input.handleQueryInputHeaders Ctxt.empty
-                _ <- attachContext ctxt
-                case Ctxt.lookupSpan ctxt of
-                  Nothing -> next input
-                  Just _ ->
-                    inSpan'' tracer ("HandleQuery:" <> input.handleQueryInputType) spanArgs $ \_ -> do
-                      next input
+                priorContext <- attachContext ctxt
+                ( case Ctxt.lookupSpan ctxt of
+                    Nothing -> next input
+                    Just _ ->
+                      inSpan'' tracer ("HandleQuery:" <> input.handleQueryInputType) spanArgs $ \_ -> do
+                        next input
+                  )
+                  `finally` restoreContext priorContext
             , handleUpdate = \input next -> do
                 -- Only trace this if there is a header, and make that span the parent.
                 -- We do not put anything that happens in an update handler on the workflow
@@ -266,22 +340,21 @@ makeOpenTelemetryInterceptor = do
                         , attributes = mempty
                         }
                 ctxt <- performUnsafeNonDeterministicIO $ extract headersPropagator input.handleUpdateInputHeaders Ctxt.empty
-                _ <- performUnsafeNonDeterministicIO $ attachContext ctxt
-                case Ctxt.lookupSpan ctxt of
+                priorContext <- performUnsafeNonDeterministicIO $ attachContext ctxt
+                result <- try @_ @SomeException $ case Ctxt.lookupSpan ctxt of
                   Nothing -> next input
                   Just _ -> do
                     span <- performUnsafeNonDeterministicIO $ createSpan tracer ctxt ("HandleUpdate:" <> input.handleUpdateInputType) spanArgs
-                    result <- try $ next input
-                    case result of
+                    updateResult <- try @_ @SomeException $ next input
+                    performUnsafeNonDeterministicIO $ case updateResult of
                       Left err -> do
-                        performUnsafeNonDeterministicIO do
-                          setStatus span (Error $ T.pack $ show err)
-                          recordException span mempty Nothing err
-                          endSpan span Nothing
-                        throwM (err :: SomeException)
-                      Right res -> do
-                        performUnsafeNonDeterministicIO $ endSpan span Nothing
-                        pure res
+                        setStatus span (Error $ T.pack $ show err)
+                        recordException span mempty Nothing err
+                        endSpan span Nothing
+                      Right _ -> endSpan span Nothing
+                    either throwM pure updateResult
+                performUnsafeNonDeterministicIO $ restoreContext priorContext
+                either throwM pure result
             , validateUpdate = \input next -> do
                 let spanArgs =
                       defaultSpanArguments
@@ -289,12 +362,14 @@ makeOpenTelemetryInterceptor = do
                         , attributes = mempty
                         }
                 ctxt <- extract headersPropagator input.handleUpdateInputHeaders Ctxt.empty
-                _ <- attachContext ctxt
-                case Ctxt.lookupSpan ctxt of
-                  Nothing -> next input
-                  Just _ ->
-                    inSpan'' tracer ("ValidateUpdate:" <> input.handleUpdateInputType) spanArgs $ \_ -> do
-                      next input
+                priorContext <- attachContext ctxt
+                ( case Ctxt.lookupSpan ctxt of
+                    Nothing -> next input
+                    Just _ ->
+                      inSpan'' tracer ("ValidateUpdate:" <> input.handleUpdateInputType) spanArgs $ \_ -> do
+                        next input
+                  )
+                  `finally` restoreContext priorContext
             }
       , workflowOutboundInterceptors =
           WorkflowOutboundInterceptor
@@ -355,9 +430,9 @@ makeOpenTelemetryInterceptor = do
                         }
 
                 ctxt <- extract headersPropagator input.activityHeaders Ctxt.empty
-                _ <- attachContext ctxt
-                inSpan'' tracer ("RunActivity:" <> input.activityInfo.activityType) spanArgs $ \_span -> do
-                  next env input
+                priorContext <- attachContext ctxt
+                inSpan'' tracer ("RunActivity:" <> input.activityInfo.activityType) spanArgs (\_span -> next env input)
+                  `finally` restoreContext priorContext
             }
       , activityOutboundInterceptors = ActivityOutboundInterceptor
       , clientInterceptors =

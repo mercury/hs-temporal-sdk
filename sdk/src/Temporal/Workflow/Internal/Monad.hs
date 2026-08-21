@@ -374,10 +374,10 @@ yield = Workflow $ \env -> do
   --
   -- Once the scheduler drains everything ahead of it, the filler runs, fills
   -- gate, and the parked continuation is re-queued and resumed.
-  -- 
+  --
   -- Keeping a job on the run queue for the duration of the yield is what prevents
   -- the scheduler from flushing commands and suspending.
-  -- 
+  --
   -- The gate is intentionally untracked so this momentary block does not show
   -- up in __stack_trace queries.
   gate <- newIVar
@@ -789,10 +789,11 @@ data WorkflowInstance = WorkflowInstance
   , workflowInstanceContinuationEnv :: {-# UNPACK #-} !ContinuationEnv
   , workflowCancellationVar :: {-# UNPACK #-} !(IVar ())
   , workflowDeadlockTimeout :: Maybe Int
-  , workflowVault :: {-# UNPACK #-} !Vault
+  , workflowVault :: {-# UNPACK #-} !(IORef Vault)
   , -- These are how the instance gets its work done
     activationChannel :: {-# UNPACK #-} !(TQueue Core.WorkflowActivation)
   , executionThread :: {-# UNPACK #-} !(IORef (Async ()))
+  , executionCancelled :: {-# UNPACK #-} !(IORef Bool)
   , inboundInterceptor :: {-# UNPACK #-} !WorkflowInboundInterceptor
   , outboundInterceptor :: {-# UNPACK #-} !WorkflowOutboundInterceptor
   , -- Improves error reporting
@@ -918,6 +919,7 @@ data ExecuteWorkflowInput = ExecuteWorkflowInput
   , executeWorkflowInputArgs :: Vector Payload
   , executeWorkflowInputHeaders :: Map Text Payload
   , executeWorkflowInputInfo :: Info
+  , executeWorkflowInputVault :: IORef Vault
   }
 
 
@@ -948,9 +950,14 @@ data HandleUpdateInput = HandleUpdateInput
 
 data WorkflowInboundInterceptor = WorkflowInboundInterceptor
   { executeWorkflow
-      :: ExecuteWorkflowInput
-      -> (ExecuteWorkflowInput -> IO (WorkflowExitVariant Payload))
-      -> IO (WorkflowExitVariant Payload)
+      :: forall a
+       . ExecuteWorkflowInput
+      -> (ExecuteWorkflowInput -> IO a)
+      -> IO a
+  , finalizeWorkflow
+      :: WorkflowInstance
+      -> Maybe (WorkflowExitVariant Payload)
+      -> IO ()
   , handleQuery
       :: HandleQueryInput
       -> (HandleQueryInput -> IO (Either SomeException Payload))
@@ -964,12 +971,23 @@ data WorkflowInboundInterceptor = WorkflowInboundInterceptor
       -> (HandleUpdateInput -> IO (Either SomeException ()))
       -> IO (Either SomeException ())
   }
+interceptWorkflow
+  :: WorkflowInboundInterceptor
+  -> ExecuteWorkflowInput
+  -> (ExecuteWorkflowInput -> IO a)
+  -> IO a
+interceptWorkflow WorkflowInboundInterceptor {executeWorkflow = f} = f
+
+
+finalizeWorkflowExecution :: WorkflowInboundInterceptor -> WorkflowInstance -> Maybe (WorkflowExitVariant Payload) -> IO ()
+finalizeWorkflowExecution WorkflowInboundInterceptor {finalizeWorkflow = f} = f
 
 
 instance Semigroup WorkflowInboundInterceptor where
   a <> b =
     WorkflowInboundInterceptor
-      { executeWorkflow = \input cont -> a.executeWorkflow input $ \input' -> b.executeWorkflow input' cont
+      { executeWorkflow = \input cont -> interceptWorkflow a input $ \input' -> interceptWorkflow b input' cont
+      , finalizeWorkflow = \inst result -> a.finalizeWorkflow inst result >> b.finalizeWorkflow inst result
       , handleQuery = \input cont -> a.handleQuery input $ \input' -> b.handleQuery input' cont
       , handleUpdate = \input cont -> a.handleUpdate input $ \input' -> b.handleUpdate input' cont
       , validateUpdate = \input cont -> a.validateUpdate input $ \input' -> b.validateUpdate input' cont
@@ -980,6 +998,7 @@ instance Monoid WorkflowInboundInterceptor where
   mempty =
     WorkflowInboundInterceptor
       { executeWorkflow = \input cont -> cont input
+      , finalizeWorkflow = \_ _ -> pure ()
       , handleQuery = \input cont -> cont input
       , handleUpdate = \input cont -> cont input
       , validateUpdate = \input cont -> cont input

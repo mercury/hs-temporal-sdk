@@ -41,6 +41,7 @@ library
       Temporal.TH
       Temporal.Worker
       Temporal.Workflow
+      Temporal.Workflow.Internal.ActivationLoop
       Temporal.Workflow.Saga
       Temporal.Workflow.Unsafe
       Temporal.Workflow.Update
@@ -158,7 +159,7 @@ test-suite temporal-sdk-tests
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
-      Spec, ClientHistorySpec, ContinueAsNewSpec, DurationSpec, IntegrationSpec, IntegrationSpec.HangingWorkflow, IntegrationSpec.NoOpWorkflow, IntegrationSpec.TimeoutsInWorkflows, IntegrationSpec.Updates, LocalActivitySpec, MockActivityEnvironmentSpec, IntegrationSpec.TimeSkipping, Common, RegisterWorkflowsSpec, ReplaySpec, ScheduleSpec, SignalSpec, SignalWithStartDropSpec, TestHelpers, THCompiles, WorkerTunerSpec
+      ActivationLoopSpec, Spec, ClientHistorySpec, ContinueAsNewSpec, DurationSpec, IntegrationSpec, IntegrationSpec.HangingWorkflow, IntegrationSpec.NoOpWorkflow, IntegrationSpec.TimeoutsInWorkflows, IntegrationSpec.Updates, LocalActivitySpec, MockActivityEnvironmentSpec, IntegrationSpec.TimeSkipping, Common, RegisterWorkflowsSpec, ReplaySpec, ScheduleSpec, SignalSpec, SignalWithStartDropSpec, TestHelpers, THCompiles, WorkerTunerSpec
   hs-source-dirs:
       test
   default-extensions:

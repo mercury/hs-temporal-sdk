@@ -72,7 +72,7 @@ guarantees; reading the vault itself is deterministic and replay-safe.
 unsafeReadWorkflowVault :: Workflow Vault
 unsafeReadWorkflowVault = do
   inst <- askInstance
-  pure inst.workflowVault
+  performUnsafeNonDeterministicIO (readIORef inst.workflowVault)
 
 
 {- | Whether the workflow is currently replaying recorded history rather than

@@ -1,16 +1,23 @@
+{-# LANGUAGE OverloadedRecordDot #-}
+
 module QuerySpec where
 
-import Control.Exception (SomeException)
+import Control.Concurrent.Async (concurrently, forConcurrently)
+import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar, tryPutMVar)
+import Control.Exception (SomeException, finally)
+import Control.Monad (forM_, void)
 import qualified Control.Monad.Catch as Catch
-import qualified Data.Vector as V
+import Data.Either (isRight)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import RequireCallStack (provideCallStack)
+import System.Timeout (timeout)
 import qualified Temporal.Client as C
 import Temporal.Duration
 import Temporal.Payload
 import Temporal.Worker
 import qualified Temporal.Workflow as W
+import qualified Temporal.Workflow.Unsafe as Unsafe
 import Test.Hspec
 import TestHelpers
 
@@ -53,6 +60,97 @@ tests = describe "Query" $ do
       result <- C.query h echoQuery C.defaultQueryOptions "echo-me-back"
       C.cancel h (C.CancellationOptions mempty)
       result `shouldBe` Right "echo-me-back"
+  specify "immediately serves newly started workflow query handlers" $ \TestEnv {..} -> do
+    let query :: W.KnownQuery '[Text] Text
+        query = W.KnownQuery "initializationQuery" defaultCodec
+        workflow :: MyWorkflow ()
+        workflow = do
+          W.setQueryHandler query pure
+          W.sleep $ seconds 5
+        wf = W.provideWorkflow defaultCodec "initializationQueryWorkflow" workflow
+        conf = configure () wf $ do baseConf
+    withWorker conf $ do
+      let opts = defaultStartOpts taskQueue
+      wfId <- W.WorkflowId <$> uuidText
+      h <- useClient (C.start wf.reference wfId opts)
+      forM_ [1 :: Int .. 100] $ \_ -> do
+        result <- useClient $ C.query h query C.defaultQueryOptions "ready"
+        result `shouldBe` Right "ready"
+      C.cancel h (C.CancellationOptions mempty)
+  specify "concurrent startup queries and signals complete promptly" $ \TestEnv {..} -> do
+    let incrementSignal :: W.KnownSignal '[]
+        incrementSignal = W.KnownSignal "incrementForQueryFlood" defaultCodec
+        releaseSignal :: W.KnownSignal '[]
+        releaseSignal = W.KnownSignal "releaseQueryFlood" defaultCodec
+        stateQuery :: W.KnownQuery '[Text] Int
+        stateQuery = W.KnownQuery "stateDuringQueryFlood" defaultCodec
+        workflow :: MyWorkflow Int
+        workflow = do
+          state <- W.newStateVar (0 :: Int)
+          released <- W.newStateVar False
+          W.setSignalHandler incrementSignal $ W.modifyStateVar state (+ 1)
+          W.setSignalHandler releaseSignal $ W.writeStateVar released True
+          W.setQueryHandler stateQuery $ \_unused -> W.readStateVar state
+          W.waitCondition $ (>= 100) <$> W.readStateVar state
+          W.waitCondition $ W.readStateVar released
+          W.readStateVar state
+        wf = W.provideWorkflow defaultCodec "concurrentStartupQueryWorkflow" workflow
+        conf = configure () wf $ do baseConf
+    withWorker conf $ do
+      let opts = defaultStartOpts taskQueue
+      wfId <- W.WorkflowId <$> uuidText
+      h <- useClient (C.start wf.reference wfId opts)
+      completed <- timeout (10 * 1_000_000) do
+        (queryResults, _signalResults) <-
+          concurrently
+            ( forConcurrently [1 :: Int .. 200] \_ ->
+                useClient $ C.query h stateQuery C.defaultQueryOptions "status"
+            )
+            ( forConcurrently [1 :: Int .. 100] \_ ->
+                useClient $ C.signal h incrementSignal C.defaultSignalOptions
+            )
+        queryResults `shouldSatisfy` all isRight
+        C.signal h releaseSignal C.defaultSignalOptions
+        C.waitWorkflowResult h `shouldReturn` 100
+      completed `shouldBe` Just ()
+  specify "a blocking startup does not starve another workflow" $ \TestEnv {..} -> do
+    blockerEntered <- newEmptyMVar
+    releaseBlocker <- newEmptyMVar
+    let blockingWorkflow :: MyWorkflow ()
+        blockingWorkflow = do
+          Unsafe.performUnsafeNonDeterministicIO $ putMVar blockerEntered () >> takeMVar releaseBlocker
+          W.sleep $ seconds 1
+        quickWorkflow :: MyWorkflow ()
+        quickWorkflow = pure ()
+        blocking = W.provideWorkflow defaultCodec "blockingStartupWorkflow" blockingWorkflow
+        quick = W.provideWorkflow defaultCodec "quickWorkflow" quickWorkflow
+        definitions :: Definitions ()
+        definitions = toDefinitions blocking <> toDefinitions quick
+        conf = configure () definitions baseConf
+        release = void $ tryPutMVar releaseBlocker ()
+    withWorker conf $
+      ( do
+          let opts = defaultStartOpts taskQueue
+          blockingId <- W.WorkflowId <$> uuidText
+          _ <- useClient $ C.start blocking.reference blockingId opts
+          takeMVar blockerEntered
+          quickId <- W.WorkflowId <$> uuidText
+          quickHandle <- useClient $ C.start quick.reference quickId opts
+          completed <- timeout (2 * 1_000_000) $ C.waitWorkflowResult quickHandle
+          completed `shouldBe` Just ()
+      )
+        `finally` release
+  specify "event subscriber shape schedules one child without timing out" $ \TestEnv {..} -> do
+    let child :: MyWorkflow ()
+        child = W.sleep $ seconds 1
+        childWf = W.provideWorkflow defaultCodec "eventSubscriberChild" child
+        parent :: MyWorkflow ()
+        parent = void $ W.executeChildWorkflow childWf.reference W.defaultChildWorkflowOptions
+        parentWf = W.provideWorkflow defaultCodec "eventSubscribers" parent
+        conf = configure () (childWf, parentWf) $ do baseConf
+    withWorker conf $
+      useClient (C.execute parentWf.reference "event-subscriber-shape" (defaultStartOpts taskQueue))
+        `shouldReturn` ()
 
   specify "query reflects current state" $ \TestEnv {..} -> do
     let incSignal :: W.KnownSignal '[]
