@@ -6,6 +6,7 @@ use std::marker::PhantomData;
 use std::str;
 use std::sync::Arc;
 use std::time::Duration;
+use temporalio_common::Worker;
 use temporalio_common::errors::{PollError, WorkflowErrorType};
 use temporalio_common::protos::coresdk::nexus::NexusTaskCompletion;
 use temporalio_common::protos::coresdk::workflow_completion::WorkflowActivationCompletion;
@@ -15,13 +16,12 @@ use temporalio_common::worker::{
     PollerBehavior, SlotInfoTrait, SlotKind, SlotMarkUsedContext, SlotReleaseContext,
     SlotReservationContext, SlotSupplier, SlotSupplierPermit, WorkerVersioningStrategy,
 };
-use temporalio_common::Worker;
 use temporalio_sdk_core::replay::{HistoryForReplay, ReplayWorkerInput};
 use temporalio_sdk_core::{
     FixedSizeSlotSupplier, ResourceBasedSlotsOptions, ResourceSlotOptions, SlotSupplierOptions,
     TunerBuilder, TunerHolder, TunerHolderOptions,
 };
-use tokio::sync::mpsc::{channel, Sender};
+use tokio::sync::mpsc::{Sender, channel};
 use tokio_stream::wrappers::ReceiverStream;
 
 use crate::client;

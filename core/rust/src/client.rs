@@ -64,7 +64,7 @@ struct ClientRetryConfig {
     /// Initial wait time before the first retry, in milliseconds.
     pub initial_interval_millis: u64,
     /// Fractional value used to determine jitter that should be added to, or subtracted from, the retry interval length.
-    /// 
+    ///
     /// For example, a factor of `0.2` will jitter by ±20%.
     pub randomization_factor: f64,
     /// Rate at which retry time should be increased, until it reaches [max_interval_millis].
