@@ -1,5 +1,26 @@
+{- | Poll and dispatch workflow activations without making the poll loop execute
+workflow code.
+
+Activations for different run IDs can execute concurrently. Activations for one
+run ID must preserve poll order, including the race where several activations
+arrive before the first handler publishes its 'WorkflowInstance'.
+
+'workerActivationTails' supplies that ordering. For each run ID it stores only
+the newest reservation: a ticket plus a completion signal. Reserving the next
+activation atomically reads that signal as its predecessor and replaces the map
+entry with its own signal. The forked handler waits for its predecessor before
+calling 'handleActivation'. Each reservation therefore retains the preceding
+link transitively, forming a short-lived per-run chain without keeping every
+reservation in the map.
+
+The chain orders dispatch into the instance's activation channel; it does not
+execute workflow continuations. Each 'WorkflowInstance' has one executor for
+that. A terminal cache-removal activation deletes its tail only when it is
+still the newest reservation, so it cannot erase a later link.
+-}
 module Temporal.Workflow.Worker where
 
+import Control.Concurrent.STM (check, throwSTM)
 import qualified Control.Exception.Annotated as Ann
 import Control.Monad
 import Control.Monad.Catch (MonadCatch)
@@ -15,7 +36,8 @@ import Data.Vault.Strict (Vault)
 import qualified Data.Vector as V
 import qualified Focus
 import Lens.Family2
-import OpenTelemetry.Context.ThreadLocal ()
+import qualified ListT
+import OpenTelemetry.Context.ThreadLocal
 import OpenTelemetry.Trace.Core hiding (inSpan, inSpan')
 import OpenTelemetry.Trace.Monad
 import qualified Proto.Temporal.Api.Common.V1.Message_Fields as Message
@@ -25,9 +47,9 @@ import Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation
 import qualified Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields as Activation
 import qualified Proto.Temporal.Sdk.Core.WorkflowCompletion.WorkflowCompletion as Completion
 import qualified Proto.Temporal.Sdk.Core.WorkflowCompletion.WorkflowCompletion_Fields as Completion
-import RequireCallStack
 import qualified StmContainers.Map as StmMap
 import Temporal.Common
+import Temporal.Common.Async
 import qualified Temporal.Common.Logging as Logging
 import qualified Temporal.Core.Client as C
 import Temporal.Core.Worker (InactiveForReplay)
@@ -37,7 +59,7 @@ import qualified Temporal.Exception as Err
 import Temporal.Payload
 import Temporal.SearchAttributes.Internal
 import Temporal.Workflow.Definition
-import Temporal.Workflow.Internal.Instance (runInstanceM)
+import qualified Temporal.Workflow.Internal.ActivationLoop as ActivationLoop
 import Temporal.Workflow.Internal.Monad hiding (try)
 import Temporal.WorkflowInstance
 import UnliftIO
@@ -50,11 +72,14 @@ data EvictionWithRunID = EvictionWithRunID
   deriving stock (Show)
 
 
-data WorkflowWorker = forall ty.
+data WorkflowWorker
+  = forall ty.
   Core.KnownWorkerType ty =>
   WorkflowWorker
   { workerWorkflowFunctions :: {-# UNPACK #-} !(HashMap Text WorkflowDefinition)
   , runningWorkflows :: {-# UNPACK #-} !(StmMap.Map RunId WorkflowInstance)
+  , workerActivationLoop :: {-# UNPACK #-} !(TVar ActivationLoop.ActivationLoop)
+  , workerActivationTails :: {-# UNPACK #-} !(StmMap.Map RunId (ActivationLoop.ActivationTicket, TMVar ()))
   , workerClient :: InactiveForReplay ty C.Client
   , workerCore :: Core.Worker ty
   , workerInboundInterceptors :: {-# UNPACK #-} !WorkflowInboundInterceptor
@@ -65,6 +90,20 @@ data WorkflowWorker = forall ty.
   , processor :: {-# UNPACK #-} !PayloadProcessor
   , workerEvictionEmitter :: {-# UNPACK #-} !(TChan EvictionWithRunID)
   , workerVault :: {-# UNPACK #-} !Vault
+  }
+
+
+{- | One node in the per-run activation dispatch chain.
+
+The predecessor gates this handler. The completion signal releases its direct
+successor. The lifecycle ticket separately accounts for shutdown draining.
+-}
+data ActivationReservation = ActivationReservation
+  { reservationTicket :: ActivationLoop.ActivationTicket
+  , reservationPredecessor :: Maybe (TMVar ())
+  , reservationCompletion :: TMVar ()
+  , reservationRunId :: RunId
+  , reservationEndsRun :: Bool
   }
 
 
@@ -103,11 +142,12 @@ are drained.
 
 The Async handle only completes successfully on poller shutdown.
 -}
-execute :: (MonadLoggerIO m, MonadUnliftIO m, MonadCatch m, MonadTracer m, RequireCallStack) => WorkflowWorker -> m ()
-execute worker = flip runReaderT worker $ do
-  Logging.logDebug "Starting workflow worker"
-  whileM_ go
+execute :: (MonadUnliftIO m, MonadTracer m, MonadLoggerIO m, MonadCatch m) => WorkflowWorker -> m ()
+execute worker@WorkflowWorker {workerCore} =
+  flip runReaderT worker $
+    whileM_ go `finally` liftIO (cancelRunningWorkflowExecutors worker)
   where
+    c = Core.getWorkerConfig workerCore
     go = inSpan' "Workflow activation step" defaultSpanArguments $ \s -> do
       -- logs <- liftIO $ fetchLogs globalRuntime
       -- forM_ logs $ \l -> case l.level of
@@ -118,7 +158,6 @@ execute worker = flip runReaderT worker $ do
       --   Error -> Logging.logError l.message
       eActivation <- pollWorkflowActivation
       case eActivation of
-        -- TODO should we do anything else on shutdown?
         (Left (Core.WorkerError Core.PollShutdown _)) -> do
           Logging.logDebug "Poller shutting down"
           pure False
@@ -128,8 +167,86 @@ execute worker = flip runReaderT worker $ do
           pure True
         (Right activation) -> do
           Logging.logDebug $ Text.pack ("Got activation " <> show activation)
-          handleActivation activation
+          -- Reserve and chain each activation before forking. Different runs remain
+          -- concurrent, while activations for one run start in poll order even before
+          -- its WorkflowInstance has been published.
+          activationCtxt <- getContext
+          mask_ $ do
+            reservation <- liftIO $ atomically $ reserveWorkflowActivation worker activation
+            let finish = liftIO $ atomically $ finishWorkflowActivation worker reservation
+            activator <-
+              ( asyncLabelledWithUnmask (Text.unpack $ Text.concat ["temporal/worker/workflow/activate", Core.namespace c, "/", Core.taskQueue c]) $ \restore ->
+                  ( do
+                      liftIO $ forM_ reservation.reservationPredecessor $ atomically . readTMVar
+                      _ <- attachContext activationCtxt
+                      restore $ handleActivation activation
+                  )
+                    `finally` finish
+              )
+                `onException` finish
+            link activator
           pure True
+
+
+{- | Atomically reserve shutdown capacity and append one activation to its
+run's dispatch chain.
+
+This transaction is the ordering linearization point: two activations for the
+same run observe one another in poll order even if neither handler has started.
+-}
+reserveWorkflowActivation :: WorkflowWorker -> Core.WorkflowActivation -> STM ActivationReservation
+reserveWorkflowActivation worker activation = do
+  loop <- readTVar worker.workerActivationLoop
+  (reservationTicket, loop') <- either throwSTM pure $ ActivationLoop.reserveActivation loop
+  let reservationRunId = RunId $ activation ^. Activation.runId
+      reservationEndsRun =
+        any (isJust . (^. Activation.maybe'removeFromCache)) (activation ^. Activation.jobs)
+  reservationPredecessor <-
+    fmap snd <$> StmMap.lookup reservationRunId worker.workerActivationTails
+  reservationCompletion <- newEmptyTMVar
+  StmMap.insert
+    (reservationTicket, reservationCompletion)
+    reservationRunId
+    worker.workerActivationTails
+  writeTVar worker.workerActivationLoop loop'
+  pure ActivationReservation {..}
+
+
+{- | Retire a handler and release the next activation for its run.
+
+Terminal activations remove the map entry only if their reservation is still
+the current tail. Older completion signals remain reachable only from their
+direct successor and can be collected after that successor starts.
+-}
+finishWorkflowActivation :: WorkflowWorker -> ActivationReservation -> STM ()
+finishWorkflowActivation worker reservation = do
+  loop <- readTVar worker.workerActivationLoop
+  loop' <- either throwSTM pure $ ActivationLoop.completeActivation reservation.reservationTicket loop
+  writeTVar worker.workerActivationLoop loop'
+  putTMVar reservation.reservationCompletion ()
+  when reservation.reservationEndsRun do
+    current <- StmMap.lookup reservation.reservationRunId worker.workerActivationTails
+    when (fmap fst current == Just reservation.reservationTicket) $
+      StmMap.delete reservation.reservationRunId worker.workerActivationTails
+
+
+cancelRunningWorkflowExecutors :: WorkflowWorker -> IO ()
+cancelRunningWorkflowExecutors worker = do
+  -- An activation handler can still be creating an instance while the poller
+  -- exits. Drain handlers before the snapshot so no executor survives Core.
+  atomically $ do
+    modifyTVar' worker.workerActivationLoop ActivationLoop.beginDraining
+    ActivationLoop.isDrained <$> readTVar worker.workerActivationLoop >>= check
+  runningWorkflows <- ListT.toList $ StmMap.listTNonAtomic worker.runningWorkflows
+  mapConcurrently_
+    ( \(_, inst) ->
+        writeIORef inst.executionCancelled True
+          >> (readIORef inst.executionThread >>= cancel)
+    )
+    runningWorkflows
+  mapConcurrently_
+    (\(_, inst) -> readIORef inst.executionThread >>= void . waitCatch)
+    runningWorkflows
 
 
 handleActivation :: forall m. (MonadUnliftIO m, MonadLoggerIO m, MonadCatch m, MonadTracer m) => Core.WorkflowActivation -> ReaderT WorkflowWorker m ()
@@ -144,20 +261,18 @@ handleActivation activation = inSpan' "handleActivation" (defaultSpanArguments {
   if shouldRun
     then do
       mInst <- createOrFetchWorkflowInstance
-      forM_ mInst $ \(inst, handledInitialJobs) -> do
-        unless handledInitialJobs do
-          -- Signals in the initialization activation were already buffered into the
-          -- instance (see applyStartWorkflow), so drop them here rather than
-          -- delivering them a second time.
-          let isInitActivation = not $ V.null activationInitializeWorkflowJobs
-              keepJob job =
-                isNothing (job ^. Activation.maybe'initializeWorkflow)
-                  && not (isInitActivation && isJust (job ^. Activation.maybe'signalWorkflow))
-              withoutStart = filter keepJob (activation ^. Activation.jobs)
-          unless (null withoutStart) $
-            liftIO $
-              runInstanceM inst $
-                advanceWorkflow (activation & Activation.jobs .~ withoutStart)
+      forM_ mInst $ \inst -> do
+        -- Signals in the initialization activation were already buffered into the
+        -- instance (see applyStartWorkflow), so drop them here rather than
+        -- delivering them a second time through the channel.
+        let isInitActivation = not $ V.null activationInitializeWorkflowJobs
+            keepJob job =
+              isNothing (job ^. Activation.maybe'initializeWorkflow)
+                && not (isInitActivation && isJust (job ^. Activation.maybe'signalWorkflow))
+            withoutStart = filter keepJob (activation ^. Activation.jobs)
+        case withoutStart of
+          [] -> pure ()
+          otherJobs -> atomically $ writeTQueue inst.activationChannel (activation & Activation.jobs .~ otherJobs)
     else do
       Logging.logDebug "Workflow does not need to run."
       let completionMessage =
@@ -185,14 +300,14 @@ handleActivation activation = inSpan' "handleActivation" (defaultSpanArguments {
         )
         (activation ^. Activation.vec'jobs)
 
-    createOrFetchWorkflowInstance :: ReaderT WorkflowWorker m (Maybe (WorkflowInstance, Bool))
+    createOrFetchWorkflowInstance :: ReaderT WorkflowWorker m (Maybe WorkflowInstance)
     createOrFetchWorkflowInstance = inSpan' "createOrFetchWorkflowInstance" (defaultSpanArguments {attributes = HashMap.fromList [("temporal.activation.run_id", toAttribute $ activation ^. Activation.runId)]}) $ \s -> do
       worker@WorkflowWorker {workerCore} <- ask
       minst <- atomically $ StmMap.lookup (RunId $ activation ^. Activation.runId) worker.runningWorkflows
       case minst of
         Just inst -> do
           addAttribute s "temporal.workflow.worker.instance_state" ("existing" :: Text)
-          pure $ Just (inst, False)
+          pure $ Just inst
         Nothing -> do
           addAttribute s "temporal.workflow.worker.instance_state" ("new" :: Text)
           vExistingInstance <- forM activationInitializeWorkflowJobs $ \(_job, initializeWorkflow) -> do
@@ -308,33 +423,24 @@ handleActivation activation = inSpan' "handleActivation" (defaultSpanArguments {
                     let initialSignals =
                           V.toList $
                             V.mapMaybe (^. Activation.maybe'signalWorkflow) (activation ^. Activation.vec'jobs)
-                        keepJob job =
-                          isNothing (job ^. Activation.maybe'initializeWorkflow)
-                            && isNothing (job ^. Activation.maybe'signalWorkflow)
-                        withoutStart = filter keepJob (activation ^. Activation.jobs)
-                    (inst, startWorkflow) <-
-                      create
-                        ( \wf -> do
-                            Core.completeWorkflowActivation workerCore wf
-                        )
-                        f
-                        worker.workerDeadlockTimeout
-                        worker.workerErrorConverters
-                        worker.workerInboundInterceptors
-                        worker.workerOutboundInterceptors
-                        worker.workerVault
-                        worker.processor
-                        workflowInfo
-                        initializeWorkflow
-                        initialSignals
-                    liftIO $ addBuiltinQueryHandlers inst
-                    published <- upsertWorkflowInstance runId_ inst
-                    liftIO $
-                      startWorkflow $
-                        if null withoutStart
-                          then Nothing
-                          else Just (activation & Activation.jobs .~ withoutStart)
-                    pure $ Just (published, True)
+                    mask_ $ do
+                      (inst, startWorker) <-
+                        create
+                          (\wf -> Core.completeWorkflowActivation workerCore wf)
+                          f
+                          worker.workerDeadlockTimeout
+                          worker.workerErrorConverters
+                          worker.workerInboundInterceptors
+                          worker.workerOutboundInterceptors
+                          worker.workerVault
+                          worker.processor
+                          workflowInfo
+                          initializeWorkflow
+                          initialSignals
+                      liftIO $ addBuiltinQueryHandlers inst
+                      published <- upsertWorkflowInstance runId_ inst
+                      liftIO startWorker
+                      pure $ Just published
           pure $ join (vExistingInstance V.!? 0)
 
     removeEvictedWorkflowInstances :: ReaderT WorkflowWorker m ()
@@ -360,6 +466,10 @@ handleActivation activation = inSpan' "handleActivation" (defaultSpanArguments {
                     Logging.logDebug msg
                 Just wf -> do
                   pure $ do
+                    liftIO $ writeIORef wf.executionCancelled True
+                    executionThread <- readIORef wf.executionThread
+                    cancel executionThread
+                    void $ waitCatch executionThread
                     liftIO $ finalizeWorkflowExecution wf.inboundInterceptor wf Nothing
                     Logging.logDebug $ Text.pack ("Evicting workflow instance with run ID " ++ show runId_ ++ ", message: " ++ show (removeFromCache ^. Activation.message))
         _ -> pure ()
