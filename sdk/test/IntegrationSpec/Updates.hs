@@ -114,6 +114,27 @@ updateThatSleeps = provideCallStack do
 registerWorkflow 'updateThatSleeps
 
 
+{- | Completes after two updates have been applied. Each handler sleeps for
+its argument in seconds, so an earlier update can finish before a later
+one: the handlers' lifetimes overlap without nesting.
+-}
+concurrentSleepingUpdates :: Workflow Int
+concurrentSleepingUpdates = provideCallStack do
+  stateVar <- newStateVar (0 :: Int)
+  let handleUpdate arg = do
+        sleep $ seconds $ fromIntegral arg
+        modifyStateVar stateVar (+ arg)
+        readStateVar stateVar
+  setUpdateHandler testUpdate handleUpdate Nothing
+  waitCondition do
+    x <- readStateVar stateVar
+    pure $ x >= 3
+  readStateVar stateVar
+
+
+registerWorkflow 'concurrentSleepingUpdates
+
+
 workflowThatThrowsBeforeTheUpdate :: Workflow Int
 workflowThatThrowsBeforeTheUpdate = provideCallStack do
   stateVar <- newStateVar (0 :: Int)
