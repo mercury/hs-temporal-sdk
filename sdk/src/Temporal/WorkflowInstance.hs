@@ -89,6 +89,7 @@ import qualified Proto.Temporal.Sdk.Core.WorkflowCompletion.WorkflowCompletion_F
 import RequireCallStack (provideCallStack)
 import System.Random (mkStdGen)
 import Temporal.Common
+import Temporal.Common.Async (asyncLabelled)
 import qualified Temporal.Common.Logging as Logging
 import qualified Temporal.Core.Worker as Core
 import Temporal.Coroutine
@@ -182,41 +183,36 @@ create
     activationChannel <- newTQueueIO
     executionThread <- newIORef (error "Workflow thread not yet started")
     executionCancelled <- newIORef False
-    -- The instance and its execution thread refer to each other. The start
-    -- barrier keeps the instance inaccessible until 'executionThread' is set.
+    -- The instance must be fully initialized and published before its executor
+    -- starts. Delaying the fork also ensures an exception during registration
+    -- cannot leave a worker thread blocked forever without an owner.
     let inst = WorkflowInstance {..}
-    -- The workflow thread must start only after the worker has registered built-ins and
-    -- published this instance. Later activations can then enqueue immediately, while this
-    -- thread remains their sole executor after initial evaluation reaches a suspension.
-    -- Crucially, no worker-poller thread waits on this barrier.
-    startWorker <- newEmptyMVar
-    liftIO $ E.mask_ $ do
-      workerThread <- async $ do
-        readMVar startWorker
-        result <-
-          E.try @SomeException $
-            runInstanceM inst $ do
-              exec <- setUpWorkflowExecution start
-              res <-
-                liftIO $
-                  interceptWorkflow inboundInterceptor exec $ \exec' ->
-                    runInstanceM inst $ runTopLevel $ do
-                      Logging.logDebug "Executing workflow"
-                      wf <- applyStartWorkflow initialSignals exec' workflowFn
-                      runWorkflowToCompletion wf
-              finishWorkflow res
-        case result of
-          Left err -> do
-            cancelled <- readIORef executionCancelled
-            case (cancelled, E.fromException err :: Maybe E.SomeAsyncException) of
-              (True, _) -> pure ()
-              (_, Just _) -> E.throwIO err
-              _ -> runInstanceM inst $ failWorkflowActivation err
-          Right () -> pure ()
-      link workerThread
-      writeIORef executionThread workerThread
-    let releaseStart = putMVar startWorker ()
-    pure (inst, releaseStart)
+        startWorker = E.mask_ $ do
+          workerThread <-
+            asyncLabelled ("temporal/workflow/executor/" <> Text.unpack (rawRunId info.runId)) $ do
+              result <-
+                E.try @SomeException $
+                  runInstanceM inst $ do
+                    exec <- setUpWorkflowExecution start
+                    res <-
+                      liftIO $
+                        interceptWorkflow inboundInterceptor exec $ \exec' ->
+                          runInstanceM inst $ runTopLevel $ do
+                            Logging.logDebug "Executing workflow"
+                            wf <- applyStartWorkflow initialSignals exec' workflowFn
+                            runWorkflowToCompletion wf
+                    finishWorkflow res
+              case result of
+                Left err -> do
+                  cancelled <- readIORef executionCancelled
+                  case (cancelled, E.fromException err :: Maybe E.SomeAsyncException) of
+                    (True, _) -> pure ()
+                    (_, Just _) -> E.throwIO err
+                    _ -> runInstanceM inst $ failWorkflowActivation err
+                Right () -> pure ()
+          writeIORef executionThread workerThread
+          link workerThread
+    pure (inst, startWorker)
 
 
 failWorkflowActivation :: SomeException -> InstanceM ()
