@@ -37,7 +37,7 @@ import qualified Data.Vector as V
 import qualified Focus
 import Lens.Family2
 import qualified ListT
-import OpenTelemetry.Context.ThreadLocal
+import OpenTelemetry.Context.ThreadLocal (attachContext, detachContext, getContext)
 import OpenTelemetry.Trace.Core hiding (inSpan, inSpan')
 import OpenTelemetry.Trace.Monad
 import qualified Proto.Temporal.Api.Common.V1.Message_Fields as Message
@@ -72,8 +72,7 @@ data EvictionWithRunID = EvictionWithRunID
   deriving stock (Show)
 
 
-data WorkflowWorker
-  = forall ty.
+data WorkflowWorker = forall ty.
   Core.KnownWorkerType ty =>
   WorkflowWorker
   { workerWorkflowFunctions :: {-# UNPACK #-} !(HashMap Text WorkflowDefinition)
@@ -113,18 +112,23 @@ pollWorkflowActivation = do
   liftIO $ Core.pollWorkflowActivation workerCore
 
 
-upsertWorkflowInstance :: (MonadLoggerIO m) => RunId -> WorkflowInstance -> ReaderT WorkflowWorker m WorkflowInstance
+upsertWorkflowInstance :: (MonadLoggerIO m) => RunId -> WorkflowInstance -> ReaderT WorkflowWorker m (WorkflowInstance, Bool)
 upsertWorkflowInstance r inst = do
   worker <- ask
   liftIO $ atomically $ do
-    let modifier =
-          \case
-            Nothing ->
-              Just inst
-            Just exists ->
-              Just exists
+    mExisting <- StmMap.lookup r worker.runningWorkflows
+    case mExisting of
+      Nothing -> do
+        StmMap.insert inst r worker.runningWorkflows
+        pure (inst, True)
+      Just existing -> pure (existing, False)
 
-    StmMap.focus (Focus.alter modifier >> Focus.lookupWithDefault inst) r worker.runningWorkflows
+
+publishWorkflowInstance :: (MonadLoggerIO m) => RunId -> WorkflowInstance -> IO () -> ReaderT WorkflowWorker m WorkflowInstance
+publishWorkflowInstance runId_ inst startWorker = do
+  (published, inserted) <- upsertWorkflowInstance runId_ inst
+  when inserted $ liftIO startWorker
+  pure published
 
 
 -- | Execute an action repeatedly as long as it returns True.
@@ -175,14 +179,17 @@ execute worker@WorkflowWorker {workerCore} =
             reservation <- liftIO $ atomically $ reserveWorkflowActivation worker activation
             let finish = liftIO $ atomically $ finishWorkflowActivation worker reservation
             activator <-
-              ( asyncLabelledWithUnmask (Text.unpack $ Text.concat ["temporal/worker/workflow/activate", Core.namespace c, "/", Core.taskQueue c]) $ \restore ->
-                  ( do
-                      liftIO $ forM_ reservation.reservationPredecessor $ atomically . readTMVar
-                      _ <- attachContext activationCtxt
-                      restore $ handleActivation activation
-                  )
-                    `finally` finish
-              )
+              asyncLabelledWithUnmask
+                (Text.unpack $ Text.concat ["temporal/worker/workflow/activate", Core.namespace c, "/", Core.taskQueue c])
+                ( \restore ->
+                    ( do
+                        liftIO $ forM_ reservation.reservationPredecessor $ atomically . readTMVar
+                        priorContext <- liftIO $ attachContext activationCtxt
+                        restore (handleActivation activation)
+                          `finally` liftIO (detachContext priorContext)
+                    )
+                      `finally` finish
+                )
                 `onException` finish
             link activator
           pure True
@@ -236,7 +243,7 @@ cancelRunningWorkflowExecutors worker = do
   -- exits. Drain handlers before the snapshot so no executor survives Core.
   atomically $ do
     modifyTVar' worker.workerActivationLoop ActivationLoop.beginDraining
-    ActivationLoop.isDrained <$> readTVar worker.workerActivationLoop >>= check
+    readTVar worker.workerActivationLoop >>= check . ActivationLoop.isDrained
   runningWorkflows <- ListT.toList $ StmMap.listTNonAtomic worker.runningWorkflows
   mapConcurrently_
     ( \(_, inst) ->
@@ -426,7 +433,7 @@ handleActivation activation = inSpan' "handleActivation" (defaultSpanArguments {
                     mask_ $ do
                       (inst, startWorker) <-
                         create
-                          (\wf -> Core.completeWorkflowActivation workerCore wf)
+                          (Core.completeWorkflowActivation workerCore)
                           f
                           worker.workerDeadlockTimeout
                           worker.workerErrorConverters
@@ -438,8 +445,7 @@ handleActivation activation = inSpan' "handleActivation" (defaultSpanArguments {
                           initializeWorkflow
                           initialSignals
                       liftIO $ addBuiltinQueryHandlers inst
-                      published <- upsertWorkflowInstance runId_ inst
-                      liftIO startWorker
+                      published <- publishWorkflowInstance runId_ inst startWorker
                       pure $ Just published
           pure $ join (vExistingInstance V.!? 0)
 
