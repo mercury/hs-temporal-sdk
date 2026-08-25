@@ -150,7 +150,6 @@ tests:
     main: Main.hs
     source-dirs: test
     other-modules:
-      ActivationLoopSpec,
       Spec,
       ClientHistorySpec,
       ContinueAsNewSpec,

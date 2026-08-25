@@ -163,7 +163,6 @@ import Temporal.Payload (PayloadProcessor (..))
 import Temporal.Runtime
 import Temporal.Worker.Types
 import Temporal.Workflow.Definition
-import qualified Temporal.Workflow.Internal.ActivationLoop as ActivationLoop
 import Temporal.Workflow.Types (NexusClient (..), makeNexusClient)
 import qualified Temporal.Workflow.Worker as Workflow
 import UnliftIO
@@ -624,8 +623,6 @@ startReplayWorker rt conf = provideCallStack $ runWorkerContext conf $ do
     workerEvictionEmitter <- newBroadcastTChanIO
     workerShutdownState <- UnliftIO.newMVar WorkerShutdownNotStarted
     runningWorkflows <- liftIO StmMap.newIO
-    workerActivationLoop <- liftIO $ newTVarIO ActivationLoop.initialActivationLoop
-    workerActivationTails <- liftIO StmMap.newIO
     uuid <- liftIO nextRandom
     let workerWorkflowFunctions = conf.wfDefs
         workerTaskQueue = TaskQueue (Core.taskQueue conf.coreConfig <> "-" <> UUID.toText uuid)
@@ -791,8 +788,6 @@ startWorker client conf = provideCallStack $ runWorkerContext conf $ inSpan "sta
     workerEvictionEmitter <- newBroadcastTChanIO
     workerShutdownState <- UnliftIO.newMVar WorkerShutdownNotStarted
     runningWorkflows <- liftIO StmMap.newIO
-    workerActivationLoop <- liftIO $ newTVarIO ActivationLoop.initialActivationLoop
-    workerActivationTails <- liftIO StmMap.newIO
     runningActivities <- liftIO StmMap.newIO
     activityEnv <- newIORef conf.actEnv
     let errorConverters = mkAnnotatedHandlers conf.applicationErrorConverters
