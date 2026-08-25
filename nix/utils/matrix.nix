@@ -6,8 +6,6 @@
   ];
 
   ghcVersions = [
-    "ghc96"
-    "ghc98"
     "ghc910"
   ];
 }
