@@ -970,30 +970,42 @@ impl WorkerRef {
     }
 
     fn initiate_shutdown(&self) {
-        let worker = self.worker.as_ref().unwrap().clone();
-        worker.initiate_shutdown();
+        // Finalization consumes the inner worker. Treat a repeated shutdown
+        // request as complete instead of panicking across the C ABI boundary.
+        if let Some(worker) = &self.worker {
+            worker.initiate_shutdown();
+        }
     }
 
     fn finalize_shutdown(&mut self, hs: HsCallback<CUnit, CWorkerError>) {
-        // Take the worker out of the option and leave None. This should be the
-        // only reference remaining to the worker so try_unwrap will work.
-        let core_worker = match Arc::try_unwrap(self.worker.take().unwrap()) {
-            Ok(core_worker) => Ok(core_worker),
-            Err(arc) => Err(WorkerError {
-                code: WorkerErrorCode::SDKError,
-                message: format!(
-                    "Cannot finalize, expected 1 reference, got {}",
-                    Arc::strong_count(&arc)
-                ),
-            }),
+        let Some(core_worker) = self.worker.take() else {
+            self.runtime.future_result_into_hs(hs, async {
+                Err(CWorkerError::c_repr_of(WorkerError {
+                    code: WorkerErrorCode::SDKError,
+                    message: "Worker finalization has already started".to_string(),
+                })
+                .unwrap())
+            });
+            return;
         };
-        self.runtime.clone().future_result_into_hs(hs, async move {
-            match core_worker {
+        self.runtime.future_result_into_hs(hs, async move {
+            // An interrupted Haskell wait does not cancel its Tokio task. Wait
+            // for Core shutdown before unwrapping so any outstanding poll or
+            // completion task can finish and release its worker reference.
+            core_worker.shutdown().await;
+            match Arc::try_unwrap(core_worker) {
                 Ok(worker) => {
                     worker.finalize_shutdown().await;
                     Ok(CUnit {})
                 }
-                Err(err) => Err(CWorkerError::c_repr_of(err).unwrap()),
+                Err(arc) => Err(CWorkerError::c_repr_of(WorkerError {
+                    code: WorkerErrorCode::SDKError,
+                    message: format!(
+                        "Cannot finalize, expected 1 reference, got {}",
+                        Arc::strong_count(&arc)
+                    ),
+                })
+                .unwrap()),
             }
         })
     }

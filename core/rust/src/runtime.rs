@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::net::SocketAddr;
 use std::os::raw::c_int;
-use std::sync::Arc;
+use std::sync::{Arc, mpsc};
 use std::time::{Duration, SystemTime};
 use temporalio_common::telemetry::metrics::{CoreMeter, NoOpCoreMeter};
 use temporalio_common::telemetry::{
@@ -24,6 +24,53 @@ pub struct RuntimeRef {
 pub(crate) struct Runtime {
     pub(crate) core: Arc<CoreRuntime>,
     pub(crate) try_put_mvar: extern "C" fn(capability: Capability, mvar: *mut MVar) -> (),
+    core_runtime_dropper: mpsc::Sender<Arc<CoreRuntime>>,
+}
+
+/// Drops task-owned Core runtime references outside the Tokio runtime they keep alive.
+///
+/// A spawned bridge call may hold the final `Arc<CoreRuntime>` after Haskell destroys
+/// its runtime handle. Dropping that reference inside the call's Tokio task would make
+/// Tokio try to shut itself down from one of its own workers. Each Runtime has
+/// a non-Tokio dropper thread on which spawned calls release their keepalives.
+fn spawn_core_runtime_dropper() -> mpsc::Sender<Arc<CoreRuntime>> {
+    let (tx, rx) = mpsc::channel::<Arc<CoreRuntime>>();
+    std::thread::Builder::new()
+        .name("temporal-core-runtime-dropper".to_owned())
+        .spawn(move || {
+            while let Ok(runtime) = rx.recv() {
+                drop(runtime);
+            }
+        })
+        .expect("failed to start the Core runtime dropper");
+    tx
+}
+
+struct CoreRuntimeKeepAlive {
+    runtime: Option<Arc<CoreRuntime>>,
+    dropper: mpsc::Sender<Arc<CoreRuntime>>,
+}
+
+impl CoreRuntimeKeepAlive {
+    fn new(runtime: Arc<CoreRuntime>, dropper: mpsc::Sender<Arc<CoreRuntime>>) -> Self {
+        Self {
+            runtime: Some(runtime),
+            dropper,
+        }
+    }
+}
+
+impl Drop for CoreRuntimeKeepAlive {
+    fn drop(&mut self) {
+        let runtime = self.runtime.take().unwrap();
+        if let Err(runtime) = self.dropper.send(runtime) {
+            // Do not unwind and drop `runtime` on a Tokio worker. Losing the
+            // Runtime's dropper is an internal lifecycle invariant failure.
+            std::mem::forget(runtime);
+            eprintln!("hs-temporal-sdk: Core runtime dropper exited unexpectedly; aborting");
+            std::process::abort();
+        }
+    }
 }
 
 fn init_runtime(
@@ -81,6 +128,7 @@ fn init_runtime(
         runtime: Runtime {
             core: Arc::new(runtime),
             try_put_mvar,
+            core_runtime_dropper: spawn_core_runtime_dropper(),
         },
     })
 }
@@ -164,56 +212,173 @@ pub struct HsCallback<A, E> {
     pub error_slot: *mut *mut E,
 }
 
+// SAFETY: Haskell allocates the two result slots before constructing this
+// callback and keeps them alive until `hs_try_putmvar` wakes either the caller
+// or its cleanup thread. The callback is their only writer. `mvar` is a
+// `StablePtr PrimMVar`; `hs_try_putmvar` may be called from any OS thread and
+// consumes that stable pointer. Moving these pointer values does not move or
+// concurrently access their pointees.
+unsafe impl<A, E> Send for HsCallback<A, E> {}
+
 impl<A, E> HsCallback<A, E> {
-    pub(crate) fn put_success(self, runtime: &Runtime, result: A)
+    pub(crate) fn put_success(self, try_put_mvar: extern "C" fn(Capability, *mut MVar), result: A)
     where
         A: RawPointerConverter<A>,
     {
         unsafe {
             *self.result_slot = result.into_raw_pointer_mut();
             *self.error_slot = std::ptr::null_mut();
-            runtime.put_mvar(self.cap, self.mvar);
+            try_put_mvar(self.cap, self.mvar);
         }
     }
 
-    pub(crate) fn put_failure(self, runtime: &Runtime, error: E)
+    pub(crate) fn put_failure(self, try_put_mvar: extern "C" fn(Capability, *mut MVar), error: E)
     where
         E: RawPointerConverter<E>,
     {
         unsafe {
             *self.error_slot = error.into_raw_pointer_mut();
             *self.result_slot = std::ptr::null_mut();
-            runtime.put_mvar(self.cap, self.mvar);
+            try_put_mvar(self.cap, self.mvar);
         }
     }
 
-    pub(crate) fn put_result(self, runtime: &Runtime, result: Result<A, E>)
-    where
+    pub(crate) fn put_result(
+        self,
+        try_put_mvar: extern "C" fn(Capability, *mut MVar),
+        result: Result<A, E>,
+    ) where
         A: RawPointerConverter<A>,
         E: RawPointerConverter<E>,
     {
         match result {
-            Ok(result) => self.put_success(runtime, result),
-            Err(error) => self.put_failure(runtime, error),
+            Ok(result) => self.put_success(try_put_mvar, result),
+            Err(error) => self.put_failure(try_put_mvar, error),
         }
     }
 }
 
 impl Runtime {
+    /// Schedule `fut` on Tokio and report its result through `callback`.
+    ///
+    /// The C ABI entry point must return after scheduling. Haskell then waits on
+    /// an interruptible `takeMVar`; using `block_on` here would instead keep it
+    /// inside the foreign call until the future completed, preventing
+    /// `timeout` and `killThread` from interrupting the wait.
     pub fn future_result_into_hs<F, T, E>(&self, callback: HsCallback<T, E>, fut: F)
     where
         F: Future<Output = Result<T, E>> + Send + 'static,
-        T: RawPointerConverter<T>,
-        E: RawPointerConverter<E>,
+        T: RawPointerConverter<T> + 'static,
+        E: RawPointerConverter<E> + 'static,
     {
         let handle = self.core.tokio_handle();
-        let _guard = handle.enter();
-        let result = handle.block_on(fut);
-        callback.put_result(self, result);
+        let try_put_mvar = self.try_put_mvar;
+        let runtime =
+            CoreRuntimeKeepAlive::new(self.core.clone(), self.core_runtime_dropper.clone());
+        let task = handle.spawn(async move {
+            callback.put_result(try_put_mvar, fut.await);
+        });
+
+        // Detached Tokio tasks do not propagate panics. Supervise this one so
+        // a panic remains fail-fast, as it was when `block_on` ran inside the C
+        // ABI call, rather than leaving the Haskell waiter blocked forever. The
+        // supervisor also keeps Tokio alive until the callback has completed.
+        handle.spawn(async move {
+            let _runtime = runtime;
+            match task.await {
+                Ok(()) => {}
+                Err(err) if err.is_panic() => {
+                    eprintln!(
+                        "hs-temporal-sdk: panic in the Tokio task servicing a Haskell call; \
+                         aborting rather than leaving the caller blocked forever"
+                    );
+                    std::process::abort();
+                }
+                // The task handle is not exposed, and `_runtime` prevents
+                // runtime shutdown while the task is pending. Cancellation
+                // would strand the Haskell callback and its cleanup thread.
+                Err(_) => {
+                    eprintln!(
+                        "hs-temporal-sdk: Tokio task servicing a Haskell call was cancelled; \
+                         aborting rather than leaving the caller blocked forever"
+                    );
+                    std::process::abort();
+                }
+            }
+        });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::mpsc;
+
+    extern "C" fn notify_haskell(_: Capability, mvar: *mut MVar) {
+        let sender = unsafe { &*mvar.cast::<mpsc::Sender<()>>() };
+        sender.send(()).unwrap();
     }
 
-    pub fn put_mvar(&self, capability: Capability, mvar: *mut MVar) {
-        (self.try_put_mvar)(capability, mvar);
+    #[test]
+    fn future_result_into_hs_returns_early_and_keeps_runtime_alive() {
+        let core = CoreRuntime::new(
+            RuntimeOptions::builder().build().unwrap(),
+            TokioRuntimeBuilder::default(),
+        )
+        .unwrap();
+        let core = Arc::new(core);
+        let core_weak = Arc::downgrade(&core);
+        let runtime = Runtime {
+            core,
+            try_put_mvar: notify_haskell,
+            core_runtime_dropper: spawn_core_runtime_dropper(),
+        };
+
+        let (completed_tx, completed_rx) = mpsc::channel::<()>();
+        let completed_tx = Box::into_raw(Box::new(completed_tx));
+        let mut result_slot: *mut CArray<u8> = std::ptr::null_mut();
+        let mut error_slot: *mut CArray<u8> = std::ptr::null_mut();
+        let callback = HsCallback {
+            cap: Capability { cap_num: -1 },
+            mvar: completed_tx.cast(),
+            result_slot: &mut result_slot,
+            error_slot: &mut error_slot,
+        };
+
+        let (returned_tx, returned_rx) = mpsc::channel();
+        let (release_tx, release_rx) = tokio::sync::oneshot::channel();
+        let releaser = std::thread::spawn(move || {
+            let returned_before_release =
+                returned_rx.recv_timeout(Duration::from_millis(250)).is_ok();
+            release_tx.send(()).unwrap();
+            returned_before_release
+        });
+
+        runtime.future_result_into_hs(callback, async move {
+            release_rx.await.unwrap();
+            Ok::<_, CArray<u8>>(CArray::c_repr_of(vec![1_u8]).unwrap())
+        });
+        // Simulate an interrupted Haskell caller leaving `bracketRuntime` while
+        // the Tokio operation and its cleanup callback are still pending.
+        drop(runtime);
+        let _ = returned_tx.send(());
+
+        let returned_before_release = releaser.join().unwrap();
+        completed_rx.recv_timeout(Duration::from_secs(1)).unwrap();
+
+        unsafe {
+            drop(Box::from_raw(completed_tx));
+            drop(CArray::from_raw_pointer_mut(result_slot).unwrap());
+        }
+
+        let drop_deadline = std::time::Instant::now() + Duration::from_secs(1);
+        while core_weak.strong_count() != 0 && std::time::Instant::now() < drop_deadline {
+            std::thread::yield_now();
+        }
+
+        assert!(returned_before_release);
+        assert!(error_slot.is_null());
+        assert_eq!(core_weak.strong_count(), 0);
     }
 }
 

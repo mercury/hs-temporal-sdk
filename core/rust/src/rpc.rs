@@ -1,4 +1,4 @@
-use crate::client::{rpc_req, rpc_resp, CRPCError, ClientRef, RPCError, RpcCall, TemporalCall};
+use crate::client::{CRPCError, ClientRef, RPCError, RpcCall, TemporalCall, rpc_req, rpc_resp};
 use crate::runtime::{Capability, HsCallback, MVar};
 use ffi_convert::{CArray, CReprOf};
 use temporalio_client::OperatorService;

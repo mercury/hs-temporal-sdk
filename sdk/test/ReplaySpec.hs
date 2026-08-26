@@ -1,15 +1,24 @@
 module ReplaySpec where
 
+import Control.Concurrent (threadDelay, yield)
+import qualified Control.Concurrent.Async as Async
+import Control.Exception (IOException, bracket, catch, fromException, try)
 import Control.Monad (void, when)
 import Data.Either (isLeft, isRight)
 import Data.ProtoLens.Encoding (encodeMessage)
 import qualified Data.Text as Text
+import qualified GHC.Conc.Sync as Conc
+import qualified Network.Socket as N
 import RequireCallStack (provideCallStack)
-import System.Directory (getTemporaryDirectory, removeFile)
+import System.Directory (findExecutable, getTemporaryDirectory, removeFile)
+import System.Timeout (timeout)
 import Temporal.Activity
 import qualified Temporal.Client as C
+import qualified Temporal.Core.Internal.TestFixture as TestFixture
 import qualified Temporal.Core.Worker as Core
 import Temporal.Duration
+import qualified Temporal.EphemeralServer as Ephemeral
+import qualified Temporal.EphemeralServer as TemporalDevServerConfig (TemporalDevServerConfig (..))
 import Temporal.Payload
 import Temporal.Replay (readHistoryProtobufFile, writeHistoryProtobufFile)
 import Temporal.Worker
@@ -19,7 +28,173 @@ import TestHelpers
 
 
 spec :: Spec
-spec = withTestServer_ tests
+spec = do
+  describe "Tokio FFI interruption" $ do
+    specify "interrupts a blocked poll and reaps its eventual result" $
+      bracket newIdleReplayWorker shutdownIdleReplayWorker $ \(worker, _) -> do
+        poller <- Async.async $ Core.pollWorkflowActivation worker
+
+        blocked <- timeout 5_000_000 $ waitUntilBlockedOnMVar (Async.asyncThreadId poller)
+        blocked `shouldBe` Just ()
+
+        cancelled <- timeout 5_000_000 $ Async.cancel poller
+        cancelled `shouldBe` Just ()
+        Async.waitCatch poller >>= \case
+          Left err
+            | Just Async.AsyncCancelled <- fromException err -> pure ()
+          outcome -> expectationFailure $ "expected AsyncCancelled, got " <> show outcome
+
+    specify "shares repeated worker finalization" $
+      bracket newIdleReplayWorker shutdownIdleReplayWorker $
+        const $
+          pure ()
+
+    specify "frees the Rust result of an interrupted call" $ do
+      before <- TestFixture.testResourceDropCount
+      call <- Async.async $ TestFixture.acquireDelayedTestResource globalRuntime 1_000
+      blocked <- timeout 5_000_000 $ waitUntilBlockedOnMVar (Async.asyncThreadId call)
+      blocked `shouldBe` Just ()
+      cancelled <- timeout 5_000_000 $ Async.cancel call
+      cancelled `shouldBe` Just ()
+      -- Interrupting the wait cannot cancel the Rust future; the forked
+      -- reaper must free the result the future eventually produces.
+      reaped <- timeout 30_000_000 $ waitUntil ((> before) <$> TestFixture.testResourceDropCount)
+      reaped `shouldBe` Just ()
+
+    specify "frees the Rust result of a completed call" $ do
+      before <- TestFixture.testResourceDropCount
+      result <- TestFixture.acquireDelayedTestResource globalRuntime 0
+      result `shouldBe` Right ()
+      after <- TestFixture.testResourceDropCount
+      after `shouldSatisfy` (> before)
+
+  describe "Ephemeral server shutdown" $ do
+    specify "shares repeated shutdown results" $
+      bracket newEphemeralServer (void . Ephemeral.shutdownEphemeralServer) $ \server -> do
+        first <- Ephemeral.shutdownEphemeralServer server
+        second <- Ephemeral.shutdownEphemeralServer server
+        first `shouldBe` Right ()
+        second `shouldBe` first
+
+    specify "stops a dev server whose startup wait was interrupted" $ do
+      freePort <- Ephemeral.getFreePort
+      serverConfig <- devServerConfig freePort
+      starter <- Async.async $ Ephemeral.launchDevServer globalRuntime serverConfig
+      blocked <- timeout 10_000_000 $ waitUntilBlockedOnMVar (Async.asyncThreadId starter)
+      blocked `shouldBe` Just ()
+      cancelled <- timeout 5_000_000 $ Async.cancel starter
+      cancelled `shouldBe` Just ()
+      -- Interrupting the wait cannot cancel the Rust future, so the server
+      -- still finishes starting and binds its port...
+      started <- timeout 60_000_000 $ waitUntil (portIsListening freePort)
+      started `shouldBe` Just ()
+      -- ...and the abandon handler must then shut the orphaned server down,
+      -- stopping the process and releasing the port.
+      stopped <- timeout 60_000_000 $ waitUntil (not <$> portIsListening freePort)
+      stopped `shouldBe` Just ()
+
+  withTestServer_ $ do
+    describe "Worker shutdown" $ do
+      specify "shares repeated high-level shutdown" $ \TestEnv {baseConf, coreClient} ->
+        bracket (startWorker coreClient $ configure () replayActivityDef baseConf) shutdown shutdown
+
+      specify "survives interrupted startup" $ \TestEnv {baseConf, coreClient} -> do
+        starter <- Async.async $ startWorker coreClient $ configure () replayActivityDef baseConf
+        blocked <- timeout 10_000_000 $ waitUntilBlockedOnMVar (Async.asyncThreadId starter)
+        blocked `shouldBe` Just ()
+        cancelled <- timeout 5_000_000 $ Async.cancel starter
+        cancelled `shouldBe` Just ()
+        -- The interrupted startup hands its core worker to a background
+        -- teardown. Until that teardown deregisters the worker from Core's
+        -- client registry, restarting on the same task queue is rejected, so
+        -- retry until the registration is released.
+        let restart =
+              try (startWorker coreClient $ configure () replayActivityDef baseConf) >>= \case
+                Left (_ :: Core.WorkerError) -> threadDelay 10_000 *> restart
+                Right worker -> pure worker
+        restarted <- timeout 30_000_000 restart
+        case restarted of
+          Nothing -> expectationFailure "worker could not be restarted after interrupted startup"
+          Just worker -> shutdown worker
+
+    tests
+
+
+newIdleReplayWorker :: IO (Core.Worker 'Core.Replay, Core.HistoryPusher)
+newIdleReplayWorker =
+  Core.newReplayWorker globalRuntime Core.defaultWorkerConfig >>= \case
+    Left err -> error $ "failed to create replay worker: " <> show err
+    Right resources -> pure resources
+
+
+shutdownIdleReplayWorker :: (Core.Worker 'Core.Replay, Core.HistoryPusher) -> IO ()
+shutdownIdleReplayWorker (worker, historyPusher) = do
+  Core.closeHistory historyPusher
+  Core.initiateShutdown worker
+  expectFinalized worker
+  expectFinalized worker
+  Core.closeWorker worker
+
+
+expectFinalized :: Core.Worker 'Core.Replay -> IO ()
+expectFinalized worker =
+  Core.finalizeShutdown worker >>= \case
+    Left err -> error $ "failed to finalize replay worker: " <> show err
+    Right () -> pure ()
+
+
+devServerConfig :: N.PortNumber -> IO Ephemeral.TemporalDevServerConfig
+devServerConfig port = do
+  temporalPath <-
+    findExecutable "temporal" >>= \case
+      Nothing -> error "Could not find the 'temporal' executable in PATH"
+      Just path -> pure path
+  pure
+    Ephemeral.defaultTemporalDevServerConfig
+      { TemporalDevServerConfig.exe = Ephemeral.ExistingPath temporalPath
+      , TemporalDevServerConfig.port = Just $ fromIntegral port
+      , TemporalDevServerConfig.extraArgs = []
+      }
+
+
+newEphemeralServer :: IO Ephemeral.EphemeralServer
+newEphemeralServer = do
+  freePort <- Ephemeral.getFreePort
+  serverConfig <- devServerConfig freePort
+  Ephemeral.launchDevServer globalRuntime serverConfig >>= either (error . show) pure
+
+
+waitUntilBlockedOnMVar :: Conc.ThreadId -> IO ()
+waitUntilBlockedOnMVar threadId =
+  Conc.threadStatus threadId >>= \case
+    Conc.ThreadBlocked Conc.BlockedOnMVar -> pure ()
+    Conc.ThreadFinished -> error "poll finished before blocking"
+    Conc.ThreadDied -> error "poll died before blocking"
+    _ -> yield *> waitUntilBlockedOnMVar threadId
+
+
+-- | Poll a condition until it holds. Bound with 'timeout' at the call site.
+waitUntil :: IO Bool -> IO ()
+waitUntil probe =
+  probe >>= \case
+    True -> pure ()
+    False -> threadDelay 10_000 *> waitUntil probe
+
+
+portIsListening :: N.PortNumber -> IO Bool
+portIsListening port =
+  bracket (N.socket N.AF_INET N.Stream N.defaultProtocol) N.close $ \sock ->
+    ( do
+        N.connect sock (N.SockAddrInet port (N.tupleToHostAddress (127, 0, 0, 1)))
+        -- A loopback connect can succeed with no listener through TCP
+        -- simultaneous open, when the kernel assigns the destination as the
+        -- ephemeral source port. That self-connection is not a server;
+        -- closing the socket tears it down and frees the port again.
+        localAddr <- N.getSocketName sock
+        peerAddr <- N.getPeerName sock
+        pure (localAddr /= peerAddr)
+    )
+      `catch` \(_ :: IOException) -> pure False
 
 
 replayActivity :: Activity () Int
@@ -245,7 +420,7 @@ tests = describe "Workflow Replay" $ do
           C.waitWorkflowResult wfHandle
           C.fetchHistory wfHandle
 
-      Right jsonBytes <- pure =<< Core.historyProtoToJson (encodeMessage history)
+      Right jsonBytes <- Core.historyProtoToJson (encodeMessage history)
       result <- runReplayHistoryJson globalRuntime conf (WorkflowId "replay-json") jsonBytes
       result `shouldSatisfy` isRight
 
@@ -265,7 +440,7 @@ tests = describe "Workflow Replay" $ do
           C.waitWorkflowResult wfHandle
           C.fetchHistory wfHandle
 
-      Right jsonBytes <- pure =<< Core.historyProtoToJson (encodeMessage history)
+      Right jsonBytes <- Core.historyProtoToJson (encodeMessage history)
       result <- runReplayHistoryJson globalRuntime conf (WorkflowId "replay-json-act") jsonBytes
       result `shouldSatisfy` isRight
 

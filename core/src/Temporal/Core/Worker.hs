@@ -64,16 +64,16 @@ module Temporal.Core.Worker (
   freeCustomSlotSupplierHandle,
 ) where
 
-import Control.Concurrent (forkIO)
+import Control.Concurrent (MVar, forkIO)
+import qualified Control.Concurrent
 import Control.Exception
 import Control.Monad
 import Data.Aeson
 import Data.Aeson.TH
-import Data.Atomics (atomicModifyIORefCAS)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
-import Data.IORef
+import Data.Maybe (fromMaybe)
 import Data.ProtoLens.Encoding (decodeMessageOrDie, encodeMessage)
 import Data.Text (Text)
 import Data.Word
@@ -82,6 +82,7 @@ import Foreign.Marshal hiding (void)
 import Foreign.Ptr
 import Foreign.StablePtr
 import Foreign.Storable
+import qualified GHC.Conc.Sync
 import Proto.Temporal.Api.History.V1.Message (History)
 import Proto.Temporal.Sdk.Core.ActivityTask.ActivityTask (ActivityTask)
 import Proto.Temporal.Sdk.Core.CoreInterface (ActivityHeartbeat, ActivityTaskCompletion)
@@ -92,8 +93,21 @@ import Temporal.Core.CTypes
 import Temporal.Core.Client
 import Temporal.Internal.FFI
 import Temporal.Runtime
-import UnliftIO (liftIO)
 import qualified UnliftIO
+
+
+{- | Temporarily identify a synchronous worker FFI call in thread dumps.
+
+GHC cannot deliver an asynchronous exception while one of these calls is in
+progress. Replacing the label for the duration of the call makes the blocked
+operation visible through 'GHC.Conc.Sync.threadLabel'.
+-}
+withFfiThreadLabel :: String -> IO a -> IO a
+withFfiThreadLabel lbl act = mask $ \restore -> do
+  tid <- Control.Concurrent.myThreadId
+  prev <- GHC.Conc.Sync.threadLabel tid
+  GHC.Conc.Sync.labelThread tid lbl
+  restore act `finally` GHC.Conc.Sync.labelThread tid (fromMaybe "" prev)
 
 
 data WorkerType = Real | Replay
@@ -127,8 +141,23 @@ instance KnownWorkerType 'Replay where
   knownWorkerType = SReplay
 
 
+data WorkerAlreadyClosed = WorkerAlreadyClosed
+  deriving stock (Show)
+
+
+instance Exception WorkerAlreadyClosed
+
+
+data WorkerLifecycle (ty :: WorkerType)
+  = WorkerOpen !(Ptr (Worker ty))
+  | WorkerFinalizing
+      !(Ptr (Worker ty))
+      !(MVar (Either SomeException (Either WorkerError ())))
+  | WorkerClosed
+
+
 data Worker (ty :: WorkerType) = Worker
-  { workerPtr :: {-# UNPACK #-} !(IORef (Ptr (Worker ty)))
+  { workerLifecycle :: {-# UNPACK #-} !(MVar (WorkerLifecycle ty))
   , workerConfig :: !WorkerConfig
   , workerClient :: !(InactiveForReplay ty Client)
   , workerRuntime :: {-# UNPACK #-} !Runtime
@@ -137,7 +166,11 @@ data Worker (ty :: WorkerType) = Worker
 
 withWorker :: forall ty a. KnownWorkerType ty => Worker ty -> (Ptr (Worker ty) -> IO a) -> IO a
 withWorker w f = withRuntime w.workerRuntime $ \_ -> do
-  ptr <- readIORef w.workerPtr
+  ptr <-
+    Control.Concurrent.withMVar w.workerLifecycle $ \case
+      WorkerOpen ptr -> pure ptr
+      WorkerFinalizing {} -> throwIO WorkerAlreadyClosed
+      WorkerClosed -> throwIO WorkerAlreadyClosed
   f ptr
 
 
@@ -632,7 +665,7 @@ validateWorker w = withWorker w $ \wp ->
     (raw_validateWorker wp)
     rust_dropWorkerValidationError
     rust_dropUnit
-    (\errPtr -> peek errPtr >>= peekWorkerValidationError)
+    (peek >=> peekWorkerValidationError)
     (\_ -> return ())
 
 
@@ -657,21 +690,15 @@ newWorker c wc = withClient c $ \cPtr -> do
         poke errPtrPtr nullPtr
 
         mask_ $ do
-          raw_newWorker cPtr wcPtr wPtrPtr errPtrPtr
+          withFfiThreadLabel "temporal/ffi/new_worker" $
+            raw_newWorker cPtr wcPtr wPtrPtr errPtrPtr
           errPtr <- peek errPtrPtr
           if errPtr == nullPtr
             then do
               wPtr <- peek wPtrPtr
-              wPtrRef <- newIORef wPtr
-              pure $ Right $ Worker wPtrRef wc c (clientRuntime c)
+              lifecycle <- Control.Concurrent.newMVar (WorkerOpen wPtr)
+              pure $ Right $ Worker lifecycle wc c (clientRuntime c)
             else Left <$> getWorkerError errPtr
-
-
-data WorkerAlreadyClosed = WorkerAlreadyClosed
-  deriving stock (Show)
-
-
-instance Exception WorkerAlreadyClosed
 
 
 -- | Explicitly close a worker.
@@ -679,9 +706,18 @@ instance Exception WorkerAlreadyClosed
 -- Explicitly close a worker, freeing its resources immediately.
 -- After calling this, the worker must not be used again.
 closeWorker :: Worker ty -> IO ()
-closeWorker (Worker w _ _ _) = mask_ $ do
-  wp <- liftIO $ atomicModifyIORefCAS w $ \wp -> (throw WorkerAlreadyClosed, wp)
-  raw_closeWorker wp
+closeWorker (Worker lifecycle _ _ _) = mask_ $ do
+  wp <-
+    Control.Concurrent.modifyMVar lifecycle $ \case
+      WorkerOpen ptr -> pure (WorkerClosed, ptr)
+      WorkerFinalizing ptr resultVar -> do
+        -- Finalization owns the inner worker after its FFI call starts. Wait for
+        -- that one-shot operation before freeing the outer WorkerRef box.
+        _ <- Control.Concurrent.readMVar resultVar
+        pure (WorkerClosed, ptr)
+      WorkerClosed -> throwIO WorkerAlreadyClosed
+  withFfiThreadLabel "temporal/ffi/drop_worker" $
+    raw_closeWorker wp
 
 
 foreign import ccall "hs_temporal_new_replay_worker" raw_newReplayWorker :: Ptr Runtime -> Ptr (CArray Word8) -> Ptr (Ptr (Worker 'Replay)) -> Ptr (Ptr HistoryPusher) -> Ptr (Ptr CWorkerError) -> IO ()
@@ -692,19 +728,20 @@ newReplayWorker r conf = withRuntime r $ \rPtr -> do
   alloca $ \wPtrPtr -> do
     alloca $ \hpPtrPtr -> do
       withCArrayBS (BL.toStrict $ encode conf) $ \confPtr -> do
-        alloca $ \errPtrPtr -> do
+        alloca $ \errPtrPtr -> mask_ $ do
           poke wPtrPtr nullPtr
           poke hpPtrPtr nullPtr
           poke errPtrPtr nullPtr
 
-          raw_newReplayWorker rPtr confPtr wPtrPtr hpPtrPtr errPtrPtr
+          withFfiThreadLabel "temporal/ffi/new_replay_worker" $
+            raw_newReplayWorker rPtr confPtr wPtrPtr hpPtrPtr errPtrPtr
           errPtr <- peek errPtrPtr
           if errPtr == nullPtr
             then do
               wPtr <- peek wPtrPtr
               hpPtr <- peek hpPtrPtr
-              wRef <- newIORef wPtr
-              pure $ Right (Worker wRef conf () r, HistoryPusher hpPtr)
+              lifecycle <- Control.Concurrent.newMVar (WorkerOpen wPtr)
+              pure $ Right (Worker lifecycle conf () r, HistoryPusher hpPtr)
             else Left <$> getWorkerError errPtr
 
 
@@ -717,11 +754,12 @@ pollWorkflowActivation w = withWorker w $ \wp ->
     (raw_pollWorkflowActivation wp)
     rust_dropWorkerError
     rust_dropByteArray
-    (\errPtr -> peek errPtr >>= peekWorkerError)
-    (\resPtr -> do
-      arr <- peek resPtr
-      bs <- cArrayToByteString arr
-      return (decodeMessageOrDie bs))
+    (peek >=> peekWorkerError)
+    ( \resPtr -> do
+        arr <- peek resPtr
+        bs <- cArrayToByteString arr
+        return (decodeMessageOrDie bs)
+    )
 
 
 foreign import ccall "hs_temporal_worker_poll_activity_task" raw_pollActivityTask :: Ptr (Worker ty) -> TokioCall CWorkerError (CArray Word8)
@@ -733,11 +771,12 @@ pollActivityTask w = withWorker w $ \wp ->
     (raw_pollActivityTask wp)
     rust_dropWorkerError
     rust_dropByteArray
-    (\errPtr -> peek errPtr >>= peekWorkerError)
-    (\resPtr -> do
-      arr <- peek resPtr
-      bs <- cArrayToByteString arr
-      return (decodeMessageOrDie bs))
+    (peek >=> peekWorkerError)
+    ( \resPtr -> do
+        arr <- peek resPtr
+        bs <- cArrayToByteString arr
+        return (decodeMessageOrDie bs)
+    )
 
 
 foreign import ccall "hs_temporal_worker_complete_workflow_activation" raw_completeWorkflowActivation :: Ptr (Worker ty) -> Ptr (CArray Word8) -> TokioCall CWorkerError CUnit
@@ -750,7 +789,7 @@ completeWorkflowActivation w p = withWorker w $ \wp ->
       (raw_completeWorkflowActivation wp pPtr)
       rust_dropWorkerError
       rust_dropUnit
-      (\errPtr -> peek errPtr >>= peekWorkerError)
+      (peek >=> peekWorkerError)
       (\_ -> return ())
 
 
@@ -764,7 +803,7 @@ completeActivityTask w p = withWorker w $ \wp ->
       (raw_completeActivityTask wp pPtr)
       rust_dropWorkerError
       rust_dropUnit
-      (\errPtr -> peek errPtr >>= peekWorkerError)
+      (peek >=> peekWorkerError)
       (\_ -> return ())
 
 
@@ -777,11 +816,12 @@ pollNexusTask w = withWorker w $ \wp ->
     (raw_pollNexusTask wp)
     rust_dropWorkerError
     rust_dropByteArray
-    (\errPtr -> peek errPtr >>= peekWorkerError)
-    (\resPtr -> do
-      arr <- peek resPtr
-      bs <- cArrayToByteString arr
-      return (decodeMessageOrDie bs))
+    (peek >=> peekWorkerError)
+    ( \resPtr -> do
+        arr <- peek resPtr
+        bs <- cArrayToByteString arr
+        return (decodeMessageOrDie bs)
+    )
 
 
 foreign import ccall "hs_temporal_worker_complete_nexus_task" raw_completeNexusTask :: Ptr (Worker ty) -> Ptr (CArray Word8) -> TokioCall CWorkerError CUnit
@@ -794,7 +834,7 @@ completeNexusTask w p = withWorker w $ \wp ->
       (raw_completeNexusTask wp pPtr)
       rust_dropWorkerError
       rust_dropUnit
-      (\errPtr -> peek errPtr >>= peekWorkerError)
+      (peek >=> peekWorkerError)
       (\_ -> return ())
 
 
@@ -808,7 +848,8 @@ recordActivityHeartbeat w p = withWorker w $ \wp ->
       alloca $ \resPtrPtr -> mask_ $ do
         poke errPtrPtr nullPtr
         poke resPtrPtr nullPtr
-        raw_recordActivityHeartbeat wp pPtr errPtrPtr resPtrPtr
+        withFfiThreadLabel "temporal/ffi/record_activity_heartbeat" $
+          raw_recordActivityHeartbeat wp pPtr errPtrPtr resPtrPtr
         errPtr <- peek errPtrPtr
         if errPtr == nullPtr
           then do
@@ -824,7 +865,8 @@ foreign import ccall "hs_temporal_worker_request_workflow_eviction" raw_requestW
 requestWorkflowEviction :: KnownWorkerType ty => Worker ty -> RunId -> IO ()
 requestWorkflowEviction w r = withWorker w $ \wp ->
   withCArrayBS r $ \rPtr -> do
-    raw_requestWorkflowEviction wp rPtr
+    withFfiThreadLabel "temporal/ffi/request_workflow_eviction" $
+      raw_requestWorkflowEviction wp rPtr
 
 
 foreign import ccall "hs_temporal_worker_initiate_shutdown" raw_initiateShutdown :: Ptr (Worker ty) -> IO ()
@@ -832,7 +874,17 @@ foreign import ccall "hs_temporal_worker_initiate_shutdown" raw_initiateShutdown
 
 -- | Initiate shutdown.
 initiateShutdown :: KnownWorkerType ty => Worker ty -> IO ()
-initiateShutdown w = withWorker w raw_initiateShutdown
+initiateShutdown w = withRuntime w.workerRuntime $ \_ -> do
+  workerPtr <-
+    Control.Concurrent.withMVar w.workerLifecycle $ \case
+      WorkerOpen ptr -> pure (Just ptr)
+      -- A repeated shutdown may arrive after finalization has consumed the
+      -- inner worker. The original operation is still running or has finished.
+      WorkerFinalizing {} -> pure Nothing
+      WorkerClosed -> throwIO WorkerAlreadyClosed
+  forM_ workerPtr $ \wp ->
+    withFfiThreadLabel "temporal/ffi/initiate_shutdown" $
+      raw_initiateShutdown wp
 
 
 foreign import ccall "hs_temporal_worker_finalize_shutdown" raw_finalizeShutdown :: Ptr (Worker ty) -> TokioCall CWorkerError CUnit
@@ -846,13 +898,35 @@ This should be called only after 'initiateShutdown' has resolved and/or both pol
 functions have returned `ShutDown` errors.
 -}
 finalizeShutdown :: KnownWorkerType ty => Worker ty -> IO (Either WorkerError ())
-finalizeShutdown w = withWorker w $ \wp ->
-  withTokioAsyncCall
-    (raw_finalizeShutdown wp)
-    rust_dropWorkerError
-    rust_dropUnit
-    (\errPtr -> peek errPtr >>= peekWorkerError)
-    (\_ -> return ())
+finalizeShutdown w = mask $ \restore -> do
+  (shouldStart, workerPtr, resultVar) <-
+    Control.Concurrent.modifyMVar w.workerLifecycle $ \case
+      WorkerOpen ptr -> do
+        resultVar <- Control.Concurrent.newEmptyMVar
+        pure (WorkerFinalizing ptr resultVar, (True, ptr, resultVar))
+      state@(WorkerFinalizing ptr resultVar) ->
+        pure (state, (False, ptr, resultVar))
+      WorkerClosed -> throwIO WorkerAlreadyClosed
+
+  when shouldStart $ do
+    spawned <-
+      try $
+        forkIO $ do
+          outcome <-
+            try $
+              withRuntime w.workerRuntime $ \_ ->
+                withTokioAsyncCall
+                  (raw_finalizeShutdown workerPtr)
+                  rust_dropWorkerError
+                  rust_dropUnit
+                  (peek >=> peekWorkerError)
+                  (\_ -> return ())
+          Control.Concurrent.putMVar resultVar outcome
+    case spawned of
+      Left err -> Control.Concurrent.putMVar resultVar (Left err)
+      Right _ -> pure ()
+
+  restore (Control.Concurrent.readMVar resultVar) >>= either throwIO pure
 
 
 foreign import ccall "hs_temporal_history_pusher_push_history" raw_pushHistory :: Ptr HistoryPusher -> Ptr (CArray Word8) -> Ptr (CArray Word8) -> TokioCall CWorkerError CUnit
@@ -866,7 +940,7 @@ pushHistory (HistoryPusher hp) wf p =
         (raw_pushHistory hp wfPtr pPtr)
         rust_dropWorkerError
         rust_dropUnit
-        (\errPtr -> peek errPtr >>= peekWorkerError)
+        (peek >=> peekWorkerError)
         (\_ -> return ())
 
 
@@ -884,7 +958,7 @@ pushHistoryJson (HistoryPusher hp) wf jsonBytes =
         (raw_pushHistoryJson hp wfPtr jsonPtr)
         rust_dropWorkerError
         rust_dropUnit
-        (\errPtr -> peek errPtr >>= peekWorkerError)
+        (peek >=> peekWorkerError)
         (\_ -> return ())
 
 

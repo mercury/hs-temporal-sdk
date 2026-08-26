@@ -20,6 +20,13 @@ enum WorkerErrorCode {
 };
 typedef uint8_t WorkerErrorCode;
 
+/**
+ * An opaque resource whose destructor is observable from Haskell through
+ * [`hs_temporal_test_resource_drop_count`], letting tests prove that a result
+ * produced after the Haskell waiter was interrupted is still reclaimed.
+ */
+typedef struct CTestResource CTestResource;
+
 typedef struct ClientRef ClientRef;
 
 typedef struct EphemeralServerRef EphemeralServerRef;
@@ -1088,6 +1095,29 @@ const struct CArray_CArray_u8 *hs_temporal_runtime_fetch_logs(struct RuntimeRef 
  * Haskell FFI bridge invariants.
  */
 void hs_temporal_runtime_free_logs(const struct CArray_CArray_u8 *logs);
+
+/**
+ * Resolve with a fresh [`CTestResource`] after `delay_millis` milliseconds.
+ *
+ * # Safety
+ *
+ * Haskell <-> Tokio FFI bridge invariants.
+ */
+void hs_temporal_test_delayed_resource(struct RuntimeRef *runtime,
+                                       uint64_t delay_millis,
+                                       struct MVar *mvar,
+                                       struct Capability cap,
+                                       struct CArray_u8 **error_slot,
+                                       struct CTestResource **result_slot);
+
+/**
+ * # Safety
+ *
+ * Haskell FFI bridge invariants.
+ */
+void hs_temporal_drop_test_resource(struct CTestResource *resource);
+
+uint64_t hs_temporal_test_resource_drop_count(void);
 
 /**
  * Create a custom slot supplier handle from Haskell-supplied callback function pointers.

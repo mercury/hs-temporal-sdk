@@ -135,7 +135,9 @@ import qualified Data.Text.Encoding as T
 import qualified Data.UUID as UUID
 import Data.UUID.V4 (nextRandom)
 import Data.Word
+import qualified GHC.Conc.Sync
 import Lens.Family2
+import qualified OpenTelemetry.Context.ThreadLocal as OTContext
 import OpenTelemetry.Trace.Core hiding (inSpan)
 import qualified OpenTelemetry.Trace.Core as OT
 import OpenTelemetry.Trace.Monad
@@ -558,8 +560,12 @@ Haskell the ability to have multiple Worker Entities in a single Worker Process.
 
 A single Worker Entity can listen to only a single Task Queue. But if a Worker Process has multiple Worker Entities, the Worker Process could be listening to multiple Task Queues.
 -}
-data Worker env
-  = forall ty.
+data WorkerShutdownState
+  = WorkerShutdownNotStarted
+  | WorkerShutdownStarted !(Control.Concurrent.MVar (Either SomeException ()))
+
+
+data Worker env = forall ty.
   Core.KnownWorkerType ty =>
   Worker
   { workerType :: !(Core.SWorkerType ty)
@@ -570,7 +576,39 @@ data Worker env
   , workerCore :: !(Core.Worker ty)
   , workerTracer :: !Tracer
   , workerEvictionEmitter :: !(TChan Workflow.EvictionWithRunID)
+  , workerShutdownState :: !(Control.Concurrent.MVar WorkerShutdownState)
   }
+
+
+{- | Best-effort teardown of a core worker that was created but never returned
+to a caller as a public 'Worker'.
+
+'startWorker' and 'startReplayWorker' can fail or be interrupted after the
+core worker has been allocated — most notably during the interruptible
+validation wait, where even a 'UnliftIO.bracket' acquire can receive a timeout
+or 'killThread'. At that point no public 'Worker' value exists, so 'shutdown'
+can never run; the core worker must be shut down here or it leaks its pollers,
+client reference, and runtime keepalive.
+
+The teardown runs on a separate thread: the caller is typically dying from an
+asynchronous exception, and the shutdown FFI waits are themselves
+interruptible. 'Core.finalizeShutdown' is single-flight and 'Core.closeWorker'
+waits for in-flight finalization, so this sequence is safe even if it races
+another shutdown path.
+
+Because the teardown is asynchronous, Core may briefly still consider the old
+worker registered: restarting a worker for the same task queue immediately
+after interrupting startup can fail with a registration conflict until the
+teardown completes.
+-}
+destroyUnstartedCoreWorker :: Core.KnownWorkerType ty => IO () -> Core.Worker ty -> IO ()
+destroyUnstartedCoreWorker releaseExtras workerCore =
+  void $ forkIOLabelled "temporal/worker/destroy-unstarted" $ do
+    void $ UnliftIO.tryAny releaseExtras
+    void $ UnliftIO.tryAny $ do
+      Core.initiateShutdown workerCore
+      void $ Core.finalizeShutdown workerCore
+    void $ UnliftIO.tryAny $ Core.closeWorker workerCore
 
 
 startReplayWorker :: (MonadUnliftIO m, MonadCatch m) => Runtime -> WorkerConfig actEnv -> m (Temporal.Worker.Worker actEnv, Core.HistoryPusher)
@@ -579,62 +617,71 @@ startReplayWorker rt conf = provideCallStack $ runWorkerContext conf $ do
   let coreConfig' = conf.coreConfig {Core.nondeterminismAsWorkflowFail = True}
   (workerCore, replay) <- either throwIO pure =<< liftIO (Core.newReplayWorker rt coreConfig')
   Logging.logDebug "Instantiated core"
-  workerEvictionEmitter <- newBroadcastTChanIO
-  runningWorkflows <- liftIO StmMap.newIO
-  workerActivationLoop <- liftIO $ newTVarIO ActivationLoop.initialActivationLoop
-  workerActivationTails <- liftIO StmMap.newIO
-  uuid <- liftIO nextRandom
-  let workerWorkflowFunctions = conf.wfDefs
-      workerTaskQueue = TaskQueue (Core.taskQueue conf.coreConfig <> "-" <> UUID.toText uuid)
-      workerInboundInterceptors = conf.interceptorConfig.workflowInboundInterceptors
-      workerOutboundInterceptors = conf.interceptorConfig.workflowOutboundInterceptors
-      workerDeadlockTimeout = conf.deadlockTimeout
-      workerClient = ()
-      workerErrorConverters = conf.applicationErrorConverters
-      processor = conf.payloadProcessor
-      workerVault = conf.interceptorConfig.interceptorVault
-      workflowWorker = Workflow.WorkflowWorker {..}
-      workerActivityWorker = ()
-      workerActivityLoop = ()
-      workerNexusLoop = ()
-      workerType = Core.SReplay
-      workerTracer = makeTracer conf.tracerProvider "hs-temporal-sdk" tracerOptions
-  workerWorkflowLoop <- asyncLabelled (T.unpack $ T.concat ["temporal/worker/workflow/", Core.namespace conf.coreConfig, "/", Core.taskQueue conf.coreConfig]) $ do
-    Logging.logInfo $
-      T.concat
-        [ "Starting replay workflow worker loop:"
-        , "namespace="
-        , Core.namespace conf.coreConfig
-        , " "
-        , "taskQueue="
-        , Core.taskQueue conf.coreConfig
-        ]
-    res <- UnliftIO.try $ Workflow.execute workflowWorker
-    case res of
-      Left (e :: SomeException) ->
-        Logging.logError $
-          T.concat
-            [ "Exiting replay workflow worker loop with error: "
-            , "namespace="
-            , Core.namespace conf.coreConfig
-            , " "
-            , "taskQueue="
-            , Core.taskQueue conf.coreConfig
-            , " "
-            , "error="
-            , T.pack $ show e
-            ]
-      Right _ ->
+  -- Same ownership rule as 'startWorker': if anything below fails or is
+  -- interrupted before the Worker value reaches the caller, the core worker
+  -- (and its history pusher) must be destroyed here or it leaks.
+  (`UnliftIO.onException` liftIO (destroyUnstartedCoreWorker (Core.closeHistory replay) workerCore)) $ do
+    workerEvictionEmitter <- newBroadcastTChanIO
+    workerShutdownState <- UnliftIO.newMVar WorkerShutdownNotStarted
+    runningWorkflows <- liftIO StmMap.newIO
+    workerActivationLoop <- liftIO $ newTVarIO ActivationLoop.initialActivationLoop
+    workerActivationTails <- liftIO StmMap.newIO
+    uuid <- liftIO nextRandom
+    let workerWorkflowFunctions = conf.wfDefs
+        workerTaskQueue = TaskQueue (Core.taskQueue conf.coreConfig <> "-" <> UUID.toText uuid)
+        workerInboundInterceptors = conf.interceptorConfig.workflowInboundInterceptors
+        workerOutboundInterceptors = conf.interceptorConfig.workflowOutboundInterceptors
+        workerDeadlockTimeout = conf.deadlockTimeout
+        workerClient = ()
+        workerErrorConverters = conf.applicationErrorConverters
+        processor = conf.payloadProcessor
+        workerVault = conf.interceptorConfig.interceptorVault
+        workflowWorker = Workflow.WorkflowWorker {..}
+        workerActivityWorker = ()
+        workerActivityLoop = ()
+        workerNexusLoop = ()
+        workerType = Core.SReplay
+        workerTracer = makeTracer conf.tracerProvider "hs-temporal-sdk" tracerOptions
+    -- Spawn the loop with async exceptions masked so cancellation cannot land
+    -- between the spawn and returning the Worker value; the loop body itself
+    -- runs unmasked.
+    UnliftIO.mask_ $ do
+      workerWorkflowLoop <- asyncLabelledWithUnmask (T.unpack $ T.concat ["temporal/worker/workflow/", Core.namespace conf.coreConfig, "/", Core.taskQueue conf.coreConfig]) $ \unmask -> unmask $ do
         Logging.logInfo $
           T.concat
-            [ "Exiting replay workflow worker loop normally: "
+            [ "Starting replay workflow worker loop:"
             , "namespace="
             , Core.namespace conf.coreConfig
             , " "
             , "taskQueue="
             , Core.taskQueue conf.coreConfig
             ]
-  pure (Temporal.Worker.Worker {..}, replay)
+        res <- UnliftIO.try $ Workflow.execute workflowWorker
+        case res of
+          Left (e :: SomeException) ->
+            Logging.logError $
+              T.concat
+                [ "Exiting replay workflow worker loop with error: "
+                , "namespace="
+                , Core.namespace conf.coreConfig
+                , " "
+                , "taskQueue="
+                , Core.taskQueue conf.coreConfig
+                , " "
+                , "error="
+                , T.pack $ show e
+                ]
+          Right _ ->
+            Logging.logInfo $
+              T.concat
+                [ "Exiting replay workflow worker loop normally: "
+                , "namespace="
+                , Core.namespace conf.coreConfig
+                , " "
+                , "taskQueue="
+                , Core.taskQueue conf.coreConfig
+                ]
+      pure (Temporal.Worker.Worker {..}, replay)
 
 
 data ReplayHistoryFailure = ReplayHistoryFailure
@@ -734,122 +781,67 @@ startWorker client conf = provideCallStack $ runWorkerContext conf $ inSpan "sta
       "Core.newWorker"
       defaultSpanArguments
       (either throwIO pure =<< liftIO (Core.newWorker client conf.coreConfig))
-  validationRes <- liftIO $ Core.validateWorker workerCore
-  workerEvictionEmitter <- newBroadcastTChanIO
-  case validationRes of
-    Left err -> throwIO err
-    Right () -> pure ()
-  runningWorkflows <- liftIO StmMap.newIO
-  workerActivationLoop <- liftIO $ newTVarIO ActivationLoop.initialActivationLoop
-  workerActivationTails <- liftIO StmMap.newIO
-  runningActivities <- liftIO StmMap.newIO
-  activityEnv <- newIORef conf.actEnv
-  let errorConverters = mkAnnotatedHandlers conf.applicationErrorConverters
-      workerWorkflowFunctions = conf.wfDefs
-      workerTaskQueue = TaskQueue $ Core.taskQueue conf.coreConfig
-      workerInboundInterceptors = conf.interceptorConfig.workflowInboundInterceptors
-      workerOutboundInterceptors = conf.interceptorConfig.workflowOutboundInterceptors
-      workerDeadlockTimeout = conf.deadlockTimeout
-      workerErrorConverters = errorConverters
-      workerVault = conf.interceptorConfig.interceptorVault
-      processor = conf.payloadProcessor
-      workflowWorker = Workflow.WorkflowWorker {..}
-      definitions = conf.actDefs
-      activityInboundInterceptors = conf.interceptorConfig.activityInboundInterceptors
-      activityOutboundInterceptors = conf.interceptorConfig.activityOutboundInterceptors
-      clientInterceptors = conf.interceptorConfig.clientInterceptors
-      activityErrorConverters = errorConverters
-      payloadProcessor = conf.payloadProcessor
-      workerActivityWorker = Activity.ActivityWorker {..}
-      workerClient = client
-      workerTracer = makeTracer conf.tracerProvider "hs-temporal-sdk" tracerOptions
-  let workerType = Core.SReal
-  -- logs <- liftIO $ fetchLogs globalRuntime
-  -- forM_ logs $ \l -> case l.level of
-  --   Trace -> Logging.logDebug l.message
-  --   Debug -> Logging.logDebug l.message
-  --   Info -> Logging.logInfo l.message
-  --   Warn -> Logging.logWarn l.message
-  --   Error -> Logging.logError l.message
-  workerWorkflowLoop <- asyncLabelled (T.unpack $ T.concat ["temporal/worker/workflow/", Core.namespace conf.coreConfig, "/", Core.taskQueue conf.coreConfig]) $ do
-    Logging.logInfo $
-      T.concat
-        [ "Starting replay workflow worker loop:"
-        , "namespace="
-        , Core.namespace conf.coreConfig
-        , " "
-        , "taskQueue="
-        , Core.taskQueue conf.coreConfig
-        ]
-    res <- UnliftIO.try $ Workflow.execute workflowWorker
-    case res of
-      Left (e :: SomeException) ->
-        Logging.logError $
-          T.concat
-            [ "Exiting workflow worker loop with error: "
-            , "namespace="
-            , Core.namespace conf.coreConfig
-            , " "
-            , "taskQueue="
-            , Core.taskQueue conf.coreConfig
-            , " "
-            , "error="
-            , T.pack $ show e
-            ]
-      Right _ ->
+  -- From here until the caller receives the Worker value this thread owns
+  -- workerCore, and nothing else can ever shut it down. The validation wait
+  -- below is interruptible even inside a 'bracket' acquire, so a timeout or
+  -- killThread — as well as a validation failure — must destroy the core
+  -- worker here or it leaks.
+  (`UnliftIO.onException` liftIO (destroyUnstartedCoreWorker (pure ()) workerCore)) $ do
+    liftIO (Core.validateWorker workerCore) >>= either throwIO pure
+    workerEvictionEmitter <- newBroadcastTChanIO
+    workerShutdownState <- UnliftIO.newMVar WorkerShutdownNotStarted
+    runningWorkflows <- liftIO StmMap.newIO
+    workerActivationLoop <- liftIO $ newTVarIO ActivationLoop.initialActivationLoop
+    workerActivationTails <- liftIO StmMap.newIO
+    runningActivities <- liftIO StmMap.newIO
+    activityEnv <- newIORef conf.actEnv
+    let errorConverters = mkAnnotatedHandlers conf.applicationErrorConverters
+        workerWorkflowFunctions = conf.wfDefs
+        workerTaskQueue = TaskQueue $ Core.taskQueue conf.coreConfig
+        workerInboundInterceptors = conf.interceptorConfig.workflowInboundInterceptors
+        workerOutboundInterceptors = conf.interceptorConfig.workflowOutboundInterceptors
+        workerDeadlockTimeout = conf.deadlockTimeout
+        workerErrorConverters = errorConverters
+        workerVault = conf.interceptorConfig.interceptorVault
+        processor = conf.payloadProcessor
+        workflowWorker = Workflow.WorkflowWorker {..}
+        definitions = conf.actDefs
+        activityInboundInterceptors = conf.interceptorConfig.activityInboundInterceptors
+        activityOutboundInterceptors = conf.interceptorConfig.activityOutboundInterceptors
+        clientInterceptors = conf.interceptorConfig.clientInterceptors
+        activityErrorConverters = errorConverters
+        payloadProcessor = conf.payloadProcessor
+        workerActivityWorker = Activity.ActivityWorker {..}
+        workerClient = client
+        workerTracer = makeTracer conf.tracerProvider "hs-temporal-sdk" tracerOptions
+    let workerType = Core.SReal
+    -- logs <- liftIO $ fetchLogs globalRuntime
+    -- forM_ logs $ \l -> case l.level of
+    --   Trace -> Logging.logDebug l.message
+    --   Debug -> Logging.logDebug l.message
+    --   Info -> Logging.logInfo l.message
+    --   Warn -> Logging.logWarn l.message
+    --   Error -> Logging.logError l.message
+    -- Spawn the loops with async exceptions masked so cancellation cannot land
+    -- between the spawns and orphan an already-started loop; the loop bodies
+    -- themselves run unmasked.
+    UnliftIO.mask_ $ do
+      workerWorkflowLoop <- asyncLabelledWithUnmask (T.unpack $ T.concat ["temporal/worker/workflow/", Core.namespace conf.coreConfig, "/", Core.taskQueue conf.coreConfig]) $ \unmask -> unmask $ do
         Logging.logInfo $
           T.concat
-            [ "Exiting workflow worker loop normally: "
+            [ "Starting replay workflow worker loop:"
             , "namespace="
             , Core.namespace conf.coreConfig
             , " "
             , "taskQueue="
             , Core.taskQueue conf.coreConfig
             ]
-  workerActivityLoop <- asyncLabelled (T.unpack $ T.concat ["temporal/worker/activity/", Core.namespace conf.coreConfig, "/", Core.taskQueue conf.coreConfig]) $ do
-    Logging.logDebug "Starting activity worker loop"
-    res <- UnliftIO.try $ Activity.execute workerActivityWorker
-    case res of
-      Left (e :: SomeException) ->
-        Logging.logError $
-          T.concat
-            [ "Exiting activity worker loop with error: "
-            , "namespace="
-            , Core.namespace conf.coreConfig
-            , " "
-            , "taskQueue="
-            , Core.taskQueue conf.coreConfig
-            , " "
-            , "error="
-            , T.pack $ show e
-            ]
-      Right _ ->
-        Logging.logInfo $
-          T.concat
-            [ "Exiting activity worker loop normally: "
-            , "namespace="
-            , Core.namespace conf.coreConfig
-            , " "
-            , "taskQueue="
-            , Core.taskQueue conf.coreConfig
-            ]
-  workerNexusLoop <- asyncLabelled (T.unpack $ T.concat ["temporal/worker/nexus/", Core.namespace conf.coreConfig, "/", Core.taskQueue conf.coreConfig]) $ do
-    let services = HashMap.fromList [(svc.serviceName, svc) | svc <- conf.nexusServiceHandlers]
-    if HashMap.null services
-      then Logging.logDebug "No nexus services registered, skipping nexus worker loop"
-      else do
-        Logging.logDebug "Starting nexus worker loop"
-        let nexusWorker =
-              Nexus.NexusWorker
-                { Nexus.workerCore = workerCore
-                , Nexus.nexusServices = services
-                }
-        res <- UnliftIO.try $ Nexus.execute nexusWorker
+        res <- UnliftIO.try $ Workflow.execute workflowWorker
         case res of
           Left (e :: SomeException) ->
             Logging.logError $
               T.concat
-                [ "Exiting nexus worker loop with error: "
+                [ "Exiting workflow worker loop with error: "
                 , "namespace="
                 , Core.namespace conf.coreConfig
                 , " "
@@ -862,14 +854,77 @@ startWorker client conf = provideCallStack $ runWorkerContext conf $ inSpan "sta
           Right _ ->
             Logging.logInfo $
               T.concat
-                [ "Exiting nexus worker loop normally: "
+                [ "Exiting workflow worker loop normally: "
                 , "namespace="
                 , Core.namespace conf.coreConfig
                 , " "
                 , "taskQueue="
                 , Core.taskQueue conf.coreConfig
                 ]
-  pure Temporal.Worker.Worker {..}
+      workerActivityLoop <- asyncLabelledWithUnmask (T.unpack $ T.concat ["temporal/worker/activity/", Core.namespace conf.coreConfig, "/", Core.taskQueue conf.coreConfig]) $ \unmask -> unmask $ do
+        Logging.logDebug "Starting activity worker loop"
+        res <- UnliftIO.try $ Activity.execute workerActivityWorker
+        case res of
+          Left (e :: SomeException) ->
+            Logging.logError $
+              T.concat
+                [ "Exiting activity worker loop with error: "
+                , "namespace="
+                , Core.namespace conf.coreConfig
+                , " "
+                , "taskQueue="
+                , Core.taskQueue conf.coreConfig
+                , " "
+                , "error="
+                , T.pack $ show e
+                ]
+          Right _ ->
+            Logging.logInfo $
+              T.concat
+                [ "Exiting activity worker loop normally: "
+                , "namespace="
+                , Core.namespace conf.coreConfig
+                , " "
+                , "taskQueue="
+                , Core.taskQueue conf.coreConfig
+                ]
+      workerNexusLoop <- asyncLabelledWithUnmask (T.unpack $ T.concat ["temporal/worker/nexus/", Core.namespace conf.coreConfig, "/", Core.taskQueue conf.coreConfig]) $ \unmask -> unmask $ do
+        let services = HashMap.fromList [(svc.serviceName, svc) | svc <- conf.nexusServiceHandlers]
+        if HashMap.null services
+          then Logging.logDebug "No nexus services registered, skipping nexus worker loop"
+          else do
+            Logging.logDebug "Starting nexus worker loop"
+            let nexusWorker =
+                  Nexus.NexusWorker
+                    { Nexus.workerCore = workerCore
+                    , Nexus.nexusServices = services
+                    }
+            res <- UnliftIO.try $ Nexus.execute nexusWorker
+            case res of
+              Left (e :: SomeException) ->
+                Logging.logError $
+                  T.concat
+                    [ "Exiting nexus worker loop with error: "
+                    , "namespace="
+                    , Core.namespace conf.coreConfig
+                    , " "
+                    , "taskQueue="
+                    , Core.taskQueue conf.coreConfig
+                    , " "
+                    , "error="
+                    , T.pack $ show e
+                    ]
+              Right _ ->
+                Logging.logInfo $
+                  T.concat
+                    [ "Exiting nexus worker loop normally: "
+                    , "namespace="
+                    , Core.namespace conf.coreConfig
+                    , " "
+                    , "taskQueue="
+                    , Core.taskQueue conf.coreConfig
+                    ]
+      pure Temporal.Worker.Worker {..}
 
 
 {- | Wait for a worker to exit. This waits for both the workflow and activity loops to complete.
@@ -964,9 +1019,48 @@ __NOTE__: It is /very important/ that the Temporal server is notified of task
 cancelation before this function completes; if we were to exit before the
 server is informed that a task has been canceled, it won't "notice" that the
 activity has ended until the next hearbeat interval.
+
+Both blocking phases below are bounded by a 'timeout'. Because 'shutdown' is
+normally called from a cleanup handler -- and @unliftio@'s and
+@safe-exceptions@' 'bracket' run cleanup under 'uninterruptibleMask' -- those
+timeouts are run on a dedicated unmasked thread rather than inline. Running them
+inline would inherit the caller's masking state, leaving the timeouts unable to
+deliver their exception. The worker thread reports its result through an 'MVar',
+allowing the timeouts to remain effective even when the caller is masked.
 -}
 shutdown :: (MonadUnliftIO m) => Temporal.Worker.Worker actEnv -> m ()
-shutdown worker@Temporal.Worker.Worker {workerCore, workerTracer} = OT.inSpan workerTracer "shutdown" defaultSpanArguments $ UnliftIO.mask $ \restore -> do
+shutdown worker@Temporal.Worker.Worker {workerShutdownState} = UnliftIO.withRunInIO $ \runInIO -> UnliftIO.mask $ \restore -> do
+  (shouldStart, resultVar) <-
+    UnliftIO.modifyMVar workerShutdownState $ \case
+      WorkerShutdownNotStarted -> do
+        resultVar <- UnliftIO.newEmptyMVar
+        pure (WorkerShutdownStarted resultVar, (True, resultVar))
+      shutdownState@(WorkerShutdownStarted resultVar) ->
+        pure (shutdownState, (False, resultVar))
+
+  when shouldStart $ do
+    -- Carry the first caller's trace context to the single shutdown thread;
+    -- thread-local context does not follow 'forkIO'.
+    callerContext <- OTContext.getContext
+    spawned <-
+      UnliftIO.try @IO @SomeException $
+        forkIOWithUnmask $ \unmask ->
+          UnliftIO.putMVar resultVar
+            =<< UnliftIO.try @IO @SomeException do
+              -- Distinguish the synchronous shutdown call from the
+              -- interruptible waits in 'shutdownBounded'.
+              Control.Concurrent.myThreadId >>= \tid -> GHC.Conc.Sync.labelThread tid "temporal/worker/shutdownBounded"
+              unmask (OTContext.attachContext callerContext *> runInIO (shutdownBounded worker))
+    case spawned of
+      Left err -> UnliftIO.putMVar resultVar (Left err)
+      Right _ -> pure ()
+
+  restore (UnliftIO.readMVar resultVar) >>= either UnliftIO.throwIO pure
+
+
+-- | The bounded shutdown sequence. Must be run unmasked; see 'shutdown'.
+shutdownBounded :: (MonadUnliftIO m) => Temporal.Worker.Worker actEnv -> m ()
+shutdownBounded worker@Temporal.Worker.Worker {workerCore, workerTracer} = OT.inSpan workerTracer "shutdown" defaultSpanArguments $ UnliftIO.mask $ \restore -> do
   OT.inSpan workerTracer "initiateShutdown" defaultSpanArguments $ liftIO $ Core.initiateShutdown workerCore
 
   -- Add 1s of buffer time to the graceful shutdown timeout so the Rust SDK

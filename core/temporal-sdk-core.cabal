@@ -21,6 +21,7 @@ extra-source-files:
     rust/src/lib.rs
     rust/src/rpc.rs
     rust/src/runtime.rs
+    rust/src/test_fixtures.rs
     rust/src/worker.rs
     rust/temporal_bridge.h
 
@@ -44,6 +45,7 @@ library
       Temporal.Core.Client.TestService
       Temporal.Core.Client.WorkflowService
       Temporal.Core.EphemeralServer
+      Temporal.Core.Internal.TestFixture
       Temporal.Core.Worker
       Temporal.Runtime
   other-modules:
@@ -89,7 +91,7 @@ library
       aeson
     , async
     , atomic-primops
-    , base >=4.14 && <5
+    , base >=4.18 && <5
     , bytestring
     , containers
     , lens-family
