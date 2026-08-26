@@ -5,12 +5,19 @@ on:
 
 jobs:
   update-temporal:
-    runs-on: ubuntu-latest
+    runs-on: namespace-profile-mercury-oss-linux
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0  # needed for branch creation
+
+      # Mounts /nix from the Namespace cache volume; must run before Nix is
+      # installed so the store lands on the volume.
+      - name: Set up nix cache
+        uses: namespacelabs/nscloud-cache-action@c5f8dab7560444c4bf8dbc64f1b203431873c547 # v1.6.1
+        with:
+          cache: nix
 
       - name: Install Nix
         uses: cachix/install-nix-action@4e002c8ec80594ecd40e759629461e26c8abed15 # V27
