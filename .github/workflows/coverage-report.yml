@@ -78,10 +78,11 @@ jobs:
             MAIN_PCT=$(grep "Overall Coverage" main-coverage.md | grep -oE "[0-9]+\.[0-9]+" | head -1)
             
             if [ -n "$PR_PCT" ] && [ -n "$MAIN_PCT" ]; then
-              DIFF=$(echo "$PR_PCT - $MAIN_PCT" | bc)
-              if (( $(echo "$DIFF > 0" | bc -l) )); then
+              DIFF=$(awk -v pr="$PR_PCT" -v main="$MAIN_PCT" 'BEGIN {printf "%.2f", pr - main}')
+              SIGN=$(awk -v d="$DIFF" 'BEGIN {print (d > 0) ? "up" : (d < 0) ? "down" : "same"}')
+              if [ "$SIGN" = "up" ]; then
                 echo "✅ **Coverage increased by ${DIFF}%** (${MAIN_PCT}% → ${PR_PCT}%)" >> coverage-report.md
-              elif (( $(echo "$DIFF < 0" | bc -l) )); then
+              elif [ "$SIGN" = "down" ]; then
                 echo "⚠️ **Coverage decreased by ${DIFF#-}%** (${MAIN_PCT}% → ${PR_PCT}%)" >> coverage-report.md
               else
                 echo "➡️ **Coverage unchanged** at ${PR_PCT}%" >> coverage-report.md
