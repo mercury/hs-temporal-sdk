@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE GADTs #-}
@@ -137,6 +138,7 @@ import Data.UUID.V4 (nextRandom)
 import Data.Word
 import qualified GHC.Conc.Sync
 import Lens.Family2
+import qualified OpenTelemetry.Context as OTCtx
 import qualified OpenTelemetry.Context.ThreadLocal as OTContext
 import OpenTelemetry.Trace.Core hiding (inSpan)
 import qualified OpenTelemetry.Trace.Core as OT
@@ -1050,12 +1052,25 @@ shutdown worker@Temporal.Worker.Worker {workerShutdownState} = UnliftIO.withRunI
               -- Distinguish the synchronous shutdown call from the
               -- interruptible waits in 'shutdownBounded'.
               Control.Concurrent.myThreadId >>= \tid -> GHC.Conc.Sync.labelThread tid "temporal/worker/shutdownBounded"
-              unmask (OTContext.attachContext callerContext *> runInIO (shutdownBounded worker))
+              unmask $ withAttachedContext callerContext $ runInIO (shutdownBounded worker)
     case spawned of
       Left err -> UnliftIO.putMVar resultVar (Left err)
       Right _ -> pure ()
 
   restore (UnliftIO.readMVar resultVar) >>= either UnliftIO.throwIO pure
+
+
+{- | Run an action with the given OpenTelemetry context attached to the
+current thread, detaching it afterwards so the thread's attach/detach token
+state stays balanced for anything that runs on this thread later.
+-}
+#if MIN_VERSION_hs_opentelemetry_api(1,0,0)
+withAttachedContext :: OTCtx.Context -> IO a -> IO a
+withAttachedContext ctx action = UnliftIO.bracket (OTContext.attachContext ctx) OTContext.detachContext $ const action
+#else
+withAttachedContext :: OTCtx.Context -> IO a -> IO a
+withAttachedContext ctx action = OTContext.attachContext ctx *> action
+#endif
 
 
 -- | The bounded shutdown sequence. Must be run unmasked; see 'shutdown'.

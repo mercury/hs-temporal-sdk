@@ -33,6 +33,8 @@ import Data.Word (Word32)
 import GHC.IO (unsafePerformIO)
 import OpenTelemetry.Context (Context)
 import qualified OpenTelemetry.Context as Ctxt
+
+
 #if MIN_VERSION_hs_opentelemetry_api(1,0,0)
 import OpenTelemetry.Context.ThreadLocal (Token, attachContext, detachContext, getContext)
 #else
@@ -152,7 +154,6 @@ headersBaggagePropagator =
           in Map.insert "baggage" payload headers
     }
 #endif
-
 
 #if MIN_VERSION_hs_opentelemetry_api(1,0,0)
 restoreContext :: Token -> IO ()
@@ -340,8 +341,15 @@ makeOpenTelemetryInterceptor = do
                         , attributes = mempty
                         }
                 ctxt <- performUnsafeNonDeterministicIO $ extract headersPropagator input.handleUpdateInputHeaders Ctxt.empty
-                priorContext <- performUnsafeNonDeterministicIO $ attachContext ctxt
-                result <- try @_ @SomeException $ case Ctxt.lookupSpan ctxt of
+                -- The handler may suspend, and other handlers or the workflow
+                -- body run interleaved with it on the same executor thread. A
+                -- thread-local attach held across a suspension detaches out of
+                -- LIFO order as soon as two handler lifetimes overlap without
+                -- nesting, and clobbers the ambient workflow context for the
+                -- unrelated code that runs while the handler is suspended. The
+                -- extracted context therefore only parents the update span and
+                -- is never attached to the thread.
+                case Ctxt.lookupSpan ctxt of
                   Nothing -> next input
                   Just _ -> do
                     span <- performUnsafeNonDeterministicIO $ createSpan tracer ctxt ("HandleUpdate:" <> input.handleUpdateInputType) spanArgs
@@ -353,8 +361,6 @@ makeOpenTelemetryInterceptor = do
                         endSpan span Nothing
                       Right _ -> endSpan span Nothing
                     either throwM pure updateResult
-                performUnsafeNonDeterministicIO $ restoreContext priorContext
-                either throwM pure result
             , validateUpdate = \input next -> do
                 let spanArgs =
                       defaultSpanArguments

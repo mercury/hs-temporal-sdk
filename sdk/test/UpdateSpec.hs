@@ -1,4 +1,14 @@
+{-# LANGUAGE CPP #-}
+-- Pinned here for the formatter: with CPP enabled it no longer picks the
+-- extension up from the cabal defaults and rewrites @x.field@ as composition.
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+-- hlint's CPP pass hides the Template Haskell splices below, producing false
+-- "unused pragma" and "redundant bracket" hints for the @$$(...)@ occurrences.
+{-# HLINT ignore "Unused LANGUAGE pragma" #-}
+{-# HLINT ignore "Redundant bracket" #-}
 
 module UpdateSpec where
 
@@ -20,6 +30,14 @@ import qualified Temporal.Client as C
 import Temporal.Duration
 import Temporal.Exception
 import Temporal.Interceptor
+
+
+#if MIN_VERSION_hs_opentelemetry_api(1,0,0)
+import Control.Exception (bracket_)
+import Control.Monad (when)
+import Data.List (isInfixOf)
+import OpenTelemetry.Internal.Logging (getGlobalErrorHandler, setGlobalErrorHandler)
+#endif
 import Temporal.Payload
 import Temporal.TH (ActivityFn, WorkflowFn, discoverDefinitions)
 import Temporal.Worker
@@ -39,6 +57,73 @@ spec = do
 updateConf baseConf_ = provideCallStack $ configure () (discoverDefinitions @() $$(discoverInstances) $$(discoverInstances)) $ do baseConf_
 
 
+{- | The interceptor stack must never hold a thread-local context token across
+a workflow suspension: suspended handlers overlap without nesting, so the
+first completion detaches out of LIFO order and permanently desynchronizes
+the executor thread's token state. Every later detach then logs
+hs-opentelemetry's "LIFO ordering violated" diagnostic and restores a stale
+context. These tests count those diagnostics via the global error handler.
+
+hs-opentelemetry-api < 1.0 has no attach\/detach tokens, so there is no LIFO
+discipline to validate there.
+-}
+#if MIN_VERSION_hs_opentelemetry_api(1,0,0)
+lifoDisciplineTests :: SpecWith TestEnv
+lifoDisciplineTests = do
+  it "emits no LIFO context diagnostics when an update handler suspends" $ \TestEnv {..} -> do
+    lifoErrors <- newIORef (0 :: Int)
+    previousHandler <- getGlobalErrorHandler
+    let countLifo msg = do
+          when ("LIFO" `isInfixOf` msg) $ atomicModifyIORef' lifoErrors $ \n -> (n + 1, ())
+          previousHandler msg
+    count <- bracket_ (setGlobalErrorHandler countLifo) (setGlobalErrorHandler previousHandler) $ do
+      let conf = updateConf baseConf
+      withWorker conf $ do
+        let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
+            updateOpts = C.UpdateOptions { updateId = "update-lifo-discipline", updateHeaders = mempty }
+        (updateResult, workflowResult) <- useClient do
+          h <- C.start UpdateThatSleeps "update-lifo-discipline" opts
+          ur <- C.executeUpdate h testUpdate updateOpts 12
+          wr <- C.waitWorkflowResult h
+          pure (ur, wr)
+        updateResult `shouldBe` 12
+        workflowResult `shouldBe` 12
+      readIORef lifoErrors
+    count `shouldBe` 0
+
+  it "emits no LIFO context diagnostics when two update handlers suspend concurrently" $ \TestEnv {..} -> do
+    lifoErrors <- newIORef (0 :: Int)
+    previousHandler <- getGlobalErrorHandler
+    let countLifo msg = do
+          when ("LIFO" `isInfixOf` msg) $ atomicModifyIORef' lifoErrors $ \n -> (n + 1, ())
+          previousHandler msg
+    count <- bracket_ (setGlobalErrorHandler countLifo) (setGlobalErrorHandler previousHandler) $ do
+      let conf = updateConf baseConf
+      withWorker conf $ do
+        let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
+            updateOptsA = C.UpdateOptions { updateId = "update-lifo-concurrent-a", updateHeaders = mempty }
+            updateOptsB = C.UpdateOptions { updateId = "update-lifo-concurrent-b", updateHeaders = mempty }
+        (resultA, resultB, workflowResult) <- useClient do
+          h <- C.start ConcurrentSleepingUpdates "update-lifo-concurrent" opts
+          -- Update A sleeps 1s, update B sleeps 2s: both handlers suspend
+          -- concurrently and A (attached first) completes first.
+          ha <- C.startUpdate h testUpdate updateOptsA 1
+          hb <- C.startUpdate h testUpdate updateOptsB 2
+          ra <- C.waitUpdateResult ha
+          rb <- C.waitUpdateResult hb
+          wr <- C.waitWorkflowResult h
+          pure (ra, rb, wr)
+        resultA `shouldBe` 1
+        resultB `shouldBe` 3
+        workflowResult `shouldBe` 3
+      readIORef lifoErrors
+    count `shouldBe` 0
+#else
+lifoDisciplineTests :: SpecWith TestEnv
+lifoDisciplineTests = pure ()
+#endif
+
+
 updateTests :: SpecWith TestEnv
 updateTests = describe "Update" $ do
   describe "startUpdate" $ do
@@ -46,22 +131,24 @@ updateTests = describe "Update" $ do
       let conf = updateConf baseConf
       withWorker conf $ do
         let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
-            updateOpts = C.UpdateOptions { updateId = "startUpdate-rejects", updateHeaders = mempty }
+            updateOpts = C.UpdateOptions {updateId = "startUpdate-rejects", updateHeaders = mempty}
         ( useClient do
             h <- C.start UpdateWithValidator "startUpdate-rejects" opts
             C.startUpdate h testUpdate updateOpts (-12)
-          ) `shouldThrow` \case
+          )
+          `shouldThrow` \case
             UpdateFailure failure -> failure ^. Failure.message == "in a bad state!!!"
 
     it "propagates validation exceptions" $ \TestEnv {..} -> do
       let conf = updateConf baseConf
       withWorker conf $ do
         let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
-            updateOpts = C.UpdateOptions { updateId = "startUpdate-throws", updateHeaders = mempty }
+            updateOpts = C.UpdateOptions {updateId = "startUpdate-throws", updateHeaders = mempty}
         ( useClient do
             h <- C.start UpdateWithValidator "startUpdate-throws" opts
             C.startUpdate h testUpdate updateOpts 5
-          ) `shouldThrow` \case
+          )
+          `shouldThrow` \case
             UpdateFailure _ -> True
 
   describe "executeUpdate" $ do
@@ -69,7 +156,7 @@ updateTests = describe "Update" $ do
       let conf = updateConf baseConf
       withWorker conf $ do
         let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
-            updateOpts = C.UpdateOptions { updateId = "update-no-val", updateHeaders = mempty }
+            updateOpts = C.UpdateOptions {updateId = "update-no-val", updateHeaders = mempty}
         (updateResult, workflowResult) <- useClient do
           h <- C.start UpdateWithoutValidator "update-no-val" opts
           ur <- C.executeUpdate h testUpdate updateOpts 12
@@ -82,7 +169,7 @@ updateTests = describe "Update" $ do
       let conf = updateConf baseConf
       withWorker conf $ do
         let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
-            updateOpts = C.UpdateOptions { updateId = "update-with-val", updateHeaders = mempty }
+            updateOpts = C.UpdateOptions {updateId = "update-with-val", updateHeaders = mempty}
         (updateResult, workflowResult) <- useClient do
           h <- C.start UpdateWithValidator "update-with-val" opts
           ur <- C.executeUpdate h testUpdate updateOpts 12
@@ -95,38 +182,41 @@ updateTests = describe "Update" $ do
       let conf = updateConf baseConf
       withWorker conf $ do
         let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
-            updateOpts = C.UpdateOptions { updateId = "update-rejects", updateHeaders = mempty }
+            updateOpts = C.UpdateOptions {updateId = "update-rejects", updateHeaders = mempty}
         ( useClient do
             h <- C.start UpdateWithValidator "update-rejects" opts
             C.executeUpdate h testUpdate updateOpts (-12)
-          ) `shouldThrow` \case
+          )
+          `shouldThrow` \case
             UpdateFailure _ -> True
 
     it "propagates validator exceptions" $ \TestEnv {..} -> do
       let conf = updateConf baseConf
       withWorker conf $ do
         let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
-            updateOpts = C.UpdateOptions { updateId = "update-val-throws", updateHeaders = mempty }
+            updateOpts = C.UpdateOptions {updateId = "update-val-throws", updateHeaders = mempty}
         ( useClient do
             h <- C.start UpdateWithValidator "update-val-throws" opts
             C.executeUpdate h testUpdate updateOpts 5
-          ) `shouldThrow` \case
+          )
+          `shouldThrow` \case
             UpdateFailure _ -> True
 
     it "propagates update handler exceptions" $ \TestEnv {..} -> do
       let conf = updateConf baseConf
       withWorker conf $ do
         let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
-            updateOpts = C.UpdateOptions { updateId = "update-handler-throws", updateHeaders = mempty }
+            updateOpts = C.UpdateOptions {updateId = "update-handler-throws", updateHeaders = mempty}
         ( useClient do
             h <- C.start UpdateThatThrows "update-handler-throws" opts
             C.executeUpdate h testUpdate updateOpts 5
-          ) `shouldThrow` \case
+          )
+          `shouldThrow` \case
             UpdateFailure _ -> True
 
     it "bad args fail" $ \TestEnv {..} -> do
       let testUpdateFn :: Int -> W.Workflow Int
-          testUpdateFn arg = pure arg
+          testUpdateFn = pure
           testWorkflowFn :: W.Workflow Int
           testWorkflowFn = provideCallStack do
             W.setUpdateHandler testUpdate testUpdateFn Nothing
@@ -136,19 +226,20 @@ updateTests = describe "Update" $ do
           badUpdateRef = W.KnownUpdate @'[String] @String defaultCodec "test-update"
           conf = configure () wfRef $ do baseConf
           opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
-          updateOpts = C.UpdateOptions { updateId = "bad-args", updateHeaders = mempty }
+          updateOpts = C.UpdateOptions {updateId = "bad-args", updateHeaders = mempty}
       withWorker conf $ do
         ( useClient do
             h <- C.start wfRef "bad-args" opts
             C.executeUpdate h badUpdateRef updateOpts "ruhroh"
-          ) `shouldThrow` \case
+          )
+          `shouldThrow` \case
             UpdateFailure _ -> True
 
     it "works with suspend (sleep in update)" $ \TestEnv {..} -> do
       let conf = updateConf baseConf
       withWorker conf $ do
         let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
-            updateOpts = C.UpdateOptions { updateId = "update-suspends", updateHeaders = mempty }
+            updateOpts = C.UpdateOptions {updateId = "update-suspends", updateHeaders = mempty}
         (updateResult, workflowResult) <- useClient do
           h <- C.start UpdateThatSleeps "update-suspends" opts
           ur <- C.executeUpdate h testUpdate updateOpts 12
@@ -157,11 +248,13 @@ updateTests = describe "Update" $ do
         updateResult `shouldBe` 12
         workflowResult `shouldBe` 12
 
+    lifoDisciplineTests
+
     it "not processed if workflow throws first" $ \TestEnv {..} -> do
       let conf = updateConf baseConf
       withWorker conf $ do
         let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
-            updateOpts = C.UpdateOptions { updateId = "wf-throws-first", updateHeaders = mempty }
+            updateOpts = C.UpdateOptions {updateId = "wf-throws-first", updateHeaders = mempty}
         (eUpdateResult, eWorkflowResult) <- useClient do
           h <- C.start WorkflowThatThrowsBeforeTheUpdate "wf-throws-first" opts
           wr <- Catch.try $ C.waitWorkflowResult h
@@ -180,7 +273,7 @@ updateTests = describe "Update" $ do
       let conf = updateConf baseConf
       withWorker conf $ do
         let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
-            updateOpts = C.UpdateOptions { updateId = "wf-throws-later", updateHeaders = mempty }
+            updateOpts = C.UpdateOptions {updateId = "wf-throws-later", updateHeaders = mempty}
         (eUpdateResult, eWorkflowResult) <- useClient do
           h <- C.start WorkflowThatThrowsAfterTheUpdate "wf-throws-later" opts
           ur <- Catch.try $ C.executeUpdate h testUpdate updateOpts 12
@@ -215,13 +308,12 @@ updateTests = describe "Update" $ do
         let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
         result <- (Catch.try :: IO a -> IO (Either SomeException a)) $ useClient do
           h <- C.start UpdateWithoutValidator "update-after-complete" opts
-          _ <- C.executeUpdate h testUpdate (C.UpdateOptions { updateId = "first", updateHeaders = mempty }) 1
+          _ <- C.executeUpdate h testUpdate (C.UpdateOptions {updateId = "first", updateHeaders = mempty}) 1
           _ <- C.waitWorkflowResult h
-          C.executeUpdate h testUpdate (C.UpdateOptions { updateId = "after-complete", updateHeaders = mempty }) 2
+          C.executeUpdate h testUpdate (C.UpdateOptions {updateId = "after-complete", updateHeaders = mempty}) 2
         result `shouldSatisfy` \case
           Left _ -> True
           Right _ -> False
-
 
   describe "Update advanced" $ do
     it "two sequential updates accumulate state" $ \TestEnv {..} -> do
@@ -245,13 +337,18 @@ updateTests = describe "Update" $ do
           workflow :: MyWorkflow Int
           workflow = do
             st <- W.newStateVar (0 :: Int)
-            W.setUpdateHandler updateDef (\n -> do
-              result <- W.executeActivity actDef.reference
-                (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
-                n
-              W.writeStateVar st result
-              pure result
-              ) Nothing
+            W.setUpdateHandler
+              updateDef
+              ( \n -> do
+                  result <-
+                    W.executeActivity actDef
+                      . reference
+                        (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
+                        n
+                  W.writeStateVar st result
+                  pure result
+              )
+              Nothing
             W.waitCondition $ (/= 0) <$> W.readStateVar st
             W.readStateVar st
           wf = W.provideWorkflow defaultCodec "updateWithActivity" workflow
@@ -260,7 +357,7 @@ updateTests = describe "Update" $ do
         let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
             updateOpts = C.UpdateOptions {updateId = "act-update", updateHeaders = mempty}
         (ur, wr) <- useClient do
-          h <- C.start wf.reference "updateWithActivityWf" opts
+          h <- C.start wf . reference "updateWithActivityWf" opts
           updateResult <- C.executeUpdate h updateDef updateOpts 41
           wfResult <- C.waitWorkflowResult h
           pure (updateResult, wfResult)
@@ -298,7 +395,7 @@ updateInterceptorTests = do
         let conf = updateConf baseConf
         withWorker conf $ do
           let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
-              updateOpts = C.UpdateOptions { updateId = "interceptors-called", updateHeaders = mempty }
+              updateOpts = C.UpdateOptions {updateId = "interceptors-called", updateHeaders = mempty}
           (updateResult, workflowResult) <- useClient do
             h <- C.start UpdateWithValidator "interceptors-called" opts
             ur <- C.executeUpdate h testUpdate updateOpts 12
@@ -337,7 +434,7 @@ updateInterceptorTests = do
         let conf = updateConf baseConf
         withWorker conf $ do
           let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
-              updateOpts = C.UpdateOptions { updateId = "interceptors-args", updateHeaders = mempty }
+              updateOpts = C.UpdateOptions {updateId = "interceptors-args", updateHeaders = mempty}
           (updateResult, workflowResult) <- useClient do
             h <- C.start UpdateWithValidator "interceptors-args" opts
             ur <- C.executeUpdate h testUpdate updateOpts 12
@@ -367,7 +464,7 @@ updateInterceptorTests = do
         let conf = updateConf baseConf
         withWorker conf $ do
           let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
-              updateOpts = C.UpdateOptions { updateId = "modify-args", updateHeaders = mempty }
+              updateOpts = C.UpdateOptions {updateId = "modify-args", updateHeaders = mempty}
           (updateResult, workflowResult) <- useClient do
             h <- C.start UpdateWithValidator "modify-args" opts
             ur <- C.executeUpdate h testUpdate updateOpts 12
@@ -391,7 +488,7 @@ updateInterceptorTests = do
         let conf = updateConf baseConf
         withWorker conf $ do
           let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
-              updateOpts = C.UpdateOptions { updateId = "modify-client-args", updateHeaders = mempty }
+              updateOpts = C.UpdateOptions {updateId = "modify-client-args", updateHeaders = mempty}
           (updateResult, workflowResult) <- useClient do
             h <- C.start UpdateWithValidator "modify-client-args" opts
             ur <- C.executeUpdate h testUpdate updateOpts 12
@@ -446,7 +543,7 @@ updateInterceptorTests = do
         let conf = updateConf baseConf
         withWorker conf $ do
           let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
-              updateOpts = C.UpdateOptions { updateId = "interceptor-order", updateHeaders = mempty }
+              updateOpts = C.UpdateOptions {updateId = "interceptor-order", updateHeaders = mempty}
           (updateResult, workflowResult) <- useClient do
             h <- C.start UpdateWithValidator "interceptor-order" opts
             ur <- C.executeUpdate h testUpdate updateOpts 12
