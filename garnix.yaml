@@ -1,7 +1,0 @@
-builds:
-  include:
-    - 'packages.x86_64-linux.hs-temporal-suite-ghc910'
-    - 'packages.x86_64-linux.temporal-bridge'
-  exclude:
-    - 'devShells.*.*'
-    - 'packages.*.devenv-up'
