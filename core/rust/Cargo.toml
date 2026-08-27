@@ -9,7 +9,7 @@ edition = "2024"
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
-temporalio-client = { git = "https://github.com/temporalio/sdk-rust", rev = "43d582b57fbc63d858a35f11ebfee193bda00834" }
+temporalio-client = { git = "https://github.com/temporalio/sdk-rust", rev = "feb722f564506e80251ed0a0ad6f2d7d058eac90" }
 temporalio-sdk-core = { git = "https://github.com/temporalio/sdk-rust", rev = "43d582b57fbc63d858a35f11ebfee193bda00834", features = ["ephemeral-server"] }
 temporalio-common = { git = "https://github.com/temporalio/sdk-rust", rev = "43d582b57fbc63d858a35f11ebfee193bda00834", features = ["serde_serialize"] }
 tokio = "~1.52"
