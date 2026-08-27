@@ -341,10 +341,10 @@ updateTests = describe "Update" $ do
               updateDef
               ( \n -> do
                   result <-
-                    W.executeActivity actDef
-                      . reference
-                        (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
-                        n
+                    W.executeActivity
+                      actDef.reference
+                      (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
+                      n
                   W.writeStateVar st result
                   pure result
               )
@@ -357,7 +357,7 @@ updateTests = describe "Update" $ do
         let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
             updateOpts = C.UpdateOptions {updateId = "act-update", updateHeaders = mempty}
         (ur, wr) <- useClient do
-          h <- C.start wf . reference "updateWithActivityWf" opts
+          h <- C.start wf.reference "updateWithActivityWf" opts
           updateResult <- C.executeUpdate h updateDef updateOpts 41
           wfResult <- C.waitWorkflowResult h
           pure (updateResult, wfResult)
