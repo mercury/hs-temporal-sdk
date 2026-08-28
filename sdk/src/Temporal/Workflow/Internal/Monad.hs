@@ -790,6 +790,8 @@ data WorkflowInstance = WorkflowInstance
   , workflowCancellationVar :: {-# UNPACK #-} !(IVar ())
   , workflowDeadlockTimeout :: Maybe Int
   , workflowVault :: {-# UNPACK #-} !(IORef Vault)
+  , -- | Ensures inbound interceptor finalizers observe one terminal outcome.
+    workflowFinalized :: {-# UNPACK #-} !(IORef Bool)
   , -- These are how the instance gets its work done
     activationChannel :: {-# UNPACK #-} !(TQueue Core.WorkflowActivation)
   , executionThread :: {-# UNPACK #-} !(IORef (Async ()))
@@ -954,7 +956,9 @@ data WorkflowInboundInterceptor = WorkflowInboundInterceptor
        . ExecuteWorkflowInput
       -> (ExecuteWorkflowInput -> IO a)
       -> IO a
-  , finalizeWorkflow
+  , -- | Called once when the workflow completes, fails, or is evicted before a
+    -- terminal outcome is known. A 'Nothing' result denotes that eviction.
+    finalizeWorkflow
       :: WorkflowInstance
       -> Maybe (WorkflowExitVariant Payload)
       -> IO ()
@@ -980,7 +984,13 @@ interceptWorkflow WorkflowInboundInterceptor {executeWorkflow = f} = f
 
 
 finalizeWorkflowExecution :: WorkflowInboundInterceptor -> WorkflowInstance -> Maybe (WorkflowExitVariant Payload) -> IO ()
-finalizeWorkflowExecution WorkflowInboundInterceptor {finalizeWorkflow = f} = f
+finalizeWorkflowExecution WorkflowInboundInterceptor {finalizeWorkflow = f} inst result =
+  mask_ do
+    shouldFinalize <-
+      atomicModifyIORef' inst.workflowFinalized $ \finalized ->
+        (True, not finalized)
+    when shouldFinalize do
+      f inst result `finally` writeIORef inst.workflowVault mempty
 
 
 instance Semigroup WorkflowInboundInterceptor where

@@ -606,18 +606,22 @@ mkBaseConf interceptors = do
 
 workflowFinalizationWithEscapedInterceptor :: SpecWith PortNumber
 workflowFinalizationWithEscapedInterceptor = do
+  finalizations <- runIO $ newIORef []
   finalized <- runIO newEmptyMVar
   let interceptor =
         mempty
           { workflowInboundInterceptors =
               mempty
                 { executeWorkflow = \_input _next -> throwIO SampleException
-                , finalizeWorkflow = \_ result -> putMVar finalized result
+                , finalizeWorkflow = \_ result -> do
+                    modifyIORef' finalizations (result :)
+                    _ <- tryPutMVar finalized result
+                    pure ()
                 }
           }
   aroundAllWith (flip $ setup interceptor) do
     describe "Workflow finalization" do
-      specify "publishes an escaped inbound interceptor exception" $ \TestEnv {..} -> do
+      specify "publishes an escaped inbound interceptor exception exactly once" $ \TestEnv {..} -> do
         let conf = configure () testConf baseConf
         withWorker conf do
           _ <- useClient $ C.start testRefs.shouldRunWorkflowTest "escaped-interceptor" (C.startWorkflowOptions taskQueue)
@@ -625,6 +629,11 @@ workflowFinalizationWithEscapedInterceptor = do
           case result of
             Just (Just (WorkflowExitFailed _)) -> pure ()
             _ -> expectationFailure "expected the finalizer to receive the escaped interceptor failure"
+
+        results <- reverse <$> readIORef finalizations
+        case results of
+          [Just (WorkflowExitFailed _)] -> pure ()
+          _ -> expectationFailure "expected eviction to leave the completed finalization unchanged"
 
 
 needsClient :: SpecWith TestEnv

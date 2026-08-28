@@ -180,6 +180,7 @@ create
     workflowInstanceContinuationEnv <- ContinuationEnv <$> newIORef JobNil
     workflowCancellationVar <- newIVar
     workflowVault <- newIORef baseWorkflowVault
+    workflowFinalized <- newIORef False
     activationChannel <- newTQueueIO
     executionThread <- newIORef (error "Workflow thread not yet started")
     executionCancelled <- newIORef False
