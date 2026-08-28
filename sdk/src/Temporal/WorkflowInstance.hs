@@ -208,7 +208,12 @@ create
                   case (cancelled, E.fromException err :: Maybe E.SomeAsyncException) of
                     (True, _) -> pure ()
                     (_, Just _) -> E.throwIO err
-                    _ -> runInstanceM inst $ failWorkflowActivation err
+                    _ -> do
+                      -- An inbound interceptor can fail outside 'runTopLevel',
+                      -- so no 'finishWorkflow' call would otherwise publish the
+                      -- failure to lifecycle observers before eviction.
+                      finalizeWorkflowExecution inboundInterceptor inst (Just $ WorkflowExitFailed err)
+                      runInstanceM inst $ failWorkflowActivation err
                 Right () -> pure ()
           writeIORef executionThread workerThread
           link workerThread

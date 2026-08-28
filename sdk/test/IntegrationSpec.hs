@@ -63,6 +63,7 @@ import RequireCallStack
 import System.Directory
 import System.Environment (lookupEnv)
 import System.IO
+import System.Timeout (timeout)
 import Temporal.Activity hiding (activityId, retryPolicy, workflowId)
 import Temporal.Bundle
 import Temporal.Bundle.TH
@@ -424,6 +425,7 @@ spec = do
     aroundAllWith (flip $ setup mempty) needsClient
     aroundAllWith (flip $ setup mempty) terminateTests
     updatesWithInterceptors
+    workflowFinalizationWithEscapedInterceptor
 
   -- Whether time-skipping is enabled is global state in the test server (it's not tracked
   -- per workflow or anything) so we need to use around (rather than aroundAll) to get a
@@ -600,6 +602,29 @@ mkBaseConf interceptors = do
         setLogger $ defaultOutput stdout
     , taskQueue
     )
+
+
+workflowFinalizationWithEscapedInterceptor :: SpecWith PortNumber
+workflowFinalizationWithEscapedInterceptor = do
+  finalized <- runIO newEmptyMVar
+  let interceptor =
+        mempty
+          { workflowInboundInterceptors =
+              mempty
+                { executeWorkflow = \_input _next -> throwIO SampleException
+                , finalizeWorkflow = \_ result -> putMVar finalized result
+                }
+          }
+  aroundAllWith (flip $ setup interceptor) do
+    describe "Workflow finalization" do
+      specify "publishes an escaped inbound interceptor exception" $ \TestEnv {..} -> do
+        let conf = configure () testConf baseConf
+        withWorker conf do
+          _ <- useClient $ C.start testRefs.shouldRunWorkflowTest "escaped-interceptor" (C.startWorkflowOptions taskQueue)
+          result <- timeout 5_000_000 (takeMVar finalized)
+          case result of
+            Just (Just (WorkflowExitFailed _)) -> pure ()
+            _ -> expectationFailure "expected the finalizer to receive the escaped interceptor failure"
 
 
 needsClient :: SpecWith TestEnv
