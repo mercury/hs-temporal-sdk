@@ -1,3 +1,4 @@
+{-# HLINT ignore "Use ?~" #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
@@ -306,14 +307,15 @@ import qualified Data.Vector as V
 import Data.Word (Word32, Word64, Word8)
 import GHC.Stack
 import Lens.Family2
+import qualified Proto.Google.Protobuf.Timestamp as Timestamp
 import qualified Proto.Temporal.Api.Common.V1.Message_Fields as Payloads
 import qualified Proto.Temporal.Api.Failure.V1.Message_Fields as Failure
 import qualified Proto.Temporal.Sdk.Core.ActivityResult.ActivityResult as ActivityResult
 import qualified Proto.Temporal.Sdk.Core.ActivityResult.ActivityResult_Fields as ActivityResult
 import qualified Proto.Temporal.Sdk.Core.Common.Common_Fields as Common
-import qualified Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields as Activation
 import qualified Proto.Temporal.Sdk.Core.Nexus.Nexus as NexusProto
 import qualified Proto.Temporal.Sdk.Core.Nexus.Nexus_Fields as NexusFields
+import qualified Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields as Activation
 import qualified Proto.Temporal.Sdk.Core.WorkflowCommands.WorkflowCommands as Command
 import qualified Proto.Temporal.Sdk.Core.WorkflowCommands.WorkflowCommands_Fields as Command
 import RequireCallStack
@@ -322,7 +324,6 @@ import Temporal.Activity.Definition (ActivityRef (..), KnownActivity (..))
 import Temporal.Common
 import qualified Temporal.Common.Logging as Logging
 import Temporal.Common.TimeoutType
-import qualified Proto.Google.Protobuf.Timestamp as Timestamp
 import Temporal.Duration (Duration (..), diffSystemTime, durationFromProto, durationToProto, nanoseconds, seconds)
 import Temporal.Exception
 import Temporal.Payload
@@ -448,7 +449,7 @@ startActivityFromPayloads (KnownActivity codec name) opts typedPayloads = ilift 
       Task
         { waitAction = do
             res <- getIVar resultSlot
-            Logging.logInfo ("Activity result: " <> Text.pack (show res))
+            Logging.logDebug ("Activity result: " <> Text.pack (show res))
             Workflow $ \_ -> case res ^. Activation.result . ActivityResult.maybe'status of
               Nothing -> error "Activity result missing status"
               Just (ActivityResult.ActivityResolution'Completed success) -> do
@@ -526,11 +527,12 @@ executeActivity (activityRef -> k@(KnownActivity codec _name)) opts = withWorkfl
   Temporal.Workflow.Unsafe.Handle.wait actHandle
 
 
--- | Schedule a Nexus operation from a workflow. Returns a 'Task' that completes
--- with a raw 'Payload' when the operation finishes (sync or async).
---
--- Use 'makeNexusClient' to create a 'NexusClient' bound to an endpoint and service,
--- then pass an 'NexusOperationName' identifying the operation within that service.
+{- | Schedule a Nexus operation from a workflow. Returns a 'Task' that completes
+with a raw 'Payload' when the operation finishes (sync or async).
+
+Use 'makeNexusClient' to create a 'NexusClient' bound to an endpoint and service,
+then pass an 'NexusOperationName' identifying the operation within that service.
+-}
 startNexusOperation
   :: RequireCallStack
   => NexusClient
@@ -817,14 +819,15 @@ startLocalActivityFromPayloads (KnownActivity codec name) opts typedPayloads = d
     )
 
 
--- | Schedule a single local activity attempt. Returns a Task that resolves with
--- the raw Payload on success. On DoBackoff, sleeps for the backoff duration and
--- recursively re-schedules with updated attempt/originalScheduleTime, creating
--- the server-side timer that core expects for long backoffs.
---
--- The @cancelledRef@ is shared across all retry attempts so that
--- 'cancelAction' on the outermost 'Task' can signal cancellation to the
--- DoBackoff retry loop.
+{- | Schedule a single local activity attempt. Returns a Task that resolves with
+the raw Payload on success. On DoBackoff, sleeps for the backoff duration and
+recursively re-schedules with updated attempt/originalScheduleTime, creating
+the server-side timer that core expects for long backoffs.
+
+The @cancelledRef@ is shared across all retry attempts so that
+'cancelAction' on the outermost 'Task' can signal cancellation to the
+DoBackoff retry loop.
+-}
 scheduleLocalActivityAttempt
   :: RequireCallStack
   => Text
