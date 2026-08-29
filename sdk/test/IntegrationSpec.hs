@@ -78,7 +78,8 @@ import Temporal.Exception hiding (activityId)
 import Temporal.Interceptor
 import Temporal.Operator (IndexedValueType (..), SearchAttributes (..), addSearchAttributes, listSearchAttributes)
 import Temporal.Payload hiding (around)
-import Temporal.SearchAttributes
+import Temporal.SearchAttributes hiding (Bool)
+import qualified Temporal.SearchAttributes as SA
 import Temporal.TH (ActivityFn, WorkflowFn, discoverDefinitions)
 import Temporal.Testing.Assertions
 import Temporal.Worker
@@ -134,6 +135,18 @@ data SampleException = SampleException
 
 
 instance Exception SampleException
+
+
+data CustomTestException = CustomTestException
+  deriving stock (Show)
+
+
+instance Exception CustomTestException
+
+
+isWorkflowFailed :: WorkflowExecutionClosed -> Bool
+isWorkflowFailed (WorkflowExecutionFailed _) = True
+isWorkflowFailed _ = False
 
 
 data AnApplicationFailure = AnApplicationFailure
@@ -3252,3 +3265,67 @@ terminateTests = do
 --   specify "Handle from start terminates run after continue as new" pending
 --   specify "Handle from start does not terminate run after continue as new if given runId" pending
 -- specify "Download and replay multiple executions with client list method" pending
+
+  describe "Custom Data Conversion" $ do
+    let mkOpts tq = (C.startWorkflowOptions tq)
+          { C.workflowIdReusePolicy = Just W.WorkflowIdReusePolicyAllowDuplicate
+          , C.timeouts = C.TimeoutOptions
+              { C.runTimeout = Just (seconds 10)
+              , C.executionTimeout = Nothing
+              , C.taskTimeout = Nothing
+              }
+          }
+
+    specify "custom payload codec (encrypt/decrypt round-trip)" $ \TestEnv {..} -> do
+      let workflow :: MyWorkflow Text
+          workflow = pure "secret-data"
+          wf = W.provideWorkflow defaultCodec "payloadCodecWf" workflow
+          conf = configure () wf $ do baseConf
+      withWorker conf $ do
+        result <- useClient (C.execute wf.reference "payloadCodecWf" (mkOpts taskQueue))
+        result `shouldBe` "secret-data"
+
+    specify "failure converter maps custom exceptions" $ \TestEnv {..} -> do
+      let workflow :: MyWorkflow ()
+          workflow = Catch.throwM CustomTestException
+          wf = W.provideWorkflow defaultCodec "failureConverterWf" workflow
+          conf = configure () wf $ do
+            baseConf
+            addErrorConverter $ \CustomTestException ->
+              ApplicationFailure
+                { message = "custom-mapped"
+                , type' = "CustomTestException"
+                , nonRetryable = True
+                , details = []
+                , stack = ""
+                , nextRetryDelay = Nothing
+                }
+      withWorker conf $ do
+        useClient (C.execute wf.reference "failureConverterWf" (mkOpts taskQueue))
+          `shouldThrow` isWorkflowFailed
+
+    specify "search attributes round-trip through codec" $ \TestEnv {..} -> do
+      let expectedAttrs = Map.fromList [("attr1", toSearchAttribute True)]
+          workflow :: MyWorkflow (Map SearchAttributeKey SearchAttributeType)
+          workflow = do
+            W.upsertSearchAttributes expectedAttrs
+            i <- W.info
+            pure i.searchAttributes
+          wf = W.provideWorkflow defaultCodec "searchAttrCodecWf" workflow
+          conf = configure () wf $ do baseConf
+      withWorker conf $ do
+        useClient (C.execute wf.reference "searchAttrCodecWf" (mkOpts taskQueue))
+          `shouldReturn` expectedAttrs
+
+    specify "payload codec works with activity arguments" $ \TestEnv {..} -> do
+      let act :: Activity () Int
+          act = pure 42
+          actDef = provideActivity defaultCodec "codecTestAct" act
+          workflow :: MyWorkflow Int
+          workflow = W.executeActivity actDef.reference
+            (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
+          wf = W.provideWorkflow defaultCodec "payloadCodecActWf" workflow
+          conf = configure () (wf, actDef) $ do baseConf
+      withWorker conf $ do
+        useClient (C.execute wf.reference "payloadCodecActWf" (mkOpts taskQueue))
+          `shouldReturn` 42

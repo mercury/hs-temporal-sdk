@@ -50,12 +50,6 @@ spec = do
     it "OTel error status includes message" $ const pending
     it "OTel replay compatibility" $ const pending
 
-  describe "Custom Data Conversion (TS)" $ do
-    it "custom payload converter" $ const pending
-    it "failure converter" $ const pending
-    it "search attribute codec" $ const pending
-    it "custom payload codec" $ const pending
-
   describe "Unfinished Handlers (Py/TS)" $ do
     it "unfinished update handler warning" $ const pending
     it "unfinished signal handler warning" $ const pending
