@@ -11,6 +11,7 @@ import Control.Monad.Logger
 import Control.Monad.Reader
 import Data.Bifunctor
 import Data.HashMap.Strict (HashMap)
+import Data.Maybe (isJust)
 import qualified Data.HashMap.Strict as HashMap
 import Data.ProtoLens
 import Data.Text (Text)
@@ -222,25 +223,28 @@ applyActivityTaskStart _tsk tt msg = do
             pure $
               defMessage
                 & C.taskToken .~ rawTaskToken tt
-                & C.result .~ case fromException err of
-                  Just (_cancelled :: ActivityCancelReason) ->
-                    defMessage
-                      & AR.cancelled
-                        .~ ( defMessage
-                              & AR.failure
-                                .~ ( defMessage
-                                      & F.message .~ "Activity cancelled"
-                                      & F.canceledFailureInfo
-                                        .~ ( defMessage
-                                              -- FIXME: provide some details if we have them
-                                              & F.details .~ defMessage
-                                           )
-                                   )
-                           )
-                  Nothing ->
-                    defMessage
-                      & AR.failed
-                        .~ (defMessage & AR.failure .~ enrichedApplicationFailure)
+                & C.result .~
+                  if isJust (fromException @CompleteAsync err)
+                    then defMessage & AR.willCompleteAsync .~ defMessage
+                    else case fromException err of
+                      Just (_cancelled :: ActivityCancelReason) ->
+                        defMessage
+                          & AR.cancelled
+                            .~ ( defMessage
+                                  & AR.failure
+                                    .~ ( defMessage
+                                          & F.message .~ "Activity cancelled"
+                                          & F.canceledFailureInfo
+                                            .~ ( defMessage
+                                                  -- FIXME: provide some details if we have them
+                                                  & F.details .~ defMessage
+                                               )
+                                       )
+                               )
+                      Nothing ->
+                        defMessage
+                          & AR.failed
+                            .~ (defMessage & AR.failure .~ enrichedApplicationFailure)
           Right ok -> do
             Logging.logDebug "Got activity result"
             ok' <- liftIO $ payloadProcessorEncode w.payloadProcessor ok

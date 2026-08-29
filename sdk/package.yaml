@@ -90,7 +90,6 @@ library:
   - Temporal.Activity.Definition
   - Temporal.Activity.Worker
   - Temporal.Client.Types
-  - Temporal.Client.AsyncActivity
   - Temporal.Client.Workflow
   - Temporal.Common
   - Temporal.Common.Async
