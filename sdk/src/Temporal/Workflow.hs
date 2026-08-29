@@ -996,7 +996,7 @@ upsertSearchAttributes values = ilift $ do
   addCommand cmd
   inst <- ask
   modifyIORef' inst.workflowInstanceInfo $ \Info {..} ->
-    Info {searchAttributes = searchAttributes <> values, ..}
+    Info {searchAttributes = values <> searchAttributes, ..}
 
 
 {- | Updates this Workflow's Memo by merging the provided values with the existing Memo.

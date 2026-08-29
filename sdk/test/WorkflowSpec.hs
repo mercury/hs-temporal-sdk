@@ -224,6 +224,20 @@ tests = do
         let opts = defaultStartOptsWithTimeout taskQueue (seconds 30)
         useClient (C.execute wf.reference "upsertSA" opts) `shouldReturn` expectedAttrs
 
+    specify "later value wins on key collision" $ \TestEnv {..} -> do
+      let workflow :: MyWorkflow (Map SearchAttributeKey SearchAttributeType)
+          workflow = do
+            W.upsertSearchAttributes $ Map.fromList [("attr2", toSearchAttribute True)]
+            W.upsertSearchAttributes $ Map.fromList [("attr2", toSearchAttribute False)]
+            i <- W.info
+            pure i.searchAttributes
+          wf = W.provideWorkflow defaultCodec "saCollision" workflow
+          conf = configure () wf $ do baseConf
+      withWorker conf $ do
+        let opts = defaultStartOptsWithTimeout taskQueue $ seconds 30
+        m <- useClient $ C.execute wf.reference "saCollision" opts
+        Map.lookup "attr2" m `shouldBe` (Just $ toSearchAttribute False)
+
   describe "Memo" $ do
     specify "able to read memo set at start" $ \TestEnv {..} -> do
       let workflow :: W.Workflow (Map Text Payload)
