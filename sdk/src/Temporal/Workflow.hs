@@ -141,6 +141,8 @@ module Temporal.Workflow (
   RootExecution (..),
   RetryPolicy (..),
   defaultRetryPolicy,
+  Priority (..),
+  mkPriority,
   ParentInfo (..),
 
   -- * Workflow metadata
@@ -433,6 +435,7 @@ startActivityFromPayloads (KnownActivity codec name) opts typedPayloads = ilift 
             & Command.cancellationType .~ activityCancellationTypeToProto activityInput.options.cancellationType
             & Command.maybe'scheduleToStartTimeout .~ fmap durationToProto activityInput.options.scheduleToStartTimeout
             & Command.maybe'heartbeatTimeout .~ fmap durationToProto activityInput.options.heartbeatTimeout
+            & Command.maybe'priority .~ fmap priorityToProto activityInput.options.priority
             & \msg ->
               case activityInput.options.timeout of
                 StartToCloseTimeout t -> msg & Command.startToCloseTimeout .~ durationToProto t
@@ -727,6 +730,7 @@ startChildWorkflowFromPayloads (workflowRef -> k@(KnownWorkflow codec _)) opts p
                 & Command.memo .~ fmap convertToProtoPayload memo
                 & Command.searchAttributes .~ searchAttrs
                 & Command.cancellationType .~ childWorkflowCancellationTypeToProto opts'.cancellationType
+                & Command.maybe'priority .~ fmap priorityToProto opts'.priority
 
             cmd =
               defMessage

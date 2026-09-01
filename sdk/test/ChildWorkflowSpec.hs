@@ -1,17 +1,25 @@
+-- Pinned here for the formatter: this module is missing from the cabal
+-- other-modules list, so fourmolu does not see the default extension and
+-- rewrites @x.field@ as composition.
+{-# LANGUAGE OverloadedRecordDot #-}
+
 module ChildWorkflowSpec where
 
 import Control.Exception (SomeException)
 import qualified Control.Monad.Catch as Catch
 import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Temporal.Client as C
-import Temporal.Payload
+import Lens.Family2
+import qualified Proto.Temporal.Api.Common.V1.Message_Fields as Common
+import qualified Proto.Temporal.Api.History.V1.Message_Fields as History
 import RequireCallStack (provideCallStack)
-import Temporal.SearchAttributes
+import qualified Temporal.Client as C
 import Temporal.Duration
 import Temporal.Exception
+import Temporal.Payload
+import Temporal.SearchAttributes
 import Temporal.Worker
-import Temporal.Workflow (StartChildWorkflowOptions(workflowId, workflowIdReusePolicy, timeoutOptions))
+import Temporal.Workflow (StartChildWorkflowOptions (priority, timeoutOptions, workflowId, workflowIdReusePolicy))
 import qualified Temporal.Workflow as W
 import Test.Hspec
 import TestHelpers
@@ -152,10 +160,11 @@ tests = describe "Child Workflows" $ do
         childWf = W.provideWorkflow defaultCodec "reuseChild" child
         parent :: MyWorkflow ()
         parent = do
-          let opts = W.defaultChildWorkflowOptions
-                { workflowId = Just $ W.WorkflowId childId
-                , workflowIdReusePolicy = W.WorkflowIdReusePolicyAllowDuplicateFailedOnly
-                }
+          let opts =
+                W.defaultChildWorkflowOptions
+                  { workflowId = Just $ W.WorkflowId childId
+                  , workflowIdReusePolicy = W.WorkflowIdReusePolicyAllowDuplicateFailedOnly
+                  }
           W.executeChildWorkflow childWf.reference opts
         parentWf = W.provideWorkflow defaultCodec "reuseParent" parent
         conf = configure () (childWf, parentWf) $ do baseConf
@@ -163,6 +172,30 @@ tests = describe "Child Workflows" $ do
       let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
       useClient (C.execute parentWf.reference "childReuse" opts)
         `shouldReturn` ()
+
+  specify "child workflow with explicit priority" $ \TestEnv {..} -> do
+    let child :: W.Workflow Int
+        child = pure 7
+        childWf = W.provideWorkflow defaultCodec "priorityChild" child
+        parent :: MyWorkflow Int
+        parent =
+          W.executeChildWorkflow childWf.reference W.defaultChildWorkflowOptions {priority = Just (W.mkPriority 1)}
+        parentWf = W.provideWorkflow defaultCodec "priorityParent" parent
+        conf = configure () (childWf, parentWf) $ do baseConf
+    withWorker conf $ do
+      wfId <- uuidText
+      let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
+      (result, hist) <- useClient $ do
+        h <- C.start parentWf.reference (W.WorkflowId wfId) opts
+        result <- C.waitWorkflowResult h
+        hist <- C.fetchHistory h
+        pure (result, hist)
+      result `shouldBe` 7
+      let initiatedPriorityKeys = do
+            ev <- hist ^. History.events
+            Just attrs <- pure (ev ^. History.maybe'startChildWorkflowExecutionInitiatedEventAttributes)
+            pure (attrs ^. History.priority . Common.priorityKey)
+      initiatedPriorityKeys `shouldBe` [1]
 
   specify "executeChildWorkflow convenience" $ \TestEnv {..} -> do
     let child :: W.Workflow Int
@@ -183,13 +216,15 @@ tests = describe "Child Workflows" $ do
         childWf = W.provideWorkflow defaultCodec "childTimeout" child
         parent :: MyWorkflow String
         parent = do
-          let childOpts = (W.defaultChildWorkflowOptions :: W.StartChildWorkflowOptions)
-                { timeoutOptions = W.TimeoutOptions
-                    { W.executionTimeout = Just $ seconds 1
-                    , W.runTimeout = Just $ seconds 1
-                    , W.taskTimeout = Nothing
-                    }
-                }
+          let childOpts =
+                (W.defaultChildWorkflowOptions :: W.StartChildWorkflowOptions)
+                  { timeoutOptions =
+                      W.TimeoutOptions
+                        { W.executionTimeout = Just $ seconds 1
+                        , W.runTimeout = Just $ seconds 1
+                        , W.taskTimeout = Nothing
+                        }
+                  }
           result <- Catch.try $ W.executeChildWorkflow childWf.reference childOpts
           pure $ show (result :: Either SomeException ())
         parentWf = W.provideWorkflow defaultCodec "childTimeoutParent" parent
@@ -205,10 +240,11 @@ tests = describe "Child Workflows" $ do
         childWf = W.provideWorkflow defaultCodec "childStartFail" child
         parent :: MyWorkflow Bool
         parent = do
-          let childOpts = (W.defaultChildWorkflowOptions :: W.StartChildWorkflowOptions)
-                { workflowId = Just "fixed-child-id-for-dup"
-                , workflowIdReusePolicy = W.WorkflowIdReusePolicyRejectDuplicate
-                }
+          let childOpts =
+                (W.defaultChildWorkflowOptions :: W.StartChildWorkflowOptions)
+                  { workflowId = Just "fixed-child-id-for-dup"
+                  , workflowIdReusePolicy = W.WorkflowIdReusePolicyRejectDuplicate
+                  }
           h1 <- W.startChildWorkflow childWf.reference childOpts
           W.waitChildWorkflowStart h1
           h2 <- W.startChildWorkflow childWf.reference childOpts

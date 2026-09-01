@@ -1,12 +1,18 @@
+-- Pinned here for the formatter: this module is missing from the cabal
+-- other-modules list, so fourmolu does not see the default extension and
+-- rewrites @x.field@ as composition.
+{-# LANGUAGE OverloadedRecordDot #-}
+
 module CancellationSpec where
 
 import Control.Concurrent (threadDelay)
 import Control.Exception (SomeException)
+import Control.Monad (join)
 import qualified Control.Monad.Catch as Catch
 import Control.Monad.IO.Class (liftIO)
 import Data.Text (Text)
-import qualified Temporal.Client as C
 import Temporal.Activity
+import qualified Temporal.Client as C
 import Temporal.Duration
 import Temporal.Exception
 import Temporal.Payload
@@ -35,6 +41,7 @@ childOptsWithId wfId =
     , W.workflowIdReusePolicy = W.WorkflowIdReusePolicyUnspecified
     , W.workflowId = Just wfId
     , W.taskQueue = Nothing
+    , W.priority = Nothing
     }
 
 
@@ -55,7 +62,7 @@ tests = describe "Cancellation" $ do
         h <- useClient (C.start wf.reference "simpleCancelWf" opts)
         waitForWorkflowStart h
         C.cancel h (C.CancellationOptions mempty)
-        C.waitWorkflowResult h `shouldThrow` (\e -> e == WorkflowExecutionCanceled)
+        C.waitWorkflowResult h `shouldThrow` (== WorkflowExecutionCanceled)
 
     specify "Cancel returns correct result when workflow catches and returns" $ \TestEnv {..} -> do
       let workflow :: MyWorkflow Text
@@ -85,7 +92,7 @@ tests = describe "Cancellation" $ do
         h <- useClient (C.start wf.reference "cancelPropagateWf" opts)
         waitForWorkflowStart h
         C.cancel h (C.CancellationOptions mempty)
-        C.waitWorkflowResult h `shouldThrow` (\e -> e == WorkflowExecutionCanceled)
+        C.waitWorkflowResult h `shouldThrow` (== WorkflowExecutionCanceled)
 
     specify "isCancelRequested returns true after cancel" $ \TestEnv {..} -> do
       let workflow :: MyWorkflow Bool
@@ -151,9 +158,10 @@ tests = describe "Cancellation" $ do
           testActivityAct = provideActivity defaultCodec "immediateCancelResponse" testActivity
           workflow :: MyWorkflow Int
           workflow = do
-            h <- W.startActivity
-              testActivityAct.reference
-              (W.defaultStartActivityOptions $ W.StartToClose $ seconds 1)
+            h <-
+              W.startActivity
+                testActivityAct.reference
+                (W.defaultStartActivityOptions $ W.StartToClose $ seconds 1)
             W.cancel (h :: W.Task Int)
             W.wait h `Catch.catch` \(_ :: ActivityCancelled) -> pure 1
           wf = W.provideWorkflow defaultCodec "activityCancellation" workflow
@@ -162,11 +170,12 @@ tests = describe "Cancellation" $ do
         let opts =
               (C.startWorkflowOptions taskQueue)
                 { C.workflowIdReusePolicy = Just W.WorkflowIdReusePolicyAllowDuplicate
-                , C.timeouts = C.TimeoutOptions
-                    { C.runTimeout = Just $ seconds 4
-                    , C.executionTimeout = Nothing
-                    , C.taskTimeout = Nothing
-                    }
+                , C.timeouts =
+                    C.TimeoutOptions
+                      { C.runTimeout = Just $ seconds 4
+                      , C.executionTimeout = Nothing
+                      , C.taskTimeout = Nothing
+                      }
                 }
         useClient (C.execute wf.reference "immediateActivityCancellation" opts)
           `shouldReturn` 1
@@ -183,10 +192,12 @@ tests = describe "Cancellation" $ do
           testActivityAct = provideActivity defaultCodec "heartbeatCancelActivity" testActivity
           workflow :: MyWorkflow Int
           workflow = do
-            h <- W.startActivity
-              testActivityAct.reference
-              (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
-                { W.heartbeatTimeout = Just $ seconds 1 }
+            h <-
+              W.startActivity
+                testActivityAct.reference
+                (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
+                  { W.heartbeatTimeout = Just $ seconds 1
+                  }
             W.sleep $ nanoseconds 1
             W.cancel (h :: W.Task Int)
             W.wait h `Catch.catch` \(_ :: ActivityCancelled) -> pure 1
@@ -196,11 +207,12 @@ tests = describe "Cancellation" $ do
         let opts =
               (C.startWorkflowOptions taskQueue)
                 { C.workflowIdReusePolicy = Just W.WorkflowIdReusePolicyAllowDuplicate
-                , C.timeouts = C.TimeoutOptions
-                    { C.runTimeout = Just $ seconds 10
-                    , C.executionTimeout = Nothing
-                    , C.taskTimeout = Nothing
-                    }
+                , C.timeouts =
+                    C.TimeoutOptions
+                      { C.runTimeout = Just $ seconds 10
+                      , C.executionTimeout = Nothing
+                      , C.taskTimeout = Nothing
+                      }
                 }
         useClient (C.execute wf.reference "activityCancelHeartbeat" opts)
           `shouldReturn` 1
@@ -219,8 +231,10 @@ tests = describe "Cancellation" $ do
           parentWf = W.provideWorkflow defaultCodec "cancelChildImmediateParent" parentWorkflow
           conf = configure () (childWf, parentWf) $ do baseConf
       withWorker conf $ do
-        let opts = (C.startWorkflowOptions taskQueue)
-              { C.workflowIdReusePolicy = Just W.WorkflowIdReusePolicyAllowDuplicate }
+        let opts =
+              (C.startWorkflowOptions taskQueue)
+                { C.workflowIdReusePolicy = Just W.WorkflowIdReusePolicyAllowDuplicate
+                }
         useClient (C.execute parentWf.reference "cancelChildImm" opts)
           `shouldReturn` "Left ChildWorkflowCancelled"
 
@@ -343,8 +357,7 @@ tests = describe "Cancellation" $ do
             h <- W.startChildWorkflow childWf.reference childOpts
             _ <- W.waitChildWorkflowStart h
             extHandle <- W.getExternalWorkflowHandle childWfId Nothing
-            waiter <- W.cancel extHandle
-            waiter
+            join (W.cancel extHandle)
             result <- Catch.try $ W.waitChildWorkflowResult h
             case (result :: Either SomeException ()) of
               Left _ -> pure "cancelled"

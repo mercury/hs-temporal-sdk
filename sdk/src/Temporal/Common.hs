@@ -254,6 +254,111 @@ retryPolicyFromProto p =
     }
 
 
+{- | Controls relative ordering of task processing when tasks are backlogged in
+a task queue. Maps to the Temporal @temporal.api.common.v1.Priority@ proto.
+
+Priority is attached to workflows and activities. Activities and child workflows
+__inherit__ 'Priority' from the workflow that created them, but may override
+individual fields when started. For each field, a zero\/empty value means
+\"inherit from the calling workflow\", or if there is no calling workflow, use
+the server default.
+
+The overall dispatch semantics are:
+
+1. __'priorityKey'__: lower number goes first (priority 1 beats priority 5).
+2. __'fairnessKey'__ and __'fairnessWeight'__: within a single priority level
+   the server partitions work by fairness key and dispatches in proportion to
+   weight.
+
+Tasks in a queue are processed in close-to-priority order, although small
+deviations are possible (especially with multiple task queue partitions).
+
+==== Minimal usage
+
+Most callers only need 'mkPriority':
+
+@
+opts { priority = Just ('mkPriority' 1) }   -- high priority
+opts { priority = Just ('mkPriority' 5) }   -- lower priority
+@
+
+==== Fairness partitioning
+
+The fairness mechanism prevents a single high-volume tenant from monopolising
+all workers on a shared task queue. Set 'fairnessKey' to a tenant\/account
+identifier (or a fixed label like @\"high\"@\/@\"low\"@) and the server will
+dispatch tasks for each key in proportion to its 'fairnessWeight'.
+
+@
+Priority
+  { priorityKey   = 2
+  , fairnessKey   = \"tenant-abc\"
+  , fairnessWeight = 1.0
+  }
+@
+
+Weights can also be overridden per-key via the server's @UpdateTaskQueueConfig@
+API (takes precedence over weights set here).
+
+Leave 'fairnessKey' empty and 'fairnessWeight' at @0@ unless your deployment
+specifically needs fairness partitioning.
+-}
+data Priority = Priority
+  { priorityKey :: !Int32
+  -- ^ Positive integer from 1 to /n/ where __smaller integers correspond to
+  -- higher priority__ (tasks run sooner). The maximum value (minimum priority)
+  -- is determined by server configuration and defaults to @5@. The default
+  -- priority when unset is @(min + max) \/ 2@, which is @3@ with the default
+  -- range of 1–5.
+  , fairnessKey :: !Text
+  -- ^ Short string (max 64 bytes) used as a key for fairness balancing within
+  -- the same priority level. Can correspond to a tenant ID or a fixed label
+  -- like @\"high\"@\/@\"low\"@. The server dispatches tasks for a given key in
+  -- proportion to its 'fairnessWeight'. Default is @\"\"@ (empty — no fairness
+  -- partitioning).
+  , fairnessWeight :: !Float
+  -- ^ Weight for task dispatch for the associated 'fairnessKey'. Tasks for a
+  -- fairness key are dispatched in proportion to their weight. The server
+  -- clamps values to the range @[0.001, 1000]@. Default weight is @1.0@.
+  --
+  -- Effective weight precedence (highest to lowest):
+  --
+  -- 1. Weights overridden in task queue configuration (@UpdateTaskQueueConfig@ API)
+  -- 2. Weights attached to the workflow\/activity (this field)
+  -- 3. Server default of @1.0@
+  }
+  deriving stock (Show, Eq, Generic, Lift)
+
+
+instance ToJSON Priority
+
+
+instance FromJSON Priority
+
+
+{- | Construct a 'Priority' from just the numeric key, leaving fairness
+fields at their defaults (@fairnessKey = \"\"@, @fairnessWeight = 0@).
+
+Lower values mean higher priority. With the default server range of 1–5:
+
+@
+'mkPriority' 1  -- highest priority (runs first)
+'mkPriority' 3  -- default priority
+'mkPriority' 5  -- lowest priority (runs last)
+@
+-}
+mkPriority :: Int32 -> Priority
+mkPriority k = Priority {priorityKey = k, fairnessKey = "", fairnessWeight = 0}
+
+
+priorityToProto :: Priority -> Message.Priority
+priorityToProto p =
+  defMessage
+    & Message.priorityKey .~ p.priorityKey
+    & Message.fairnessKey .~ p.fairnessKey
+    & Message.fairnessWeight .~ p.fairnessWeight
+
+
 data RetryState
   = RetryStateUnspecified
   | RetryStateInProgress
