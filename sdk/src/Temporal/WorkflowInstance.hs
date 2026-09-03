@@ -180,6 +180,7 @@ create
     workflowInstanceContinuationEnv <- ContinuationEnv <$> newIORef JobNil
     workflowCancellationVar <- newIVar
     workflowVault <- newIORef baseWorkflowVault
+    workflowFinalized <- newIORef False
     activationChannel <- newTQueueIO
     executionThread <- newIORef (error "Workflow thread not yet started")
     executionCancelled <- newIORef False
@@ -208,7 +209,12 @@ create
                   case (cancelled, E.fromException err :: Maybe E.SomeAsyncException) of
                     (True, _) -> pure ()
                     (_, Just _) -> E.throwIO err
-                    _ -> runInstanceM inst $ failWorkflowActivation err
+                    _ -> do
+                      -- An inbound interceptor can fail outside 'runTopLevel',
+                      -- so no 'finishWorkflow' call would otherwise publish the
+                      -- failure to lifecycle observers before eviction.
+                      finalizeWorkflowExecution inboundInterceptor inst (Just $ WorkflowExitFailed err)
+                      runInstanceM inst $ failWorkflowActivation err
                 Right () -> pure ()
           writeIORef executionThread workerThread
           link workerThread
@@ -234,12 +240,14 @@ finishWorkflow :: WorkflowExitVariant Payload -> InstanceM ()
 finishWorkflow res = do
   inst <- ask
   let finalize = liftIO $ finalizeWorkflowExecution inst.inboundInterceptor inst (Just res)
+  -- Finalize before publishing the terminal command. The executor remains alive
+  -- after publication to answer queries, so executor exit is not workflow exit.
   (`Catch.finally` finalize) do
     Logging.logDebug "Workflow execution completed"
     addCommand =<< convertExitVariantToCommand res
-    flushCommands
-    Logging.logDebug "Handling leftover queries"
-    handleQueriesAfterCompletion
+  flushCommands
+  Logging.logDebug "Handling leftover queries"
+  handleQueriesAfterCompletion
 
 
 runWithWorkflowExecutionContext :: WorkflowInstance -> InstanceM a -> InstanceM a
@@ -1040,7 +1048,17 @@ workflowExitFromException err
   | otherwise = WorkflowExitFailed err
 
 
+handleTopLevelException :: SomeException -> InstanceM (WorkflowExitVariant Payload)
+handleTopLevelException err = do
+  rethrowAsyncExceptions err
+  case E.fromException err :: Maybe LogicBug of
+    -- SDK watchdog and invariant failures belong to the workflow task. Let the
+    -- executor publish a failed activation instead of terminating the workflow.
+    Just _ -> throwIO err
+    Nothing -> pure $ workflowExitFromException err
+
+
 runTopLevel :: InstanceM Payload -> InstanceM (WorkflowExitVariant Payload)
 runTopLevel m =
   (WorkflowExitSuccess <$> m)
-    `Catch.catches` [Catch.Handler $ \err -> rethrowAsyncExceptions err >> pure (workflowExitFromException err)]
+    `Catch.catches` [Catch.Handler handleTopLevelException]
