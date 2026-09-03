@@ -1,4 +1,7 @@
-{-# LANGUAGE TemplateHaskell #-}
+-- Pinned here for the formatter: this module is missing from the cabal
+-- other-modules list, so fourmolu does not see the default extension and
+-- rewrites @x.field@ as composition.
+{-# LANGUAGE OverloadedRecordDot #-}
 
 module WorkflowSpec where
 
@@ -9,20 +12,21 @@ import Control.Exception.Annotated (checkpoint)
 import qualified Control.Monad.Catch as Catch
 import Control.Monad.Logger (logInfoN)
 import Data.Aeson (toJSON)
-import Data.Int (Int64)
-import Data.ProtoLens (defMessage)
-import Data.Time.Clock.System (SystemTime(..))
-import Data.Word (Word32)
+import Data.Int (Int32, Int64)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.ProtoLens (defMessage)
 import Data.Text (Text)
 import qualified Data.Text as Text
+import Data.Time.Clock.System (SystemTime (..))
+import Data.Word (Word32)
 import Lens.Family2
 import qualified Proto.Temporal.Api.Common.V1.Message_Fields as Common
+import qualified Proto.Temporal.Api.Failure.V1.Message_Fields as Failure
+import Proto.Temporal.Api.History.V1.Message (History)
+import qualified Proto.Temporal.Api.History.V1.Message_Fields as History
 import qualified Proto.Temporal.Api.Workflow.V1.Message_Fields as WFInfo
 import qualified Proto.Temporal.Api.Workflowservice.V1.RequestResponse_Fields as RR
-import qualified Proto.Temporal.Api.Failure.V1.Message_Fields as Failure
-import qualified Proto.Temporal.Api.History.V1.Message_Fields as History
 import qualified Temporal.Activity as A
 import qualified Temporal.Client as C
 import Temporal.Duration
@@ -38,6 +42,13 @@ import TestHelpers
 
 spec :: Spec
 spec = withTestServer_ tests
+
+
+startedPriorityKeys :: History -> [Int32]
+startedPriorityKeys hist = do
+  ev <- hist ^. History.events
+  Just attrs <- pure (ev ^. History.maybe'workflowExecutionStartedEventAttributes)
+  pure (attrs ^. History.priority . Common.priorityKey)
 
 
 tests :: SpecWith TestEnv
@@ -200,19 +211,23 @@ tests = do
           wf = W.provideWorkflow defaultCodec "readSA" workflow
           conf = configure () wf $ do baseConf
       withWorker conf $ do
-        let initialAttrs = Map.fromList
-              [ ("attr1", toSearchAttribute True)
-              , ("attr2", toSearchAttribute (4 :: Int64))
-              ]
-            opts = (defaultStartOptsWithTimeout taskQueue (seconds 30))
-              { C.searchAttributes = initialAttrs }
+        let initialAttrs =
+              Map.fromList
+                [ ("attr1", toSearchAttribute True)
+                , ("attr2", toSearchAttribute (4 :: Int64))
+                ]
+            opts =
+              (defaultStartOptsWithTimeout taskQueue (seconds 30))
+                { C.searchAttributes = initialAttrs
+                }
         useClient (C.execute wf.reference "readSA" opts) `shouldReturn` initialAttrs
 
     specify "can upsert search attributes" $ \TestEnv {..} -> do
-      let expectedAttrs = Map.fromList
-            [ ("attr1", toSearchAttribute True)
-            , ("attr2", toSearchAttribute (4 :: Int64))
-            ]
+      let expectedAttrs =
+            Map.fromList
+              [ ("attr1", toSearchAttribute True)
+              , ("attr2", toSearchAttribute (4 :: Int64))
+              ]
           workflow :: MyWorkflow (Map SearchAttributeKey SearchAttributeType)
           workflow = do
             W.upsertSearchAttributes expectedAttrs
@@ -233,7 +248,7 @@ tests = do
       withWorker conf $ do
         p1 <- encode JSON ("v1" :: Text)
         p2 <- encode JSON (1 :: Int)
-        let opts = (defaultStartOpts taskQueue) { C.memo = Map.fromList [("a", p1), ("b", p2)] }
+        let opts = (defaultStartOpts taskQueue) {C.memo = Map.fromList [("a", p1), ("b", p2)]}
             expected = Map.fromList [("a", p1), ("b", p2)]
         m <- useClient (C.execute wf.reference "readMemo" opts)
         m `shouldBe` expected
@@ -248,7 +263,7 @@ tests = do
             pure i.rawMemo
           wf = W.provideWorkflow defaultCodec "upsertMemo" workflow
           conf = configure () wf $ do baseConf
-          opts = (defaultStartOpts taskQueue) { C.memo = Map.fromList [("a", p1), ("b", p2)] }
+          opts = (defaultStartOpts taskQueue) {C.memo = Map.fromList [("a", p1), ("b", p2)]}
       withWorker conf $ do
         m <- useClient (C.execute wf.reference "upsertMemo" opts)
         let expectedB = encodeJSON (toJSON ("two" :: Text))
@@ -354,10 +369,10 @@ tests = do
           conf = configure () wf $ do baseConf
       withWorker conf $ do
         let wfId = W.WorkflowId "conflict-fail"
-            opts = (C.startWorkflowOptions taskQueue) { C.workflowIdConflictPolicy = Just C.WorkflowIdConflictPolicyFail }
+            opts = (C.startWorkflowOptions taskQueue) {C.workflowIdConflictPolicy = Just C.WorkflowIdConflictPolicyFail}
         _ <- useClient (C.start wf.reference wfId opts)
         useClient (C.start wf.reference wfId opts)
-          `shouldThrow` \(RpcError {} ) -> True
+          `shouldThrow` \(RpcError {}) -> True
 
     specify "UseExisting returns existing handle" $ \TestEnv {..} -> do
       let wf :: W.ProvidedWorkflow (W.Workflow ())
@@ -365,7 +380,7 @@ tests = do
           conf = configure () wf $ do baseConf
       withWorker conf $ do
         let wfId = W.WorkflowId "conflict-existing"
-            opts = (C.startWorkflowOptions taskQueue) { C.workflowIdConflictPolicy = Just C.WorkflowIdConflictPolicyUseExisting }
+            opts = (C.startWorkflowOptions taskQueue) {C.workflowIdConflictPolicy = Just C.WorkflowIdConflictPolicyUseExisting}
         h1 <- useClient (C.start wf.reference wfId opts)
         h2 <- useClient (C.start wf.reference wfId opts)
         h1.workflowHandleRunId `shouldBe` h2.workflowHandleRunId
@@ -376,7 +391,7 @@ tests = do
           conf = configure () wf $ do baseConf
       withWorker conf $ do
         let wfId = W.WorkflowId "conflict-terminate"
-            opts = (C.startWorkflowOptions taskQueue) { C.workflowIdConflictPolicy = Just C.WorkflowIdConflictPolicyTerminateExisting }
+            opts = (C.startWorkflowOptions taskQueue) {C.workflowIdConflictPolicy = Just C.WorkflowIdConflictPolicyTerminateExisting}
         h1 <- useClient (C.start wf.reference wfId opts)
         h2 <- useClient (C.start wf.reference wfId opts)
         h1.workflowHandleRunId `shouldNotBe` h2.workflowHandleRunId
@@ -388,7 +403,7 @@ tests = do
           conf = configure () wf $ do baseConf
       withWorker conf $ do
         let wfId = W.WorkflowId "conflict-term-run"
-            opts = (C.startWorkflowOptions taskQueue) { C.workflowIdReusePolicy = Just W.WorkflowIdReusePolicyTerminateIfRunning }
+            opts = (C.startWorkflowOptions taskQueue) {C.workflowIdReusePolicy = Just W.WorkflowIdReusePolicyTerminateIfRunning}
         h1 <- useClient (C.start wf.reference wfId opts)
         h2 <- useClient (C.start wf.reference wfId opts)
         h1.workflowHandleRunId `shouldNotBe` h2.workflowHandleRunId
@@ -410,7 +425,7 @@ tests = do
     specify "workflow that catches and re-throws" $ \TestEnv {..} -> do
       let workflow :: MyWorkflow ()
           workflow = do
-            Catch.catch (error "inner") (\ (_ :: SomeException) -> error "rethrow")
+            Catch.catch (error "inner") (\(_ :: SomeException) -> error "rethrow")
           wf = W.provideWorkflow defaultCodec "errCatchRethrow" workflow
           conf = configure () wf $ do baseConf
       withWorker conf $ do
@@ -439,11 +454,13 @@ tests = do
       let workflow :: W.Workflow ()
           workflow = error "always fails"
           wf = W.provideWorkflow defaultCodec "retryThenFail" workflow
-          rp = (W.defaultRetryPolicy) { W.maximumAttempts = 2 }
+          rp = W.defaultRetryPolicy {W.maximumAttempts = 2}
           conf = configure () wf $ do baseConf
       withWorker conf $ do
-        let opts = (defaultStartOptsWithTimeout taskQueue (seconds 10))
-              { C.retryPolicy = Just rp }
+        let opts =
+              (defaultStartOptsWithTimeout taskQueue (seconds 10))
+                { C.retryPolicy = Just rp
+                }
         useClient (C.execute wf.reference "retryThenFail" opts)
           `shouldThrow` \case
             WorkflowExecutionFailed _ -> True
@@ -469,13 +486,15 @@ tests = do
           wf = W.provideWorkflow defaultCodec "runTimeout" workflow
           conf = configure () wf $ do baseConf
       withWorker conf $ do
-        let opts = (defaultStartOpts taskQueue)
-              { C.timeouts = C.TimeoutOptions
-                  { C.runTimeout = Just $ seconds 1
-                  , C.executionTimeout = Nothing
-                  , C.taskTimeout = Nothing
-                  }
-              }
+        let opts =
+              (defaultStartOpts taskQueue)
+                { C.timeouts =
+                    C.TimeoutOptions
+                      { C.runTimeout = Just $ seconds 1
+                      , C.executionTimeout = Nothing
+                      , C.taskTimeout = Nothing
+                      }
+                }
         useClient (C.execute wf.reference "runTimeout" opts)
           `shouldThrow` \case
             WorkflowExecutionTimedOut -> True
@@ -513,8 +532,10 @@ tests = do
           conf = configure () wf $ do baseConf
       withWorker conf $ do
         let wfId = W.WorkflowId "duplicate-id-reject-test"
-            opts = (defaultStartOpts taskQueue)
-              { C.workflowIdReusePolicy = Just W.WorkflowIdReusePolicyRejectDuplicate }
+            opts =
+              (defaultStartOpts taskQueue)
+                { C.workflowIdReusePolicy = Just W.WorkflowIdReusePolicyRejectDuplicate
+                }
         _ <- useClient (C.start wf.reference wfId opts)
         useClient (C.start wf.reference wfId opts)
           `shouldThrow` \(RpcError {}) -> True
@@ -641,9 +662,7 @@ tests = do
   describe "Determinism (Py/TS: uuid/random)" $ do
     specify "uuid4 produces valid UUID" $ \TestEnv {..} -> do
       let workflow :: W.Workflow Text
-          workflow = do
-            u <- W.uuid4
-            pure $ Text.pack $ show u
+          workflow = Text.pack . show <$> W.uuid4
           wf = W.provideWorkflow defaultCodec "uuid4Test" workflow
           conf = configure () wf $ do baseConf
       withWorker conf $ do
@@ -752,8 +771,29 @@ tests = do
           wf = W.provideWorkflow defaultCodec "priorityWf" workflow
           conf = configure () wf $ do baseConf
       withWorker conf $ do
-        let opts = (defaultStartOpts taskQueue) { C.priority = Just (C.mkPriority 3) }
-        useClient (C.execute wf.reference "priorityWf" opts) `shouldReturn` "prioritized"
+        let opts = (defaultStartOpts taskQueue) {C.priority = Just (C.mkPriority 3)}
+        (result, hist) <- useClient $ do
+          h <- C.start wf.reference "priorityWf" opts
+          result <- C.waitWorkflowResult h
+          hist <- C.fetchHistory h
+          pure (result, hist)
+        result `shouldBe` "prioritized"
+        startedPriorityKeys hist `shouldBe` [3]
+
+    specify "signalWithStart records priority" $ \TestEnv {..} -> do
+      let kick = W.KnownSignal "kick" defaultCodec :: W.KnownSignal '[Int]
+          workflow :: MyWorkflow ()
+          workflow = W.setSignalHandler kick $ \_ -> pure ()
+          wf = W.provideWorkflow defaultCodec "signalWithStartPriorityWf" workflow
+          conf = configure () wf $ do baseConf
+      withWorker conf $ do
+        wfId <- W.WorkflowId <$> uuidText
+        let opts = (defaultStartOptsWithTimeout taskQueue (seconds 30)) {C.priority = Just (C.mkPriority 2)}
+        hist <- useClient $ do
+          h <- C.signalWithStart wf.reference wfId opts kick 1
+          C.waitWorkflowResult h
+          C.fetchHistory h
+        startedPriorityKeys hist `shouldBe` [2]
 
   describe "Memo operations (Py/TS: memo access)" $ do
     specify "getMemoValues returns initial memos (Py: test_workflow_memo)" $ \TestEnv {..} -> do
@@ -763,8 +803,10 @@ tests = do
           conf = configure () wf $ do baseConf
       withWorker conf $ do
         let memoVal = encodeJSON ("test-memo" :: Text)
-            opts = (defaultStartOpts taskQueue)
-              { C.memo = Map.fromList [("mykey", memoVal)] }
+            opts =
+              (defaultStartOpts taskQueue)
+                { C.memo = Map.fromList [("mykey", memoVal)]
+                }
         result <- useClient (C.execute wf.reference "getMemo" opts)
         Map.member "mykey" result `shouldBe` True
 
@@ -772,8 +814,7 @@ tests = do
       let workflow :: MyWorkflow Bool
           workflow = do
             W.upsertMemo (Map.fromList [("added", toJSON ("hello" :: Text))])
-            memos <- W.getMemoValues
-            pure $ Map.member "added" memos
+            Map.member "added" <$> W.getMemoValues
           wf = W.provideWorkflow defaultCodec "upsertMemoWf" workflow
           conf = configure () wf $ do baseConf
       withWorker conf $ do
@@ -799,13 +840,15 @@ tests = do
           wf = W.provideWorkflow defaultCodec "runTimeoutWf" workflow
           conf = configure () wf $ do baseConf
       withWorker conf $ do
-        let opts = (defaultStartOpts taskQueue)
-              { C.timeouts = C.TimeoutOptions
-                  { C.runTimeout = Just (seconds 1)
-                  , C.executionTimeout = Nothing
-                  , C.taskTimeout = Nothing
-                  }
-              }
+        let opts =
+              (defaultStartOpts taskQueue)
+                { C.timeouts =
+                    C.TimeoutOptions
+                      { C.runTimeout = Just (seconds 1)
+                      , C.executionTimeout = Nothing
+                      , C.taskTimeout = Nothing
+                      }
+                }
         useClient (C.execute wf.reference "runTimeout" opts)
           `shouldThrow` \case
             WorkflowExecutionTimedOut -> True
@@ -885,8 +928,10 @@ tests = do
           wf = W.provideWorkflow defaultCodec "startDelayWf" workflow
           conf = configure () wf $ do baseConf
       withWorker conf $ do
-        let opts = (defaultStartOptsWithTimeout taskQueue (seconds 10))
-              { C.workflowStartDelay = Just (seconds 2) }
+        let opts =
+              (defaultStartOptsWithTimeout taskQueue (seconds 10))
+                { C.workflowStartDelay = Just (seconds 2)
+                }
             wfId = W.WorkflowId "start-delay-test"
         h <- useClient (C.start wf.reference wfId opts)
         C.waitWorkflowResult h `shouldReturn` ()
@@ -897,8 +942,10 @@ tests = do
           conf = configure () wf $ do baseConf
       withWorker conf $ do
         let wfId = W.WorkflowId "client-conflict-terminate"
-            opts = (C.startWorkflowOptions taskQueue)
-              { C.workflowIdConflictPolicy = Just C.WorkflowIdConflictPolicyTerminateExisting }
+            opts =
+              (C.startWorkflowOptions taskQueue)
+                { C.workflowIdConflictPolicy = Just C.WorkflowIdConflictPolicyTerminateExisting
+                }
         _ <- useClient (C.start wf.reference wfId opts)
         h2 <- useClient (C.start wf.reference wfId opts)
         C.waitWorkflowResult h2 `shouldReturn` ()
@@ -909,8 +956,10 @@ tests = do
           conf = configure () wf $ do baseConf
       withWorker conf $ do
         let wfId = W.WorkflowId "client-conflict-use"
-            opts = (C.startWorkflowOptions taskQueue)
-              { C.workflowIdConflictPolicy = Just C.WorkflowIdConflictPolicyUseExisting }
+            opts =
+              (C.startWorkflowOptions taskQueue)
+                { C.workflowIdConflictPolicy = Just C.WorkflowIdConflictPolicyUseExisting
+                }
         h1 <- useClient (C.start wf.reference wfId opts)
         h2 <- useClient (C.start wf.reference wfId opts)
         h1.workflowHandleRunId `shouldBe` h2.workflowHandleRunId
@@ -1006,9 +1055,11 @@ tests = do
           actDef = A.provideActivity defaultCodec "longRunningAct" act
           workflow :: MyWorkflow ()
           workflow =
-            W.executeActivity actDef.reference
+            W.executeActivity
+              actDef.reference
               (W.defaultStartActivityOptions $ W.StartToClose $ seconds 30)
-                { W.heartbeatTimeout = Just $ seconds 5 }
+                { W.heartbeatTimeout = Just $ seconds 5
+                }
           wf = W.provideWorkflow defaultCodec "shutdownCancelsActWf" workflow
           conf = configure () (wf, actDef) $ do
             baseConf

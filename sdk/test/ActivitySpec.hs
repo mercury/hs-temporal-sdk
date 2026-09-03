@@ -1,29 +1,38 @@
+-- Pinned here for the formatter: this module is missing from the cabal
+-- other-modules list, so fourmolu does not see the default extension and
+-- rewrites @x.field@ as composition.
+{-# LANGUAGE OverloadedRecordDot #-}
+
 module ActivitySpec where
 
 import Control.Concurrent (threadDelay)
 import Control.Exception (SomeException)
 import Control.Exception.Annotated (checkpoint)
-import Control.Monad.IO.Class (liftIO)
 import qualified Control.Monad.Catch as Catch
+import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Logger
 import Control.Monad.Reader (ask)
+import Data.Functor (($>))
 import Data.IORef
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Data.Time.Clock.System (SystemTime(..))
+import Data.Time.Clock.System (SystemTime (..))
 import Data.Word (Word32)
+import Lens.Family2
+import qualified Proto.Temporal.Api.Common.V1.Message_Fields as Common
+import qualified Proto.Temporal.Api.History.V1.Message_Fields as History
 import RequireCallStack (provideCallStack)
 import System.IO (stdout)
-import Temporal.Activity hiding (activityId, retryPolicy, cancellationType, heartbeatTimeout)
+import Temporal.Activity hiding (activityId, cancellationType, heartbeatTimeout, retryPolicy)
 import qualified Temporal.Activity as Act
 import qualified Temporal.Client as C
 import Temporal.Duration
 import Temporal.Exception hiding (activityId)
 import Temporal.Payload
 import Temporal.Worker (configure, setLogger, setNamespace, setTaskQueue)
-import Temporal.Workflow (StartActivityOptions(activityId, retryPolicy, cancellationType, heartbeatTimeout))
+import Temporal.Workflow (StartActivityOptions (activityId, cancellationType, heartbeatTimeout, priority, retryPolicy))
 import qualified Temporal.Workflow as W
 import Test.Hspec
 import TestHelpers
@@ -245,10 +254,13 @@ tests = describe "Activities" $ do
           actDef = provideActivity defaultCodec "maxAttemptsAct" act
           workflow :: MyWorkflow Bool
           workflow = do
-            eRes <- Catch.try @_ @ActivityFailure $ W.executeActivity
-              actDef.reference
-              (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
-                { retryPolicy = Just $ W.defaultRetryPolicy { W.maximumAttempts = 1 } }
+            eRes <-
+              Catch.try @_ @ActivityFailure $
+                W.executeActivity
+                  actDef.reference
+                  (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
+                    { retryPolicy = Just $ W.defaultRetryPolicy {W.maximumAttempts = 1}
+                    }
             case eRes of
               Left e -> pure (e.retryState == RetryStateMaximumAttemptsReached)
               Right () -> pure False
@@ -304,9 +316,12 @@ tests = describe "Activities" $ do
           actDef = provideActivity defaultCodec "attemptCountAct" act
           workflow :: MyWorkflow Int
           -- Fast retry interval to keep the test quick
-          workflow = W.executeActivity actDef.reference
-            (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
-              { retryPolicy = Just $ W.defaultRetryPolicy {W.initialInterval = milliseconds 50} }
+          workflow =
+            W.executeActivity
+              actDef.reference
+              (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
+                { retryPolicy = Just $ W.defaultRetryPolicy {W.initialInterval = milliseconds 50}
+                }
           wf = W.provideWorkflow defaultCodec "attemptCountWf" workflow
           conf = configure () (wf, actDef) $ do baseConf
       withWorker conf $ do
@@ -396,14 +411,15 @@ tests = describe "Activities" $ do
   describe "Activity ID" $ do
     specify "custom activity ID is used" $ \TestEnv {..} -> do
       let act :: Activity () Text
-          act = do
-            i <- askActivityInfo
-            pure $ W.rawActivityId (Act.activityId i)
+          act = W.rawActivityId . Act.activityId <$> askActivityInfo
           actDef = provideActivity defaultCodec "customIdAct" act
           workflow :: MyWorkflow Text
-          workflow = W.executeActivity actDef.reference
-            (W.defaultStartActivityOptions $ W.StartToClose $ seconds 3)
-              { activityId = Just $ W.ActivityId "my-custom-id" }
+          workflow =
+            W.executeActivity
+              actDef.reference
+              (W.defaultStartActivityOptions $ W.StartToClose $ seconds 3)
+                { activityId = Just $ W.ActivityId "my-custom-id"
+                }
           wf = W.provideWorkflow defaultCodec "customIdActWf" workflow
           conf = configure () (wf, actDef) $ do baseConf
       withWorker conf $ do
@@ -411,14 +427,43 @@ tests = describe "Activities" $ do
         useClient (C.execute wf.reference "customIdAct" opts)
           `shouldReturn` "my-custom-id"
 
+  describe "Activity priority" $ do
+    specify "explicit priority is recorded on the scheduled task" $ \TestEnv {..} -> do
+      let act :: Activity () Int
+          act = pure 7
+          actDef = provideActivity defaultCodec "priorityAct" act
+          workflow :: MyWorkflow Int
+          workflow =
+            W.executeActivity
+              actDef.reference
+              (W.defaultStartActivityOptions $ W.StartToClose $ seconds 3) {priority = Just (W.mkPriority 1)}
+          wf = W.provideWorkflow defaultCodec "priorityActWf" workflow
+          conf = configure () (wf, actDef) $ do baseConf
+      withWorker conf $ do
+        wfId <- uuidText
+        let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
+        (result, hist) <- useClient $ do
+          h <- C.start wf.reference (W.WorkflowId wfId) opts
+          result <- C.waitWorkflowResult h
+          hist <- C.fetchHistory h
+          pure (result, hist)
+        result `shouldBe` 7
+        let scheduledPriorityKeys = do
+              ev <- hist ^. History.events
+              Just attrs <- pure (ev ^. History.maybe'activityTaskScheduledEventAttributes)
+              pure (attrs ^. History.priority . Common.priorityKey)
+        scheduledPriorityKeys `shouldBe` [1]
+
   describe "Timeouts" $ do
     specify "activity with custom start-to-close and schedule-to-close timeouts" $ \TestEnv {..} -> do
       let act :: Activity () Int
           act = pure 123
           actDef = provideActivity defaultCodec "customTimeoutAct" act
           workflow :: MyWorkflow Int
-          workflow = W.executeActivity actDef.reference
-            (W.defaultStartActivityOptions (W.StartToClose $ seconds 2, W.ScheduleToClose $ seconds 5))
+          workflow =
+            W.executeActivity
+              actDef.reference
+              (W.defaultStartActivityOptions (W.StartToClose $ seconds 2, W.ScheduleToClose $ seconds 5))
           wf = W.provideWorkflow defaultCodec "customTimeoutActWf" workflow
           conf = configure () (wf, actDef) $ do baseConf
       withWorker conf $ do
@@ -432,9 +477,12 @@ tests = describe "Activities" $ do
           act = error "activity kaboom"
           actDef = provideActivity defaultCodec "failingAct" act
           workflow :: MyWorkflow ()
-          workflow = W.executeActivity actDef.reference
-            (W.defaultStartActivityOptions $ W.StartToClose $ seconds 3)
-              { retryPolicy = Just $ W.defaultRetryPolicy { W.maximumAttempts = 1 } }
+          workflow =
+            W.executeActivity
+              actDef.reference
+              (W.defaultStartActivityOptions $ W.StartToClose $ seconds 3)
+                { retryPolicy = Just $ W.defaultRetryPolicy {W.maximumAttempts = 1}
+                }
           wf = W.provideWorkflow defaultCodec "failActWf" workflow
           conf = configure () (wf, actDef) $ do baseConf
       withWorker conf $ do
@@ -449,8 +497,10 @@ tests = describe "Activities" $ do
           act = checkpoint annotateNonRetryableError $ error "permanent"
           actDef = provideActivity defaultCodec "nonRetryableFailAct" act
           workflow :: MyWorkflow ()
-          workflow = W.executeActivity actDef.reference
-            (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
+          workflow =
+            W.executeActivity
+              actDef.reference
+              (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
           wf = W.provideWorkflow defaultCodec "nonRetryableFailActWf" workflow
           conf = configure () (wf, actDef) $ do baseConf
       withWorker conf $ do
@@ -467,9 +517,12 @@ tests = describe "Activities" $ do
           act = liftIO $ threadDelay 2_000_000
           actDef = provideActivity defaultCodec "slowTimeoutAct" act
           workflow :: MyWorkflow ()
-          workflow = W.executeActivity actDef.reference
-            (W.defaultStartActivityOptions $ W.StartToClose $ seconds 1)
-              { retryPolicy = Just $ W.defaultRetryPolicy { W.maximumAttempts = 1 } }
+          workflow =
+            W.executeActivity
+              actDef.reference
+              (W.defaultStartActivityOptions $ W.StartToClose $ seconds 1)
+                { retryPolicy = Just $ W.defaultRetryPolicy {W.maximumAttempts = 1}
+                }
           wf = W.provideWorkflow defaultCodec "actTimeoutWf" workflow
           conf = configure () (wf, actDef) $ do baseConf
       withWorker conf $ do
@@ -485,9 +538,12 @@ tests = describe "Activities" $ do
           act = checkpoint (annotateNextRetryDelay $ seconds 1) $ error "retry with delay"
           actDef = provideActivity defaultCodec "nextRetryDelayAct" act
           workflow :: MyWorkflow ()
-          workflow = W.executeActivity actDef.reference
-            (W.defaultStartActivityOptions $ W.StartToClose $ seconds 10)
-              { retryPolicy = Just $ W.defaultRetryPolicy { W.maximumAttempts = 2 } }
+          workflow =
+            W.executeActivity
+              actDef.reference
+              (W.defaultStartActivityOptions $ W.StartToClose $ seconds 10)
+                { retryPolicy = Just $ W.defaultRetryPolicy {W.maximumAttempts = 2}
+                }
           wf = W.provideWorkflow defaultCodec "nextRetryDelayWf" workflow
           conf = configure () (wf, actDef) $ do baseConf
       withWorker conf $ do
@@ -506,8 +562,10 @@ tests = describe "Activities" $ do
             pure tq
           actDef = provideActivity defaultCodec "actInfoTaskQueue" act
           workflow :: MyWorkflow Text
-          workflow = W.executeActivity actDef.reference
-            (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
+          workflow =
+            W.executeActivity
+              actDef.reference
+              (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
           wf = W.provideWorkflow defaultCodec "actInfoTaskQueueWf" workflow
           conf = configure () (wf, actDef) $ do baseConf
       withWorker conf $ do
@@ -522,8 +580,10 @@ tests = describe "Activities" $ do
             pure info.attempt
           actDef = provideActivity defaultCodec "actInfoAttempt" act
           workflow :: MyWorkflow Word32
-          workflow = W.executeActivity actDef.reference
-            (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
+          workflow =
+            W.executeActivity
+              actDef.reference
+              (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
           wf = W.provideWorkflow defaultCodec "actInfoAttemptWf" workflow
           conf = configure () (wf, actDef) $ do baseConf
       withWorker conf $ do
@@ -537,8 +597,10 @@ tests = describe "Activities" $ do
             pure (info.startedTime > MkSystemTime 0 0)
           actDef = provideActivity defaultCodec "actInfoStarted" act
           workflow :: MyWorkflow Bool
-          workflow = W.executeActivity actDef.reference
-            (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
+          workflow =
+            W.executeActivity
+              actDef.reference
+              (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
           wf = W.provideWorkflow defaultCodec "actInfoStartedWf" workflow
           conf = configure () (wf, actDef) $ do baseConf
       withWorker conf $ do
@@ -552,8 +614,10 @@ tests = describe "Activities" $ do
             pure (info.scheduledTime > MkSystemTime 0 0)
           actDef = provideActivity defaultCodec "actInfoScheduled" act
           workflow :: MyWorkflow Bool
-          workflow = W.executeActivity actDef.reference
-            (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
+          workflow =
+            W.executeActivity
+              actDef.reference
+              (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
           wf = W.provideWorkflow defaultCodec "actInfoScheduledWf" workflow
           conf = configure () (wf, actDef) $ do baseConf
       withWorker conf $ do
@@ -567,8 +631,10 @@ tests = describe "Activities" $ do
             pure info.activityType
           actDef = provideActivity defaultCodec "actInfoType" act
           workflow :: MyWorkflow Text
-          workflow = W.executeActivity actDef.reference
-            (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
+          workflow =
+            W.executeActivity
+              actDef.reference
+              (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
           wf = W.provideWorkflow defaultCodec "actInfoTypeWf" workflow
           conf = configure () (wf, actDef) $ do baseConf
       withWorker conf $ do
@@ -583,8 +649,10 @@ tests = describe "Activities" $ do
             pure wid
           actDef = provideActivity defaultCodec "actInfoWfId" act
           workflow :: MyWorkflow Text
-          workflow = W.executeActivity actDef.reference
-            (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
+          workflow =
+            W.executeActivity
+              actDef.reference
+              (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
           wf = W.provideWorkflow defaultCodec "actInfoWfIdWf" workflow
           conf = configure () (wf, actDef) $ do baseConf
       withWorker conf $ do
@@ -601,13 +669,17 @@ tests = describe "Activities" $ do
               else pure info.attempt
           actDef = provideActivity defaultCodec "actInfoRetryAttempt" act
           workflow :: MyWorkflow Word32
-          workflow = W.executeActivity actDef.reference
-            (W.defaultStartActivityOptions $ W.StartToClose $ seconds 10)
-              { retryPolicy = Just $ W.defaultRetryPolicy
-                  { W.maximumAttempts = 5
-                  , W.initialInterval = milliseconds 100
-                  }
-              }
+          workflow =
+            W.executeActivity
+              actDef.reference
+              (W.defaultStartActivityOptions $ W.StartToClose $ seconds 10)
+                { retryPolicy =
+                    Just $
+                      W.defaultRetryPolicy
+                        { W.maximumAttempts = 5
+                        , W.initialInterval = milliseconds 100
+                        }
+                }
           wf = W.provideWorkflow defaultCodec "actInfoRetryAttemptWf" workflow
           conf = configure () (wf, actDef) $ do baseConf
       withWorker conf $ do
@@ -619,9 +691,12 @@ tests = describe "Activities" $ do
           act = liftIO $ threadDelay 2_000_000
           actDef = provideActivity defaultCodec "schedToCloseAct" act
           workflow :: MyWorkflow ()
-          workflow = W.executeActivity actDef.reference
-            (W.defaultStartActivityOptions $ W.ScheduleToClose $ seconds 1)
-              { retryPolicy = Just $ W.defaultRetryPolicy {W.maximumAttempts = 1} }
+          workflow =
+            W.executeActivity
+              actDef.reference
+              (W.defaultStartActivityOptions $ W.ScheduleToClose $ seconds 1)
+                { retryPolicy = Just $ W.defaultRetryPolicy {W.maximumAttempts = 1}
+                }
           wf = W.provideWorkflow defaultCodec "schedToCloseWf" workflow
           conf = configure () (wf, actDef) $ do baseConf
       withWorker conf $ do
@@ -636,11 +711,13 @@ tests = describe "Activities" $ do
           act = liftIO $ threadDelay 2_000_000
           actDef = provideActivity defaultCodec "heartbeatTimeoutAct" act
           workflow :: MyWorkflow ()
-          workflow = W.executeActivity actDef.reference
-            (W.defaultStartActivityOptions $ W.StartToClose $ seconds 10)
-              { heartbeatTimeout = Just $ seconds 1
-              , retryPolicy = Just $ W.defaultRetryPolicy {W.maximumAttempts = 1}
-              }
+          workflow =
+            W.executeActivity
+              actDef.reference
+              (W.defaultStartActivityOptions $ W.StartToClose $ seconds 10)
+                { heartbeatTimeout = Just $ seconds 1
+                , retryPolicy = Just $ W.defaultRetryPolicy {W.maximumAttempts = 1}
+                }
           wf = W.provideWorkflow defaultCodec "heartbeatTimeoutWf" workflow
           conf = configure () (wf, actDef) $ do baseConf
       withWorker conf $ do
@@ -663,14 +740,16 @@ tests = describe "Activities" $ do
           actDef = provideActivity defaultCodec "tryCancelAct" act
           workflow :: MyWorkflow Text
           workflow = do
-            h <- W.startActivity actDef.reference
-              (W.defaultStartActivityOptions $ W.StartToClose $ seconds 30)
-                { cancellationType = W.ActivityCancellationTryCancel
-                , heartbeatTimeout = Just $ seconds 5
-                }
+            h <-
+              W.startActivity
+                actDef.reference
+                (W.defaultStartActivityOptions $ W.StartToClose $ seconds 30)
+                  { cancellationType = W.ActivityCancellationTryCancel
+                  , heartbeatTimeout = Just $ seconds 5
+                  }
             W.sleep $ nanoseconds 1
             W.cancel (h :: W.Task ())
-            Catch.catch (W.wait h *> pure "completed") (\(_ :: ActivityCancelled) -> pure "cancelled")
+            Catch.catch (W.wait h $> "completed") (\(_ :: ActivityCancelled) -> pure "cancelled")
           wf = W.provideWorkflow defaultCodec "tryCancelWf" workflow
           conf = configure () (wf, actDef) $ do baseConf
       withWorker conf $ do
@@ -690,14 +769,16 @@ tests = describe "Activities" $ do
           actDef = provideActivity defaultCodec "waitCancelAct" act
           workflow :: MyWorkflow Text
           workflow = do
-            h <- W.startActivity actDef.reference
-              (W.defaultStartActivityOptions $ W.StartToClose $ seconds 30)
-                { cancellationType = W.ActivityCancellationWaitCancellationCompleted
-                , heartbeatTimeout = Just $ seconds 5
-                }
+            h <-
+              W.startActivity
+                actDef.reference
+                (W.defaultStartActivityOptions $ W.StartToClose $ seconds 30)
+                  { cancellationType = W.ActivityCancellationWaitCancellationCompleted
+                  , heartbeatTimeout = Just $ seconds 5
+                  }
             W.sleep $ nanoseconds 1
             W.cancel (h :: W.Task ())
-            Catch.catch (W.wait h *> pure "completed") (\(_ :: ActivityCancelled) -> pure "cancelled")
+            Catch.catch (W.wait h $> "completed") (\(_ :: ActivityCancelled) -> pure "cancelled")
           wf = W.provideWorkflow defaultCodec "waitCancelWf" workflow
           conf = configure () (wf, actDef) $ do baseConf
       withWorker conf $ do

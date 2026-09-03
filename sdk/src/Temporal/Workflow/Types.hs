@@ -88,6 +88,8 @@ data StartActivityOptions = StartActivityOptions
   , headers :: Map Text Payload
   , disableEagerExecution :: Bool
   -- ^ If true, will disable eager activity execution. Eager activity execution is an optimization on some servers that sends activities back to the same worker as the calling workflow if they can run there. This setting is experimental and may be removed in a future release.
+  , priority :: Maybe Priority
+  -- ^ 'Nothing' inherits the calling workflow's priority; see 'Priority'.
   }
   deriving stock (Show, Lift)
 
@@ -139,6 +141,7 @@ Default options for starting an activity. Takes a 'StartActivityTimeoutOption'
   , cancellationType = 'ActivityCancellationTryCancel'
   , headers = 'mempty'
   , disableEagerExecution = 'False'
+  , priority = 'Nothing'
   }
 @
 -}
@@ -154,6 +157,7 @@ defaultStartActivityOptions t =
     , cancellationType = ActivityCancellationTryCancel
     , headers = mempty
     , disableEagerExecution = False
+    , priority = Nothing
     }
 
 
@@ -237,6 +241,8 @@ data StartChildWorkflowOptions = StartChildWorkflowOptions
   , workflowIdReusePolicy :: WorkflowIdReusePolicy
   , workflowId :: Maybe WorkflowId
   , taskQueue :: Maybe TaskQueue
+  , priority :: Maybe Priority
+  -- ^ 'Nothing' inherits the calling workflow's priority; see 'Priority'.
   }
   deriving stock (Show, Lift)
 
@@ -262,6 +268,7 @@ Default options for starting a child workflow.
   , workflowIdReusePolicy = 'WorkflowIdReusePolicyUnspecified'
   , workflowId = 'Nothing'
   , taskQueue = 'Nothing'
+  , priority = 'Nothing'
   }
 @
 -}
@@ -284,6 +291,7 @@ defaultChildWorkflowOptions =
     , workflowIdReusePolicy = WorkflowIdReusePolicyUnspecified
     , workflowId = Nothing
     , taskQueue = Nothing
+    , priority = Nothing
     }
 
 
@@ -423,8 +431,9 @@ nexusOperationCancellationTypeToProto NexusOperationTryCancel = NexusProto.TRY_C
 nexusOperationCancellationTypeToProto NexusOperationWaitCancellationRequested = NexusProto.WAIT_CANCELLATION_REQUESTED
 
 
--- | A handle for calling Nexus operations, bound to a specific endpoint and service.
--- Create one via 'makeNexusClient'.
+{- | A handle for calling Nexus operations, bound to a specific endpoint and service.
+Create one via 'makeNexusClient'.
+-}
 data NexusClient = NexusClient
   { nexusEndpoint :: !NexusEndpointName
   , nexusService :: !NexusServiceName

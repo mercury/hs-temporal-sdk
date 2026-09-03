@@ -129,7 +129,6 @@ import qualified Data.UUID as UUID
 import qualified Data.UUID.V4 as UUID
 import qualified Data.Vector as V
 import Lens.Family2
-import qualified Proto.Temporal.Api.Common.V1.Message as CommonMsg
 import qualified Proto.Temporal.Api.Common.V1.Message_Fields as Common
 import qualified Proto.Temporal.Api.Enums.V1.Query as Query
 import qualified Proto.Temporal.Api.Enums.V1.Reset as Reset
@@ -738,6 +737,7 @@ signalWithStartFromPayloads (KnownSignal sigName _) w@(KnownWorkflow codec _) wf
             & RR.cronSchedule .~ fromMaybe "" opts'.signalWithStartOptions.cronSchedule
             & RR.memo .~ convertToProtoMemo memo'
             & RR.header .~ headerToProto (fmap convertToProtoPayload opts'.signalWithStartOptions.headers)
+            & WF.maybe'priority .~ fmap priorityToProto opts'.signalWithStartOptions.priority
     -- & RR.workflowStartDelay .~ _
     -- & RR.skipGenerateWorkflowTask .~ _
     res <-
@@ -1021,7 +1021,8 @@ streamEvents followOpt baseReq = do
 
 
 {- | 'streamEvents' with the history fetch injected. Factored out so the
-follow / pagination loop can be tested without a live server. -}
+follow / pagination loop can be tested without a live server.
+-}
 streamEventsWith
   :: (Monad m)
   => (GetWorkflowExecutionHistoryRequest -> m GetWorkflowExecutionHistoryResponse)
@@ -1357,11 +1358,3 @@ checkWorkflowExecutionExists _wfRef wfId = do
         Core.RpcError status _ _ | fromIntegral status == fromEnum StatusNotFound -> pure False
         _ -> throwIO $ coreRpcErrorToRpcError err
       Right _ -> pure True
-
-
-priorityToProto :: Priority -> CommonMsg.Priority
-priorityToProto p =
-  defMessage
-    & Common.priorityKey .~ p.priorityKey
-    & Common.fairnessKey .~ p.fairnessKey
-    & Common.fairnessWeight .~ p.fairnessWeight
