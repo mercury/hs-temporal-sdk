@@ -19,7 +19,6 @@ module IntegrationSpec where
 
 import Common
 import Control.Concurrent
-import TestHelpers (waitForWorkflowStart)
 import Control.Exception
 import Control.Exception.Annotated
 import qualified Control.Exception.Annotated as Annotated
@@ -56,7 +55,10 @@ import IntegrationSpec.TimeSkipping
 import IntegrationSpec.TimeoutsInWorkflows
 import IntegrationSpec.Updates
 import Lens.Family2
+import OpenTelemetry.Processor.Span
 import OpenTelemetry.Trace
+import OpenTelemetry.Trace.Core (SpanHot (..))
+import OpenTelemetry.Trace.Id.Generator.Default (defaultIdGenerator)
 import qualified Proto.Temporal.Api.Failure.V1.Message_Fields as Failure
 import qualified Proto.Temporal.Api.History.V1.Message_Fields as History
 import RequireCallStack
@@ -83,13 +85,14 @@ import Temporal.SearchAttributes
 import Temporal.TH (ActivityFn, WorkflowFn, discoverDefinitions)
 import Temporal.Testing.Assertions
 import Temporal.Worker
-import Temporal.Workflow
-  ( StartActivityOptions(retryPolicy, activityId)
-  , StartChildWorkflowOptions(workflowId, workflowIdReusePolicy)
-  )
+import Temporal.Workflow (
+  StartActivityOptions (activityId, retryPolicy),
+  StartChildWorkflowOptions (workflowId, workflowIdReusePolicy),
+ )
 import qualified Temporal.Workflow as W
 import Temporal.Workflow.Unsafe (performUnsafeNonDeterministicIO)
 import Test.Hspec
+import TestHelpers (waitForWorkflowStart)
 
 
 temporalBundle
@@ -426,6 +429,8 @@ spec = do
     aroundAllWith (flip $ setup mempty) terminateTests
     updatesWithInterceptors
     workflowFinalizationWithEscapedInterceptor
+    workflowFinalizationOnCompletion
+    openTelemetryWorkflowFinalization
 
   -- Whether time-skipping is enabled is global state in the test server (it's not tracked
   -- per workflow or anything) so we need to use around (rather than aroundAll) to get a
@@ -636,6 +641,132 @@ workflowFinalizationWithEscapedInterceptor = do
           _ -> expectationFailure "expected eviction to leave the completed finalization unchanged"
 
 
+workflowFinalizationOnCompletion :: SpecWith PortNumber
+workflowFinalizationOnCompletion = do
+  finalizations <- runIO $ newIORef []
+  let interceptor =
+        mempty
+          { workflowInboundInterceptors =
+              mempty
+                { finalizeWorkflow = \_ result ->
+                    modifyIORef' finalizations (result :)
+                }
+          }
+  aroundAllWith (flip $ setup interceptor) do
+    describe "Workflow finalization" do
+      specify "finalizes every continued run before publishing its completion" $ \TestEnv {..} -> do
+        let conf = configure () testConf baseConf
+            startOptions =
+              (C.startWorkflowOptions taskQueue)
+                { C.workflowIdReusePolicy = Just W.WorkflowIdReusePolicyAllowDuplicate
+                }
+        withWorker conf do
+          useClient (C.execute testRefs.continueAsNewWorks "finalize-continued-runs" startOptions 0)
+            `shouldReturn` "woohoo"
+
+          results <- reverse <$> readIORef finalizations
+          case results of
+            [Just (WorkflowExitContinuedAsNew _), Just (WorkflowExitSuccess _)] -> pure ()
+            _ -> expectationFailure "expected continued and successful runs to finalize before completion"
+
+
+openTelemetryWorkflowFinalization :: SpecWith PortNumber
+openTelemetryWorkflowFinalization = do
+  emittedSpans <- runIO $ newIORef []
+  interceptor <- runIO do
+    let processor =
+          SpanProcessor
+            { spanProcessorOnStart = \_ _ -> pure ()
+            , spanProcessorOnEnd = \endedSpan ->
+                atomicModifyIORef' emittedSpans $ \spans -> (endedSpan : spans, ())
+            , spanProcessorForceFlush = pure FlushSuccess
+            , spanProcessorShutdown = pure ShutdownSuccess
+            }
+        providerOptions =
+          emptyTracerProviderOptions
+            { tracerProviderOptionsIdGenerator = defaultIdGenerator
+            }
+    provider <- createTracerProvider [processor] providerOptions
+    previousProvider <- getGlobalTracerProvider
+    bracket_
+      (setGlobalTracerProvider provider)
+      (setGlobalTracerProvider previousProvider)
+      makeOpenTelemetryInterceptor
+
+  let readSpanNames = do
+        spans <- readIORef emittedSpans
+        traverse (fmap hotName . readIORef . spanHot) spans
+
+  finalizerStarted <- runIO newEmptyMVar
+  allowFinalizer <- runIO newEmptyMVar
+  let inbound = workflowInboundInterceptors interceptor
+      gatedInterceptor =
+        interceptor
+          { workflowInboundInterceptors =
+              inbound
+                { finalizeWorkflow = \inst result -> do
+                    putMVar finalizerStarted ()
+                    takeMVar allowFinalizer
+                    finalizeWorkflow inbound inst result
+                }
+          }
+
+  aroundAllWith (flip $ setup gatedInterceptor) do
+    describe "OpenTelemetry workflow finalization" do
+      specify "finalizes RunWorkflow before publishing an activity workflow result" $ \TestEnv {..} -> do
+        writeIORef emittedSpans []
+        workflowResult <- newEmptyMVar
+        let conf = configure () testConf baseConf
+            startOptions =
+              (C.startWorkflowOptions taskQueue)
+                { C.workflowIdReusePolicy = Just W.WorkflowIdReusePolicyAllowDuplicate
+                }
+        withWorker conf do
+          _ <- forkIO do
+            result <-
+              Control.Exception.try @SomeException $
+                useClient (C.execute testRefs.basicActivityWf "otel-activity-finalization" startOptions)
+            putMVar workflowResult result
+
+          finalizerDidStart <- timeout 5_000_000 (takeMVar finalizerStarted)
+          case finalizerDidStart of
+            Nothing -> do
+              putMVar allowFinalizer ()
+              expectationFailure "workflow finalizer did not start"
+            Just () -> pure ()
+          prematureResult <- timeout 1_000_000 (takeMVar workflowResult)
+          putMVar allowFinalizer ()
+          case prematureResult of
+            Just result ->
+              expectationFailure $
+                "workflow result was observable before RunWorkflow finalization: " <> show result
+            Nothing -> do
+              completedResult <- timeout 5_000_000 (takeMVar workflowResult)
+              case completedResult of
+                Just (Right 1) -> pure ()
+                _ -> expectationFailure $ "expected successful workflow result, got: " <> show completedResult
+
+          spanNames <- readSpanNames
+          filter (Text.isPrefixOf "RunWorkflow:") spanNames `shouldSatisfy` ((== 1) . length)
+          filter (Text.isPrefixOf "RunActivity:") spanNames `shouldSatisfy` ((== 1) . length)
+
+  aroundAllWith (flip $ setup interceptor) do
+    describe "OpenTelemetry workflow finalization" do
+      specify "exports both continued RunWorkflow spans before the result is observable" $ \TestEnv {..} -> do
+        writeIORef emittedSpans []
+        let conf = configure () testConf baseConf
+            startOptions =
+              (C.startWorkflowOptions taskQueue)
+                { C.workflowIdReusePolicy = Just W.WorkflowIdReusePolicyAllowDuplicate
+                }
+        withWorker conf do
+          useClient (C.execute testRefs.continueAsNewWorks "otel-continue-finalization" startOptions 0)
+            `shouldReturn` "woohoo"
+
+          spanNames <- readSpanNames
+          filter (Text.isPrefixOf "RunWorkflow:") spanNames `shouldSatisfy` ((== 2) . length)
+
+
 needsClient :: SpecWith TestEnv
 needsClient = do
   describe "Workflow" $ do
@@ -655,6 +786,38 @@ needsClient = do
                 }
         useClient (C.execute testRefs.shouldRunWorkflowTest "basicWf" opts)
           `shouldReturn` ()
+
+    specify "retries a resumed activation that exceeds the deadlock timeout" $ \TestEnv {..} -> do
+      evaluationAttempts <- newIORef (0 :: Int)
+      firstEvaluationEntered <- newEmptyMVar
+      let workflow = provideCallStack do
+            W.sleep $ milliseconds 1
+            performUnsafeNonDeterministicIO do
+              attempt <- atomicModifyIORef' evaluationAttempts $ \n ->
+                let next = n + 1
+                in (next, next)
+              when (attempt == 1) do
+                putMVar firstEvaluationEntered ()
+                threadDelay 250_000
+          wf = W.provideWorkflow defaultCodec "workflow-activation-deadlock-retry" workflow
+          conf =
+            (configure () wf baseConf)
+              { deadlockTimeout = Just 100_000
+              }
+          startOptions =
+            (C.startWorkflowOptions taskQueue)
+              { C.timeouts =
+                  C.TimeoutOptions
+                    { C.runTimeout = Just $ seconds 10
+                    , C.executionTimeout = Nothing
+                    , C.taskTimeout = Nothing
+                    }
+              }
+      withWorker conf do
+        workflowHandle <- useClient $ C.start wf.reference "workflow-activation-deadlock-retry" startOptions
+        timeout 5_000_000 (takeMVar firstEvaluationEntered) `shouldReturn` Just ()
+        timeout 5_000_000 (useClient $ C.waitWorkflowResult workflowHandle) `shouldReturn` Just ()
+        readIORef evaluationAttempts `shouldReturn` 2
 
     describe "Workflow existence assertions" $ do
       specify "checkWorkflowExecutionExists returns correct values" $ \TestEnv {..} -> do
@@ -885,10 +1048,11 @@ needsClient = do
             workflow = do
               W.executeLocalActivity
                 localAct.reference
-                (W.defaultStartLocalActivityOptions
-                  { W.startToCloseTimeout = Just $ seconds 5
-                  , W.retryPolicy = Just $ W.defaultRetryPolicy { W.maximumAttempts = 1 }
-                  })
+                ( W.defaultStartLocalActivityOptions
+                    { W.startToCloseTimeout = Just $ seconds 5
+                    , W.retryPolicy = Just $ W.defaultRetryPolicy {W.maximumAttempts = 1}
+                    }
+                )
 
             wf = W.provideWorkflow defaultCodec "failingLocalActivityWf" workflow
             conf = configure () (wf, activityDefinition localAct) $ do
@@ -897,11 +1061,12 @@ needsClient = do
           let opts =
                 (C.startWorkflowOptions taskQueue)
                   { C.workflowIdReusePolicy = Just W.WorkflowIdReusePolicyAllowDuplicate
-                  , C.timeouts = C.TimeoutOptions
-                      { C.runTimeout = Just $ seconds 10
-                      , C.executionTimeout = Nothing
-                      , C.taskTimeout = Nothing
-                      }
+                  , C.timeouts =
+                      C.TimeoutOptions
+                        { C.runTimeout = Just $ seconds 10
+                        , C.executionTimeout = Nothing
+                        , C.taskTimeout = Nothing
+                        }
                   }
           res <- Control.Exception.try @SomeException $ useClient (C.execute wf.reference "failingLocalActivity" opts)
           res `shouldSatisfy` isLeft
@@ -912,9 +1077,10 @@ needsClient = do
 
             workflow :: MyWorkflow Text
             workflow = do
-              task <- W.startLocalActivity
-                localAct.reference
-                (W.defaultStartLocalActivityOptions {W.startToCloseTimeout = Just $ seconds 5})
+              task <-
+                W.startLocalActivity
+                  localAct.reference
+                  (W.defaultStartLocalActivityOptions {W.startToCloseTimeout = Just $ seconds 5})
               W.wait task
 
             wf = W.provideWorkflow defaultCodec "asyncLocalActivityWf" workflow
@@ -941,13 +1107,16 @@ needsClient = do
             workflow = do
               W.executeLocalActivity
                 localAct.reference
-                (W.defaultStartLocalActivityOptions
-                  { W.startToCloseTimeout = Just $ seconds 10
-                  , W.retryPolicy = Just $ W.defaultRetryPolicy
-                      { W.maximumAttempts = 5
-                      , W.initialInterval = milliseconds 100
-                      }
-                  })
+                ( W.defaultStartLocalActivityOptions
+                    { W.startToCloseTimeout = Just $ seconds 10
+                    , W.retryPolicy =
+                        Just $
+                          W.defaultRetryPolicy
+                            { W.maximumAttempts = 5
+                            , W.initialInterval = milliseconds 100
+                            }
+                    }
+                )
 
             wf = W.provideWorkflow defaultCodec "retryLocalActivityWf" workflow
             conf = configure () (wf, activityDefinition localAct) $ do
@@ -956,11 +1125,12 @@ needsClient = do
           let opts =
                 (C.startWorkflowOptions taskQueue)
                   { C.workflowIdReusePolicy = Just W.WorkflowIdReusePolicyAllowDuplicate
-                  , C.timeouts = C.TimeoutOptions
-                      { C.runTimeout = Just $ seconds 30
-                      , C.executionTimeout = Nothing
-                      , C.taskTimeout = Nothing
-                      }
+                  , C.timeouts =
+                      C.TimeoutOptions
+                        { C.runTimeout = Just $ seconds 30
+                        , C.executionTimeout = Nothing
+                        , C.taskTimeout = Nothing
+                        }
                   }
           useClient (C.execute wf.reference "retryLocalActivity" opts)
             `shouldReturn` 3
@@ -1023,9 +1193,10 @@ needsClient = do
 
             workflow :: MyWorkflow Int
             workflow = do
-              h <- W.startLocalActivity
-                localAct.reference
-                (W.defaultStartLocalActivityOptions {W.startToCloseTimeout = Just $ seconds 10})
+              h <-
+                W.startLocalActivity
+                  localAct.reference
+                  (W.defaultStartLocalActivityOptions {W.startToCloseTimeout = Just $ seconds 10})
               W.cancel (h :: W.Task Int)
               W.wait h `Catch.catch` \(_ :: ActivityCancelled) -> pure 99
 
@@ -1036,11 +1207,12 @@ needsClient = do
           let opts =
                 (C.startWorkflowOptions taskQueue)
                   { C.workflowIdReusePolicy = Just W.WorkflowIdReusePolicyAllowDuplicate
-                  , C.timeouts = C.TimeoutOptions
-                      { C.runTimeout = Just $ seconds 15
-                      , C.executionTimeout = Nothing
-                      , C.taskTimeout = Nothing
-                      }
+                  , C.timeouts =
+                      C.TimeoutOptions
+                        { C.runTimeout = Just $ seconds 15
+                        , C.executionTimeout = Nothing
+                        , C.taskTimeout = Nothing
+                        }
                   }
           useClient (C.execute wf.reference "cancelLocalActivity" opts)
             `shouldReturn` 99
@@ -1048,19 +1220,21 @@ needsClient = do
       specify "local activity non-retryable error does not retry" $ \TestEnv {..} -> do
         attemptRef <- newIORef (0 :: Int)
         let localAct :: ProvidedActivity () (Activity () ())
-            localAct = provideCallStack $ provideActivity defaultCodec "nonRetryLocalAct" $
-              checkpoint annotateNonRetryableError $ do
-                _ <- liftIO $ atomicModifyIORef' attemptRef (\n -> (n + 1, n + 1))
-                error "non-retryable error"
+            localAct = provideCallStack $
+              provideActivity defaultCodec "nonRetryLocalAct" $
+                checkpoint annotateNonRetryableError $ do
+                  _ <- liftIO $ atomicModifyIORef' attemptRef (\n -> (n + 1, n + 1))
+                  error "non-retryable error"
 
             workflow :: MyWorkflow ()
             workflow = do
               W.executeLocalActivity
                 localAct.reference
-                (W.defaultStartLocalActivityOptions
-                  { W.startToCloseTimeout = Just $ seconds 5
-                  , W.retryPolicy = Just $ W.defaultRetryPolicy { W.maximumAttempts = 5 }
-                  })
+                ( W.defaultStartLocalActivityOptions
+                    { W.startToCloseTimeout = Just $ seconds 5
+                    , W.retryPolicy = Just $ W.defaultRetryPolicy {W.maximumAttempts = 5}
+                    }
+                )
 
             wf = W.provideWorkflow defaultCodec "nonRetryLocalActivityWf" workflow
             conf = configure () (wf, activityDefinition localAct) $ do
@@ -1069,11 +1243,12 @@ needsClient = do
           let opts =
                 (C.startWorkflowOptions taskQueue)
                   { C.workflowIdReusePolicy = Just W.WorkflowIdReusePolicyAllowDuplicate
-                  , C.timeouts = C.TimeoutOptions
-                      { C.runTimeout = Just $ seconds 10
-                      , C.executionTimeout = Nothing
-                      , C.taskTimeout = Nothing
-                      }
+                  , C.timeouts =
+                      C.TimeoutOptions
+                        { C.runTimeout = Just $ seconds 10
+                        , C.executionTimeout = Nothing
+                        , C.taskTimeout = Nothing
+                        }
                   }
           res <- Control.Exception.try @SomeException $ useClient (C.execute wf.reference "nonRetryLocalActivity" opts)
           res `shouldSatisfy` isLeft
@@ -1088,12 +1263,14 @@ needsClient = do
 
             workflow :: MyWorkflow (Bool, Bool)
             workflow = do
-              localResult <- W.executeLocalActivity
-                checkIsLocalAct.reference
-                (W.defaultStartLocalActivityOptions {W.startToCloseTimeout = Just $ seconds 5})
-              remoteResult <- W.executeActivity
-                checkIsLocalAct.reference
-                (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
+              localResult <-
+                W.executeLocalActivity
+                  checkIsLocalAct.reference
+                  (W.defaultStartLocalActivityOptions {W.startToCloseTimeout = Just $ seconds 5})
+              remoteResult <-
+                W.executeActivity
+                  checkIsLocalAct.reference
+                  (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
               pure (localResult, remoteResult)
 
             wf = W.provideWorkflow defaultCodec "isLocalFlagWf" workflow
@@ -1120,14 +1297,17 @@ needsClient = do
             workflow = do
               W.executeLocalActivity
                 localAct.reference
-                (W.defaultStartLocalActivityOptions
-                  { W.startToCloseTimeout = Just $ seconds 30
-                  , W.localRetryThreshold = Just $ milliseconds 1
-                  , W.retryPolicy = Just $ W.defaultRetryPolicy
-                      { W.maximumAttempts = 3
-                      , W.initialInterval = seconds 2
-                      }
-                  })
+                ( W.defaultStartLocalActivityOptions
+                    { W.startToCloseTimeout = Just $ seconds 30
+                    , W.localRetryThreshold = Just $ milliseconds 1
+                    , W.retryPolicy =
+                        Just $
+                          W.defaultRetryPolicy
+                            { W.maximumAttempts = 3
+                            , W.initialInterval = seconds 2
+                            }
+                    }
+                )
 
             wf = W.provideWorkflow defaultCodec "backoffLocalActivityWf" workflow
             conf = configure () (wf, activityDefinition localAct) $ do
@@ -1136,11 +1316,12 @@ needsClient = do
           let opts =
                 (C.startWorkflowOptions taskQueue)
                   { C.workflowIdReusePolicy = Just W.WorkflowIdReusePolicyAllowDuplicate
-                  , C.timeouts = C.TimeoutOptions
-                      { C.runTimeout = Just $ seconds 60
-                      , C.executionTimeout = Nothing
-                      , C.taskTimeout = Nothing
-                      }
+                  , C.timeouts =
+                      C.TimeoutOptions
+                        { C.runTimeout = Just $ seconds 60
+                        , C.executionTimeout = Nothing
+                        , C.taskTimeout = Nothing
+                        }
                   }
           useClient (C.execute wf.reference "backoffLocalActivity" opts)
             `shouldReturn` 2
@@ -1167,10 +1348,11 @@ needsClient = do
             workflowBoth =
               W.executeLocalActivity
                 localAct.reference
-                (W.defaultStartLocalActivityOptions
-                  { W.startToCloseTimeout = Just $ seconds 3
-                  , W.scheduleToCloseTimeout = Just $ seconds 7
-                  })
+                ( W.defaultStartLocalActivityOptions
+                    { W.startToCloseTimeout = Just $ seconds 3
+                    , W.scheduleToCloseTimeout = Just $ seconds 7
+                    }
+                )
 
             wfStc = W.provideWorkflow defaultCodec "timeoutStcOnlyWf" workflowStcOnly
             wfS2c = W.provideWorkflow defaultCodec "timeoutS2cOnlyWf" workflowS2cOnly
@@ -1201,18 +1383,22 @@ needsClient = do
 
             workflow :: MyWorkflow Int
             workflow = do
-              h <- W.startLocalActivity
-                localAct.reference
-                (W.defaultStartLocalActivityOptions
-                  { W.startToCloseTimeout = Just $ seconds 30
-                  , W.retryPolicy = Just $ W.defaultRetryPolicy
-                      { W.maximumAttempts = 10
-                      , W.initialInterval = seconds 30
+              h <-
+                W.startLocalActivity
+                  localAct.reference
+                  ( W.defaultStartLocalActivityOptions
+                      { W.startToCloseTimeout = Just $ seconds 30
+                      , W.retryPolicy =
+                          Just $
+                            W.defaultRetryPolicy
+                              { W.maximumAttempts = 10
+                              , W.initialInterval = seconds 30
+                              }
+                      , -- Tiny threshold forces DoBackoff after every failure, creating
+                        -- server-side timers that can be cancelled.
+                        W.localRetryThreshold = Just $ milliseconds 1
                       }
-                  -- Tiny threshold forces DoBackoff after every failure, creating
-                  -- server-side timers that can be cancelled.
-                  , W.localRetryThreshold = Just $ milliseconds 1
-                  })
+                  )
               -- Wait long enough for the first attempt to fail and the DoBackoff
               -- timer to be scheduled, then cancel.
               W.sleep $ seconds 2
@@ -1226,11 +1412,12 @@ needsClient = do
           let opts =
                 (C.startWorkflowOptions taskQueue)
                   { C.workflowIdReusePolicy = Just W.WorkflowIdReusePolicyAllowDuplicate
-                  , C.timeouts = C.TimeoutOptions
-                      { C.runTimeout = Just $ seconds 30
-                      , C.executionTimeout = Nothing
-                      , C.taskTimeout = Nothing
-                      }
+                  , C.timeouts =
+                      C.TimeoutOptions
+                        { C.runTimeout = Just $ seconds 30
+                        , C.executionTimeout = Nothing
+                        , C.taskTimeout = Nothing
+                        }
                   }
           useClient (C.execute wf.reference "cancelDoBackoffLocalActivity" opts)
             `shouldReturn` 77
@@ -1261,11 +1448,12 @@ needsClient = do
           let opts =
                 (C.startWorkflowOptions taskQueue)
                   { C.workflowIdReusePolicy = Just W.WorkflowIdReusePolicyAllowDuplicate
-                  , C.timeouts = C.TimeoutOptions
-                      { C.runTimeout = Just $ seconds 30
-                      , C.executionTimeout = Nothing
-                      , C.taskTimeout = Nothing
-                      }
+                  , C.timeouts =
+                      C.TimeoutOptions
+                        { C.runTimeout = Just $ seconds 30
+                        , C.executionTimeout = Nothing
+                        , C.taskTimeout = Nothing
+                        }
                   }
           _ <- forkIO $ do
             res <- useClient (C.execute wf.reference "workerShutdownLA" opts)
@@ -1366,9 +1554,11 @@ needsClient = do
             badActRef = KnownActivity @'[String] @Bool defaultCodec "badArgAct"
             workflow :: MyWorkflow Bool
             workflow =
-              W.executeActivity badActRef
+              W.executeActivity
+                badActRef
                 (W.defaultStartActivityOptions $ W.ScheduleToClose $ seconds 3)
-                  { retryPolicy = Just W.defaultRetryPolicy { W.maximumAttempts = 1 } }
+                  { retryPolicy = Just W.defaultRetryPolicy {W.maximumAttempts = 1}
+                  }
                 "notAnInt"
             wf = W.provideWorkflow defaultCodec "badArgActWf" workflow
             conf = configure () (wf, actDef) $ do
