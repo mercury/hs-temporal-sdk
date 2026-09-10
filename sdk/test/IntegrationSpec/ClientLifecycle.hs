@@ -28,7 +28,7 @@ import qualified Temporal.Core.Client.WorkflowService as Service
 import qualified Temporal.Core.Worker as Worker
 import qualified Temporal.EphemeralServer as Dev (TemporalDevServerConfig (..))
 import qualified Temporal.EphemeralServer as Server
-import Temporal.Runtime (TelemetryOptions (NoTelemetry), bracketRuntime, fetchLogs)
+import Temporal.Runtime (RuntimeClosedError (..), TelemetryOptions (NoTelemetry), bracketRuntime, fetchLogs)
 import Test.Hspec
 import TestHelpers (configWithRetry, globalRuntime, uuidText, withServer)
 
@@ -102,9 +102,20 @@ spec = describe "Client lifecycle" $ do
         putMVar proceed ()
         wait caller
 
+  it "closes promptly when it is the last owner of its Core runtime" $
+    withServer $ \port -> bounded $ do
+      let acquire = bracketRuntime NoTelemetry $ \runtime -> do
+            client <- runNoLoggingT $ Core.connectClient runtime (configWithRetry port)
+            bounded $ Core.waitForConnection client
+            pure client
+      client <- acquire
+      closed <- timeout 2_000_000 $ Core.closeClient client
+      closed `shouldBe` Just ()
+
   it "releases callback scopes on exceptions and cancellation" $
     bounded $
       withQuietClient unreachable $ \client -> do
+        Core.withClientRuntime client (\_ -> throwIO RuntimeClosedError) `shouldThrow` (== RuntimeClosedError)
         Core.withClientRuntime client (\_ -> throwIO LoggerFailure) `shouldThrow` (== LoggerFailure)
         entered <- newEmptyMVar
         proceed <- newEmptyMVar
@@ -193,22 +204,39 @@ spec = describe "Client lifecycle" $ do
             )
             (\_ _ _ _ -> logWarning)
 
-  it "closes while initialization is paused in its logger" $ do
-    entered <- newEmptyMVar
-    proceed <- newEmptyMVar
-    let logger _ _ _ _ = putMVar entered () >> readMVar proceed
-    bounded
-      ( runLoggingT
-          ( Core.bracketClient globalRuntime unreachable $ \client -> liftIO $ do
-              takeMVar entered
-              Core.withClientRuntime client $ void . fetchLogs
+  forM_ [False, True] $ \masked ->
+    it ("closes while initialization is paused in its logger, masked=" <> show masked) $ do
+      entered <- newEmptyMVar
+      proceed <- newEmptyMVar
+      let logger _ _ _ _ = (if masked then uninterruptibleMask_ else id) $ putMVar entered () >> readMVar proceed
+          acquire = bracketRuntime NoTelemetry $ \runtime ->
+            runLoggingT (Core.connectClient runtime unreachable) logger
+          releaseLogger = void $ tryPutMVar proceed ()
+          closeWhileLoggerBlocked = bracket acquire Core.closeClient $ \client -> do
+            takeMVar entered
+            Core.withClientRuntime client $ void . fetchLogs
+            withAsync (Core.waitForConnection client) $ \caller -> do
               Core.closeClient client
+              wait caller `shouldThrow` isClosed
               Core.waitForConnection client `shouldThrow` isClosed
               Service.getSystemInfo client defMessage `shouldThrow` isClosed
-          )
-          logger
-      )
-      `finally` void (tryPutMVar proceed ())
+      bounded closeWhileLoggerBlocked `finally` releaseLogger
+
+  it "does not leave waitForConnection blocked when connection completion races with close" $
+    withServer $ \port -> bounded $
+      replicateM_ 30 $ do
+        gate <- newEmptyMVar
+        let acquire = bracketRuntime NoTelemetry $ \runtime ->
+              runNoLoggingT $ Core.connectClient runtime (configWithRetry port)
+        bracket acquire Core.closeClient $ \client ->
+          withAsync (readMVar gate >> Core.waitForConnection client) $ \caller ->
+            withAsync (readMVar gate >> Core.closeClient client) $ \closer -> do
+              putMVar gate ()
+              wait closer
+              waitCatch caller >>= \case
+                Right () -> pure ()
+                Left err -> fromException err `shouldSatisfy` maybe False isClosed
+              Core.waitForConnection client `shouldThrow` isClosed
 
   it "retains the runtime across an initialization retry" $ do
     entered <- newEmptyMVar

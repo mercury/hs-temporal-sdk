@@ -62,6 +62,24 @@ stable pointer and result slots.
 type TokioCall e a = StablePtr PrimMVar -> Int -> TokioSlot e -> TokioSlot a -> IO ()
 
 
+{- | Run a 'TokioCall', bracketing resource acquisition and release.
+
+@withResource@ acquires the resource when the 'TokioCall' is invoked and
+releases it when the call into Rust returns. Rust may start work that
+continues after returning; if so, it must copy or retain any resources
+that work requires before returning.
+
+The resulting call must satisfy the 'TokioCall' ownership contract; in
+particular, resource cleanup must not throw after Rust accepts the callback.
+-}
+withScopedTokioCall
+  :: ((resource -> IO ()) -> IO ())
+  -> (resource -> TokioCall err res)
+  -> TokioCall err res
+withScopedTokioCall withResource call mvar cap err result =
+  withResource $ \resource -> call resource mvar cap err result
+
+
 type TokioSlot a = Ptr (Ptr a)
 
 

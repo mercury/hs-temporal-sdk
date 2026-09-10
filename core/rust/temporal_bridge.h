@@ -1075,6 +1075,15 @@ void hs_list_nexus_endpoints(struct ClientRef *client,
                              struct CArray_u8 **result_slot);
 
 /**
+ * Test-only accessor for [`LIVE_CORE_RUNTIMES`]. See that item's documentation.
+ *
+ * # Safety
+ *
+ * None beyond the usual C ABI calling convention; this reads a global atomic.
+ */
+uint64_t hs_temporal_test_runtime_live_count(void);
+
+/**
  * # Safety
  *
  * Haskell FFI bridge invariants.
@@ -1223,7 +1232,7 @@ void hs_temporal_new_worker(struct ClientRef *client,
  *
  * Haskell FFI bridge invariants.
  */
-void hs_temporal_new_replay_worker(struct RuntimeRef *runtime,
+void hs_temporal_new_replay_worker(const struct RuntimeRef *runtime,
                                    const struct CArray_u8 *config,
                                    struct WorkerRef **worker_slot,
                                    struct HistoryPusher **history_slot,

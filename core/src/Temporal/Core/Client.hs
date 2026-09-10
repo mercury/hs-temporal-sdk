@@ -80,11 +80,12 @@ import Temporal.Core.CTypes
 import qualified Temporal.Core.Client.Internal.Connection as Connection
 import Temporal.Internal.FFI
 import Temporal.Runtime
+import qualified Temporal.Runtime.Internal as Runtime.Internal
 import UnliftIO (MonadUnliftIO, withRunInIO)
 import qualified UnliftIO
 
 
-foreign import ccall "hs_temporal_connect_client" raw_connectClient :: Ptr Runtime -> CString -> TokioCall (CArray Word8) CoreClient
+foreign import ccall "hs_temporal_connect_client" raw_connectClient :: Ptr CRuntime -> CString -> TokioCall (CArray Word8) CoreClient
 
 
 foreign import ccall "hs_temporal_drop_client" raw_freeClient :: Ptr CoreClient -> IO ()
@@ -93,9 +94,6 @@ foreign import ccall "hs_temporal_drop_client" raw_freeClient :: Ptr CoreClient 
 -- These unsafe imports clone handles synchronously; they do not wait for the
 -- network and they do not invoke Haskell callbacks.
 foreign import ccall unsafe "hs_temporal_clone_client" raw_cloneClient :: Ptr CoreClient -> IO (Ptr CoreClient)
-
-
-foreign import ccall unsafe "hs_temporal_clone_runtime" raw_cloneRuntime :: Ptr Runtime -> IO (Ptr Runtime)
 
 
 -- | Configuration options for 'connectClient'.
@@ -192,7 +190,7 @@ Use 'closeClient' or 'bracketClient' to release the connection explicitly.
 -}
 data Client = Client
   { client :: Connection.ClientHandle (Ptr CoreClient)
-  , runtime :: MVar (Maybe Runtime)
+  , runtime :: Runtime
   -- ^ Owned runtime clone for scoped access, initialization, and retries; released on close.
   , warn :: Text -> IO ()
   , config :: ClientConfig
@@ -271,14 +269,10 @@ withClientRuntime :: MonadUnliftIO m => Client -> (Runtime -> m a) -> m a
 withClientRuntime c = UnliftIO.bracket (liftIO $ acquireClientRuntime c) (liftIO . destroyRuntime)
 
 
--- Call with asynchronous exceptions masked until cleanup is installed or
--- ownership transfers. Only synchronous cloning occurs under this lock.
 acquireClientRuntime :: Client -> IO Runtime
 acquireClientRuntime c =
-  uninterruptibleMask_ $
-    withMVar c.runtime $ \case
-      Nothing -> throwIO ClientClosedError
-      Just rt -> Runtime <$> withRuntime rt raw_cloneRuntime
+  Runtime.Internal.clone c.runtime
+    `catch` \RuntimeClosedError -> throwIO ClientClosedError
 
 
 {- | Run an action with a client handle.
@@ -322,8 +316,7 @@ if you need to block until a connection is available, otherwise the given
 'Client' will block if initialization has not completed when it is used for the
 first time.
 
-The caller must keep its runtime valid throughout construction. The client owns
-an independent clone after construction.
+The client owns an independent runtime clone after construction.
 
 See 'bracketClient' for examples with automatic cleanup.
 -}
@@ -337,13 +330,12 @@ connectClient rt conf = do
       else pure conf
   withRunInIO $ \runInIO -> mask_ $ do
     (conn, outcome) <- Connection.new
-    owner <- Runtime <$> withRuntime rt raw_cloneRuntime
+    runtime <- Runtime.Internal.clone rt
     let initializeClient = do
-          retained <- newMVar (Just owner)
-          let c = Client conn retained (\msg -> runInIO $ $(logWarn) msg) conf'
+          let c = Client conn runtime (\msg -> runInIO $ $(logWarn) msg) conf'
           connectClientAsync c outcome
           pure c
-    initializeClient `onException` destroyRuntime owner
+    initializeClient `onException` destroyRuntime runtime
 
 
 {- | Wait for a 'Client' to fully initialize its connection to a Temporal
@@ -354,30 +346,26 @@ waitForConnection :: MonadIO m => Client -> m ()
 waitForConnection c = liftIO $ Connection.waitForConnection c.client (toException ClientClosedError) retryableConnectionError (connectClientAsync c)
 
 
-{- | Connect to the client asynchronously, retaining a clone of the runtime
-handle until connection attempts finish.
--}
+-- | Connect asynchronously, acquiring the client's runtime for each connection attempt.
 connectClientAsync :: Client -> Connection.Outcome -> IO ()
 connectClientAsync c outcome =
   mask_ $
-    bracketOnError (acquireClientRuntime c) destroyRuntime spawn `catch` failed
+    void (forkIOWithUnmask $ \unmask -> unmask (connectWithRetry c outcome) `catch` failed)
+      `catch` failed
   where
     failed err = Connection.complete c.client outcome raw_freeClient $ Left err
-    -- Once started, the background thread is responsible for releasing this runtime handle.
-    spawn rt = void $ forkIOWithUnmask $ \unmask ->
-      (unmask (withRuntime rt $ connectWithRetry c c.warn outcome) `catch` failed) `finally` destroyRuntime rt
 
 
-connectWithRetry :: Client -> (Text -> IO ()) -> Connection.Outcome -> Ptr Runtime -> IO ()
-connectWithRetry c warn outcome rt = do
+connectWithRetry :: Client -> Connection.Outcome -> IO ()
+connectWithRetry c outcome = do
   bytes <- evaluate $ BL.toStrict $ encode c.config
   let go attempt = do
         pending <- Connection.isConnecting c.client outcome
-        result <- if pending then connectOnce c outcome rt bytes else pure Nothing
+        result <- if pending then connectOnce c outcome bytes else pure Nothing
         case result of
           Nothing -> pure ()
           Just err -> do
-            warn err
+            c.warn err
             micros <- case nextConnectionRetryDelay c.config attempt of
               Nothing -> throwIO $ ClientConnectionError err
               Just delay -> pure delay
@@ -387,11 +375,28 @@ connectWithRetry c warn outcome rt = do
   go 1
 
 
-connectOnce :: Client -> Connection.Outcome -> Ptr Runtime -> BS.ByteString -> IO (Maybe Text)
-connectOnce c outcome rt bytes = mask $ \restore -> do
+{- | Acquire the client's runtime for submitting a connection attempt.
+Throws @ClientClosedError@ if the runtime has been closed.
+
+The native connection call retains its own runtime reference before returning.
+
+The callback should return promptly after @raw_connectClient@, releasing the
+temporary runtime handle before performing subsequent actions.
+-}
+withConnectionRuntime :: Client -> (Ptr CRuntime -> IO a) -> IO a
+withConnectionRuntime c submit =
+  withRuntime c.runtime submit
+    `catch` \RuntimeClosedError -> throwIO ClientClosedError
+
+
+connectOnce :: Client -> Connection.Outcome -> BS.ByteString -> IO (Maybe Text)
+connectOnce c outcome bytes = mask $ \restore -> do
   -- Keep acquisition masked until shared state adopts or releases the handle.
   result <- BS.useAsCString bytes $ \confPtr ->
-    makeTokioAsyncCall (raw_connectClient rt confPtr) rust_dropByteArray raw_freeClient
+    makeTokioAsyncCall
+      (withScopedTokioCall (withConnectionRuntime c) $ \rt -> raw_connectClient rt confPtr)
+      rust_dropByteArray
+      raw_freeClient
   case result of
     Right hdl -> do
       Connection.complete c.client outcome raw_freeClient $ Right hdl
@@ -433,10 +438,10 @@ If a connection attempt succeeds after this function is called, the connection
 handle returned is immediately released.
 -}
 closeClient :: MonadIO m => Client -> m ()
-closeClient c = liftIO $ mask_ $ do
-  owner <- uninterruptibleMask_ $ swapMVar c.runtime Nothing
-  Connection.close c.client (toException ClientClosedError) raw_freeClient
-    `finally` maybe (pure ()) destroyRuntime owner
+closeClient c =
+  liftIO $
+    Runtime.Internal.closeWithCleanup c.runtime $
+      Connection.close c.client (toException ClientClosedError) raw_freeClient
 
 
 type PrimRpcCall = Ptr CoreClient -> Ptr CRpcCall -> TokioCall CRPCError (CArray Word8)
@@ -467,7 +472,7 @@ call f c req_ = do
       alloca $ \rpcCallPtr -> do
         poke rpcCallPtr rpcCall
         withTokioAsyncCall
-          (\sp cap errSlot resultSlot -> withClient c $ \cPtr -> f cPtr rpcCallPtr sp cap errSlot resultSlot)
+          (withScopedTokioCall (withClient c) $ \cPtr -> f cPtr rpcCallPtr)
           rust_drop_rpc_error
           rust_dropByteArray
           (\errPtr -> peek errPtr >>= peekCRPCError)

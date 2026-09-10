@@ -52,6 +52,7 @@ library
   other-modules:
       Temporal.Core.CTypes
       Temporal.Core.Client.HealthService
+      Temporal.Runtime.Internal
       Temporal.Internal.FFI
       Paths_temporal_sdk_core
   autogen-modules:
@@ -120,6 +121,7 @@ test-suite temporal-sdk-core-tests
   main-is: Main.hs
   other-modules:
       ClientConnectionSpec
+      RuntimeSpec
   hs-source-dirs:
       test
   default-extensions:

@@ -737,21 +737,22 @@ closeWorker (Worker lifecycle _ _) = mask_ $ do
     raw_closeWorker wp
 
 
-foreign import ccall "hs_temporal_new_replay_worker" raw_newReplayWorker :: Ptr Runtime -> Ptr (CArray Word8) -> Ptr (Ptr (Worker 'Replay)) -> Ptr (Ptr HistoryPusher) -> Ptr (Ptr CWorkerError) -> IO ()
+foreign import ccall "hs_temporal_new_replay_worker" raw_newReplayWorker :: Ptr CRuntime -> Ptr (CArray Word8) -> Ptr (Ptr (Worker 'Replay)) -> Ptr (Ptr HistoryPusher) -> Ptr (Ptr CWorkerError) -> IO ()
 
 
 newReplayWorker :: Runtime -> WorkerConfig -> IO (Either WorkerError (Worker 'Replay, HistoryPusher))
-newReplayWorker r conf = withRuntime r $ \rPtr -> do
-  alloca $ \wPtrPtr -> do
-    alloca $ \hpPtrPtr -> do
-      withCArrayBS (BL.toStrict $ encode conf) $ \confPtr -> do
+newReplayWorker r conf =
+  alloca $ \wPtrPtr ->
+    alloca $ \hpPtrPtr ->
+      withCArrayBS (BL.toStrict $ encode conf) $ \confPtr ->
         alloca $ \errPtrPtr -> mask_ $ do
           poke wPtrPtr nullPtr
           poke hpPtrPtr nullPtr
           poke errPtrPtr nullPtr
 
           withFfiThreadLabel "temporal/ffi/new_replay_worker" $
-            raw_newReplayWorker rPtr confPtr wPtrPtr hpPtrPtr errPtrPtr
+            withRuntime r $ \rPtr ->
+              raw_newReplayWorker rPtr confPtr wPtrPtr hpPtrPtr errPtrPtr
           errPtr <- peek errPtrPtr
           if errPtr == nullPtr
             then do
