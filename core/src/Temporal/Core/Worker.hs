@@ -3,6 +3,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -22,6 +23,7 @@ module Temporal.Core.Worker (
   validateWorker,
   newReplayWorker,
   closeWorker,
+  WorkerAlreadyClosed (..),
   InactiveForReplay,
   WorkflowActivation,
   pollWorkflowActivation,
@@ -163,29 +165,38 @@ data Worker (ty :: WorkerType) = Worker
   }
 
 
-{- | Run an action with the worker's underlying pointer.
+foreign import ccall "hs_temporal_drop_worker" raw_closeWorker :: Ptr (Worker ty) -> IO ()
 
-__FIXME__: unlike 'Client', which hands out a refcounted clone of its
-runtime handle for the duration of a call, there is no mechanism such as
-@hs_temporal_clone_worker@ (yet).
+foreign import ccall unsafe "hs_temporal_clone_worker" raw_cloneWorker :: Ptr (Worker ty) -> IO (Ptr (Worker ty))
 
-The 'workerLifecycle' lock is only held long enough to read the pointer out
-of the 'MVar' before @f@ runs, so a concurrent 'closeWorker' may free the
-underlying @WorkerRef@ (and the runtime it carries) while @f@ is still using
-the pointer it was handed.
 
-The proper fix is a refcounted worker handle mirroring 'Client'/'Connection';
-until that lands, callers are responsible for ensuring 'closeWorker' cannot race
-with an in-flight call through this function.
+{- | Run an action with a freshly cloned worker pointer.
+
+The 'workerLifecycle' lock is held only long enough to clone the underlying
+@WorkerRef@ via @hs_temporal_clone_worker@, a fast, non-blocking call.
+
+The clone is released after @f@ returns; @f@ must not free the pointer it is
+given or use it after returning.
+
+For asynchronous Tokio calls, use this function alongside 'withScopedTokioCall'
+to ensure the critical path around the 'workerLifecycle' lock is scoped only to
+the synchronous submission to Tokio rather than the entire async operation.
+
+Throws 'WorkerAlreadyClosed' if the worker has already been closed or has
+begun finalization.
 -}
 withWorker :: forall ty a. KnownWorkerType ty => Worker ty -> (Ptr (Worker ty) -> IO a) -> IO a
-withWorker w f = do
-  ptr <-
-    Control.Concurrent.withMVar w.workerLifecycle $ \case
-      WorkerOpen ptr -> pure ptr
-      WorkerFinalizing {} -> throwIO WorkerAlreadyClosed
-      WorkerClosed -> throwIO WorkerAlreadyClosed
-  f ptr
+withWorker w = bracket acquireWorkerClone raw_closeWorker
+  where
+    acquireWorkerClone :: IO (Ptr (Worker ty))
+    acquireWorkerClone =
+      Control.Concurrent.withMVar w.workerLifecycle $ \case
+        WorkerOpen ptr -> do
+          cloned <- raw_cloneWorker ptr
+          when (cloned == nullPtr) $ throwIO WorkerAlreadyClosed
+          pure cloned
+        WorkerFinalizing {} -> throwIO WorkerAlreadyClosed
+        WorkerClosed -> throwIO WorkerAlreadyClosed
 
 
 getWorkerClient :: Worker 'Real -> Client
@@ -674,16 +685,13 @@ foreign import ccall "hs_temporal_validate_worker" raw_validateWorker :: Ptr (Wo
 
 
 validateWorker :: Worker 'Real -> IO (Either WorkerValidationError ())
-validateWorker w = withWorker w $ \wp ->
+validateWorker w =
   withTokioAsyncCall
-    (raw_validateWorker wp)
+    (withScopedTokioCall (withWorker w) raw_validateWorker)
     rust_dropWorkerValidationError
     rust_dropUnit
     (peek >=> peekWorkerValidationError)
     (\_ -> return ())
-
-
-foreign import ccall "hs_temporal_drop_worker" raw_closeWorker :: Ptr (Worker ty) -> IO ()
 
 
 getWorkerError :: Ptr CWorkerError -> IO WorkerError
@@ -717,24 +725,29 @@ newWorker c wc = withClient c $ \cPtr -> do
 
 -- | Explicitly close a worker.
 --
--- Explicitly close a worker, freeing its resources immediately.
--- After calling this, the worker must not be used again.
---
--- Known gap: this can race with a concurrent call inside 'withWorker'. See
--- 'withWorker''s documentation for details.
+-- Explicitly close a worker, freeing its resources immediately; after calling
+-- this function, the worker must not be used again.
 closeWorker :: Worker ty -> IO ()
-closeWorker (Worker lifecycle _ _) = mask_ $ do
-  wp <-
-    Control.Concurrent.modifyMVar lifecycle $ \case
-      WorkerOpen ptr -> pure (WorkerClosed, ptr)
-      WorkerFinalizing ptr resultVar -> do
-        -- Finalization owns the inner worker after its FFI call starts. Wait for
-        -- that one-shot operation before freeing the outer WorkerRef box.
-        _ <- Control.Concurrent.readMVar resultVar
-        pure (WorkerClosed, ptr)
-      WorkerClosed -> throwIO WorkerAlreadyClosed
-  withFfiThreadLabel "temporal/ffi/drop_worker" $
-    raw_closeWorker wp
+closeWorker (Worker lifecycle _ _) = loop
+  where
+    loop = do
+      inFlight <-
+        -- Masked, not 'modifyMVar': the body frees the box, and 'modifyMVar' would run
+        -- it at the caller's masking state, so an interrupt landing between the free and
+        -- the commit would make it restore a state naming freed memory.
+        Control.Concurrent.modifyMVarMasked lifecycle $ \case
+          WorkerOpen ptr -> (WorkerClosed, Nothing) <$ release ptr
+          state@(WorkerFinalizing ptr resultVar) ->
+            Control.Concurrent.tryReadMVar resultVar >>= \case
+              Just _ -> (WorkerClosed, Nothing) <$ release ptr
+              Nothing -> pure (state, Just resultVar)
+          WorkerClosed -> throwIO WorkerAlreadyClosed
+      forM_ inFlight $ \resultVar ->
+        Control.Concurrent.readMVar resultVar *> loop
+
+    release ptr =
+      withFfiThreadLabel "temporal/ffi/drop_worker" $
+        raw_closeWorker ptr
 
 
 foreign import ccall "hs_temporal_new_replay_worker" raw_newReplayWorker :: Ptr CRuntime -> Ptr (CArray Word8) -> Ptr (Ptr (Worker 'Replay)) -> Ptr (Ptr HistoryPusher) -> Ptr (Ptr CWorkerError) -> IO ()
@@ -767,9 +780,9 @@ foreign import ccall "hs_temporal_worker_poll_workflow_activation" raw_pollWorkf
 
 
 pollWorkflowActivation :: KnownWorkerType ty => Worker ty -> IO (Either WorkerError WorkflowActivation)
-pollWorkflowActivation w = withWorker w $ \wp ->
+pollWorkflowActivation w =
   withTokioAsyncCall
-    (raw_pollWorkflowActivation wp)
+    (withScopedTokioCall (withWorker w) raw_pollWorkflowActivation)
     rust_dropWorkerError
     rust_dropByteArray
     (peek >=> peekWorkerError)
@@ -784,9 +797,9 @@ foreign import ccall "hs_temporal_worker_poll_activity_task" raw_pollActivityTas
 
 
 pollActivityTask :: KnownWorkerType ty => Worker ty -> IO (Either WorkerError ActivityTask)
-pollActivityTask w = withWorker w $ \wp ->
+pollActivityTask w =
   withTokioAsyncCall
-    (raw_pollActivityTask wp)
+    (withScopedTokioCall (withWorker w) raw_pollActivityTask)
     rust_dropWorkerError
     rust_dropByteArray
     (peek >=> peekWorkerError)
@@ -801,10 +814,10 @@ foreign import ccall "hs_temporal_worker_complete_workflow_activation" raw_compl
 
 
 completeWorkflowActivation :: KnownWorkerType ty => Worker ty -> WorkflowActivationCompletion -> IO (Either WorkerError ())
-completeWorkflowActivation w p = withWorker w $ \wp ->
+completeWorkflowActivation w p =
   withCArrayBS (encodeMessage p) $ \pPtr ->
     withTokioAsyncCall
-      (raw_completeWorkflowActivation wp pPtr)
+      (withScopedTokioCall (withWorker w) $ \wp -> raw_completeWorkflowActivation wp pPtr)
       rust_dropWorkerError
       rust_dropUnit
       (peek >=> peekWorkerError)
@@ -815,10 +828,10 @@ foreign import ccall "hs_temporal_worker_complete_activity_task" raw_completeAct
 
 
 completeActivityTask :: KnownWorkerType ty => Worker ty -> ActivityTaskCompletion -> IO (Either WorkerError ())
-completeActivityTask w p = withWorker w $ \wp ->
+completeActivityTask w p =
   withCArrayBS (encodeMessage p) $ \pPtr ->
     withTokioAsyncCall
-      (raw_completeActivityTask wp pPtr)
+      (withScopedTokioCall (withWorker w) $ \wp -> raw_completeActivityTask wp pPtr)
       rust_dropWorkerError
       rust_dropUnit
       (peek >=> peekWorkerError)
@@ -829,9 +842,9 @@ foreign import ccall "hs_temporal_worker_poll_nexus_task" raw_pollNexusTask :: P
 
 
 pollNexusTask :: KnownWorkerType ty => Worker ty -> IO (Either WorkerError NexusTask)
-pollNexusTask w = withWorker w $ \wp ->
+pollNexusTask w =
   withTokioAsyncCall
-    (raw_pollNexusTask wp)
+    (withScopedTokioCall (withWorker w) raw_pollNexusTask)
     rust_dropWorkerError
     rust_dropByteArray
     (peek >=> peekWorkerError)
@@ -846,10 +859,10 @@ foreign import ccall "hs_temporal_worker_complete_nexus_task" raw_completeNexusT
 
 
 completeNexusTask :: KnownWorkerType ty => Worker ty -> NexusTaskCompletion -> IO (Either WorkerError ())
-completeNexusTask w p = withWorker w $ \wp ->
+completeNexusTask w p =
   withCArrayBS (encodeMessage p) $ \pPtr ->
     withTokioAsyncCall
-      (raw_completeNexusTask wp pPtr)
+      (withScopedTokioCall (withWorker w) $ \wp -> raw_completeNexusTask wp pPtr)
       rust_dropWorkerError
       rust_dropUnit
       (peek >=> peekWorkerError)
@@ -892,17 +905,23 @@ foreign import ccall "hs_temporal_worker_initiate_shutdown" raw_initiateShutdown
 
 -- | Initiate shutdown.
 initiateShutdown :: KnownWorkerType ty => Worker ty -> IO ()
-initiateShutdown w = do
-  workerPtr <-
+initiateShutdown w = mask $ \restore -> do
+  clonedPtr <-
     Control.Concurrent.withMVar w.workerLifecycle $ \case
-      WorkerOpen ptr -> pure (Just ptr)
+      WorkerOpen ptr -> do
+        cloned <- raw_cloneWorker ptr
+        when (cloned == nullPtr) $ throwIO WorkerAlreadyClosed
+        pure (Just cloned)
       -- A repeated shutdown may arrive after finalization has consumed the
       -- inner worker. The original operation is still running or has finished.
       WorkerFinalizing {} -> pure Nothing
       WorkerClosed -> throwIO WorkerAlreadyClosed
-  forM_ workerPtr $ \wp ->
-    withFfiThreadLabel "temporal/ffi/initiate_shutdown" $
-      raw_initiateShutdown wp
+  forM_ clonedPtr $ \wp ->
+    restore
+      ( withFfiThreadLabel "temporal/ffi/initiate_shutdown" $
+          raw_initiateShutdown wp
+      )
+      `finally` raw_closeWorker wp
 
 
 foreign import ccall "hs_temporal_worker_finalize_shutdown" raw_finalizeShutdown :: Ptr (Worker ty) -> TokioCall CWorkerError CUnit

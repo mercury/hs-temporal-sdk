@@ -12,6 +12,7 @@ module Temporal.Core.Internal.TestFixture (
   acquireDelayedTestResource,
   testResourceDropCount,
   runtimeLiveCount,
+  workerLiveCount,
 ) where
 
 import Control.Monad ((>=>))
@@ -50,6 +51,18 @@ This makes it possible to observe that a runtime clone nothing hands a
 'Temporal.Runtime.Runtime' handle back for has actually been released.
 -}
 foreign import ccall "hs_temporal_test_runtime_live_count" runtimeLiveCount :: IO Word64
+
+
+{- | Number of live 'Temporal.Core.Worker.Worker' FFI handles, __not__ the
+number of distinct underlying core workers.
+
+Every successful worker construction or clone increments this; every handle drop
+decrements it.
+
+This makes it possible to observe that a clone acquired for a single call, but
+never handed back, has actually been released.
+-}
+foreign import ccall "hs_temporal_test_worker_live_count" workerLiveCount :: IO Word64
 
 
 {- | Schedule a bridge call that produces a drop-counted resource after the

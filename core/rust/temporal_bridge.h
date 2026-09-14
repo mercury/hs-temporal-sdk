@@ -1157,6 +1157,15 @@ void hs_temporal_drop_test_resource(struct CTestResource *resource);
 uint64_t hs_temporal_test_resource_drop_count(void);
 
 /**
+ * Test-only accessor for [`LIVE_WORKER_REFS`]. See that item's documentation.
+ *
+ * # Safety
+ *
+ * None beyond the usual C ABI calling convention; this reads a global atomic.
+ */
+uint64_t hs_temporal_test_worker_live_count(void);
+
+/**
  * Create a custom slot supplier handle from Haskell-supplied callback function pointers.
  * Returns a raw pointer that must be freed with `hs_temporal_drop_custom_slot_supplier`.
  *
@@ -1216,6 +1225,24 @@ void hs_temporal_drop_unit(struct CUnit *unit);
  * Haskell FFI bridge invariants.
  */
 void hs_temporal_drop_worker(struct WorkerRef *worker);
+
+/**
+ * Clone a worker handle, sharing its underlying worker and runtime references.
+ *
+ * Returns null if the worker has already begun finalization and consumed its inner
+ * worker; the caller should treat that the same as an already-closed worker.
+ *
+ * Release the returned handle exactly once with `hs_temporal_drop_worker`; either
+ * handle may outlive the other.
+ *
+ * # Safety
+ * `worker` must be a non-null pointer to a live handle returned by
+ * `hs_temporal_new_worker`, `hs_temporal_new_replay_worker`, or `hs_temporal_clone_worker`.
+ *
+ * The caller must keep the source handle alive and prevent concurrent destruction
+ * or mutation of the source wrapper throughout this call.
+ */
+struct WorkerRef *hs_temporal_clone_worker(const struct WorkerRef *worker);
 
 /**
  * # Safety

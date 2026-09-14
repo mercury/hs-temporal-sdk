@@ -1,6 +1,6 @@
 module ReplaySpec where
 
-import Control.Concurrent (threadDelay, yield)
+import Control.Concurrent (newEmptyMVar, putMVar, readMVar, threadDelay, yield)
 import qualified Control.Concurrent.Async as Async
 import Control.Exception (IOException, bracket, catch, fromException, try)
 import Control.Monad (void, when)
@@ -32,6 +32,30 @@ import TestHelpers
 spec :: Spec
 spec = do
   describe "Tokio FFI interruption" $ do
+    specify "frees the worker once when a close races finalization" $ do
+      before <- TestFixture.workerLiveCount
+      (worker, historyPusher) <- newIdleReplayWorker
+      Core.closeHistory historyPusher
+      Core.initiateShutdown worker
+      start <- newEmptyMVar
+      finalizing <- Async.async $ readMVar start *> Core.finalizeShutdown worker
+      closing <- Async.async $ readMVar start *> Core.closeWorker worker
+      putMVar start ()
+      -- The close either waits out an in-flight finalization or finds it already
+      -- settled.
+      -- 
+      -- If it wins the race outright, finalization reports a closed worker
+      -- rather than consuming one that is already gone.
+      closed <- timeout 30_000_000 $ Async.wait closing
+      closed `shouldBe` Just ()
+      outcome <- timeout 30_000_000 $ Async.waitCatch finalizing
+      case outcome of
+        Just (Right (Right ())) -> pure ()
+        Just (Left err) | Just Core.WorkerAlreadyClosed <- fromException err -> pure ()
+        other -> expectationFailure $ "unexpected finalization outcome: " <> show other
+      -- Whichever order they resolved in, the handle is freed exactly once.
+      TestFixture.workerLiveCount `shouldReturn` before
+
     specify "interrupts a blocked poll and reaps its eventual result" $
       bracket newIdleReplayWorker shutdownIdleReplayWorker $ \(worker, _) -> do
         poller <- Async.async $ Core.pollWorkflowActivation worker

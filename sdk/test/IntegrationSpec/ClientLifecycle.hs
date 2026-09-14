@@ -25,6 +25,7 @@ import System.Directory (findExecutable)
 import System.Timeout (timeout)
 import qualified Temporal.Core.Client as Core
 import qualified Temporal.Core.Client.WorkflowService as Service
+import qualified Temporal.Core.Internal.TestFixture as TestFixture
 import qualified Temporal.Core.Worker as Worker
 import qualified Temporal.EphemeralServer as Dev (TemporalDevServerConfig (..))
 import qualified Temporal.EphemeralServer as Server
@@ -142,11 +143,6 @@ spec = describe "Client lifecycle" $ do
             else Core.waitForConnection client
           Service.getSystemInfo client defMessage >>= (`shouldSatisfy` isRight)
 
-  -- NB: this only exercises the happy path (sequential shutdown, no
-  -- concurrent close). It does not cover a 'Worker.closeWorker' racing a
-  -- concurrent poll/other in-flight call through 'Worker.withWorker' -- see
-  -- that function's documentation for the known use-after-free gap this
-  -- test does not detect.
   it "uses and shuts down a worker after its original runtime scope ends (happy path only)" $
     withServer $ \port -> bounded $ do
       let acquire = bracketRuntime NoTelemetry $ \runtime ->
@@ -162,15 +158,21 @@ spec = describe "Client lifecycle" $ do
             Worker.closeWorker worker
       bracket acquire release (Worker.validateWorker >=> (`shouldSatisfy` isRight))
 
-  -- TODO: 'closeWorker' can race a concurrent call through 'withWorker'
-  -- and free the underlying 'WorkerRef' out from under it.
-  --
-  -- Once we have a ref-counted 'WorkerRef' handle lands, replace this with a
-  -- real regression test that starts a long poll, closes the worker
-  -- concurrently, and asserts the poll observes a clean shutdown/error rather
-  -- than a use-after-free.
-  it "does not use-after-free when closeWorker races a concurrent poll" $
-    pendingWith "known gap: no refcounted worker handle yet, see withWorker docs"
+  it "no use-after-free when closeWorker races concurrent in-flight calls" $
+    withServer $ \port -> bounded $ do
+      baseline <- TestFixture.workerLiveCount
+      let acquire =
+            bracketRuntime NoTelemetry $ \runtime ->
+              runNoLoggingT $ Core.bracketClient runtime (configWithRetry port) $ \client -> liftIO $ do
+                Core.waitForConnection client
+                Worker.newWorker client Worker.defaultWorkerConfig >>= either throwIO pure
+      worker <- acquire
+      let racer =
+            try (Worker.requestWorkflowEviction worker "does-not-exist") >>= \case
+              Right () -> pure ()
+              Left Worker.WorkerAlreadyClosed -> pure ()
+      mapConcurrently_ (const racer) [1 :: Int .. 200] `concurrently_` Worker.closeWorker worker
+      TestFixture.workerLiveCount `shouldReturn` baseline
 
   it "uses the established transport after a server restart" $ do
     port <- Server.getFreePort
@@ -195,14 +197,12 @@ spec = describe "Client lifecycle" $ do
     , ("logger failure", throwIO LoggerFailure, (`shouldThrow` (== LoggerFailure)))
     ]
     $ \(name, logWarning, assertFailure) ->
-      it ("publishes " <> name <> " durably through readiness") $
-        bounded $
-          runLoggingT
-            ( Core.bracketClient globalRuntime unreachable $ \client -> liftIO $ do
-                assertFailure (Core.waitForConnection client)
-                assertFailure (Core.waitForConnection client)
-            )
-            (\_ _ _ _ -> logWarning)
+      it ("publishes " <> name <> " durably through readiness") $ bounded $ do
+        let logger _ _ _ _ = logWarning
+            acquire = runLoggingT (Core.connectClient globalRuntime unreachable) logger
+        bracket acquire Core.closeClient $ \client -> do
+          assertFailure (Core.waitForConnection client)
+          assertFailure (Core.waitForConnection client)
 
   forM_ [False, True] $ \masked ->
     it ("closes while initialization is paused in its logger, masked=" <> show masked) $ do
@@ -263,16 +263,15 @@ spec = describe "Client lifecycle" $ do
             (runLoggingT (Core.connectClient runtime config) logger)
             Core.closeClient
             (\client -> takeMVar entered >> pure client)
-    bounded
-      ( bracket acquire Core.closeClient $ \client -> do
+        releaseLogger = void $ tryPutMVar proceed ()
+        checkRetries = bracket acquire Core.closeClient $ \client -> do
           -- Both this operation and later recovery retain their own runtime.
           putMVar proceed ()
           Core.waitForConnection client `shouldThrow` isConnectionError
           readIORef warnings `shouldReturn` 2
           Core.waitForConnection client `shouldThrow` isConnectionError
           readIORef warnings `shouldReturn` 4
-      )
-      `finally` void (tryPutMVar proceed ())
+    bounded checkRetries `finally` releaseLogger
 
   it "uses an acquired pointer twice after close" $
     withServer $ \port -> do
@@ -284,20 +283,18 @@ spec = describe "Client lifecycle" $ do
         -- pointer from client, even after its original owner is destroyed.
         admitted <- newEmptyMVar
         proceed <- newEmptyMVar
-        withAsync
-          ( Core.withClient client $ \ptr -> do
+        let callTwiceAfterClose = Core.withClient client $ \ptr -> do
               putMVar admitted ()
               takeMVar proceed
               let rpc = Core.call @WorkflowService @"getSystemInfo" (\_ -> rawGetSystemInfo ptr) driver defMessage
               rpc >>= (`shouldSatisfy` isRight)
               rpc >>= (`shouldSatisfy` isRight)
-          )
-          $ \caller -> do
-            link caller
-            takeMVar admitted
-            Core.closeClient client
-            putMVar proceed ()
-            wait caller
+        withAsync callTwiceAfterClose $ \caller -> do
+          link caller
+          takeMVar admitted
+          Core.closeClient client
+          putMVar proceed ()
+          wait caller
 
   it "completes a second RPC while a long poll is pending and promptly cancels the thread awaiting its result" $
     withServer $ \port ->

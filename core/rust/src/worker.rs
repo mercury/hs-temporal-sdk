@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::str;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use temporalio_common::Worker;
 use temporalio_common::errors::{PollError, WorkflowErrorType};
@@ -31,6 +32,43 @@ use serde::{Deserialize, Serialize};
 pub struct WorkerRef {
     worker: Option<Arc<temporalio_sdk_core::Worker>>,
     runtime: runtime::Runtime,
+}
+
+/// Number of live `WorkerRef` handles, not the distinct workers themselves.
+///
+/// Every successful `hs_temporal_new_worker`, `hs_temporal_new_replay_worker`,
+/// and `hs_temporal_clone_worker` call increments this; every `WorkerRef`
+/// drop decrements it.
+///
+/// This lets tests confirm that clones acquired by `withWorker` are always released
+/// exactly once, even when concurrent `closeWorker` calls are raced against the
+/// original handle.
+static LIVE_WORKER_REFS: AtomicU64 = AtomicU64::new(0);
+
+impl WorkerRef {
+    fn new(worker: Arc<temporalio_sdk_core::Worker>, runtime: runtime::Runtime) -> Self {
+        LIVE_WORKER_REFS.fetch_add(1, Ordering::SeqCst);
+        Self {
+            worker: Some(worker),
+            runtime,
+        }
+    }
+}
+
+impl Drop for WorkerRef {
+    fn drop(&mut self) {
+        LIVE_WORKER_REFS.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// Test-only accessor for [`LIVE_WORKER_REFS`]. See that item's documentation.
+///
+/// # Safety
+///
+/// None beyond the usual C ABI calling convention; this reads a global atomic.
+#[unsafe(no_mangle)]
+pub extern "C" fn hs_temporal_test_worker_live_count() -> u64 {
+    LIVE_WORKER_REFS.load(Ordering::SeqCst)
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -679,10 +717,7 @@ fn new_worker(client: &client::ClientRef, config: WorkerConfig) -> Result<Worker
         code: WorkerErrorCode::InitWorkerFailed,
         message: format!("Failed creating worker: {}", err),
     })?;
-    Ok(WorkerRef {
-        worker: Some(Arc::new(worker)),
-        runtime: client.runtime.clone(),
-    })
+    Ok(WorkerRef::new(Arc::new(worker), client.runtime.clone()))
 }
 
 // TODO: [publish-crate]
@@ -692,6 +727,32 @@ fn new_worker(client: &client::ClientRef, config: WorkerConfig) -> Result<Worker
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn hs_temporal_drop_worker(worker: *mut WorkerRef) {
     unsafe { drop(Box::from_raw(worker)) }
+}
+
+/// Clone a worker handle, sharing its underlying worker and runtime references.
+///
+/// Returns null if the worker has already begun finalization and consumed its inner
+/// worker; the caller should treat that the same as an already-closed worker.
+///
+/// Release the returned handle exactly once with `hs_temporal_drop_worker`; either
+/// handle may outlive the other.
+///
+/// # Safety
+/// `worker` must be a non-null pointer to a live handle returned by
+/// `hs_temporal_new_worker`, `hs_temporal_new_replay_worker`, or `hs_temporal_clone_worker`.
+///
+/// The caller must keep the source handle alive and prevent concurrent destruction
+/// or mutation of the source wrapper throughout this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn hs_temporal_clone_worker(worker: *const WorkerRef) -> *mut WorkerRef {
+    let worker = unsafe { &*worker };
+    match worker.worker.as_ref() {
+        Some(inner) => Box::into_raw(Box::new(WorkerRef::new(
+            inner.clone(),
+            worker.runtime.clone(),
+        ))),
+        None => std::ptr::null_mut(),
+    }
 }
 
 // TODO: [publish-crate]
@@ -747,16 +808,16 @@ fn new_replay_worker(
     enter_sync!(runtime_ref.runtime);
     let config: temporalio_sdk_core::WorkerConfig = config.try_into()?;
     let (history_pusher, stream) = HistoryPusher::new(runtime_ref.runtime.clone());
-    let worker = WorkerRef {
-        worker: Some(Arc::new(
+    let worker = WorkerRef::new(
+        Arc::new(
             temporalio_sdk_core::init_replay_worker(ReplayWorkerInput::new(config, stream))
                 .map_err(|err| WorkerError {
                     code: WorkerErrorCode::InitReplayWorkerFailed,
                     message: format!("Failed creating replay worker: {}", err),
                 })?,
-        )),
-        runtime: runtime_ref.runtime.clone(),
-    };
+        ),
+        runtime_ref.runtime.clone(),
+    );
 
     Ok((worker, history_pusher))
 }
