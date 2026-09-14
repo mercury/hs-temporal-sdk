@@ -124,12 +124,15 @@ fn init_runtime(
     telemetry_config: TelemetryOptions,
     late_telemetry_options: HsTelemetryOptions,
     try_put_mvar: extern "C" fn(capability: Capability, mvar: *mut MVar) -> (),
-) -> Result<Box<RuntimeRef>, String> {
+) -> anyhow::Result<Box<RuntimeRef>> {
+    // `RuntimeOptionsBuilder::build` returns `Result<_, String>` rather than an
+    // `std::error::Error`, so it's the one call in this function that can't
+    // convert via `?` alone.
     let runtime_options = RuntimeOptions::builder()
         .telemetry_options(telemetry_config)
-        .build()?;
-    let mut runtime = CoreRuntime::new(runtime_options, TokioRuntimeBuilder::default())
-        .map_err(|err| err.to_string())?;
+        .build()
+        .map_err(|err| anyhow::anyhow!(err))?;
+    let mut runtime = CoreRuntime::new(runtime_options, TokioRuntimeBuilder::default())?;
 
     let _guard = runtime.tokio_handle().enter();
     let core_meter: Arc<dyn CoreMeter> = match late_telemetry_options {
@@ -139,20 +142,14 @@ fn init_runtime(
             headers,
             metric_periodicity,
             global_tags,
-        } => Arc::new(
-            build_otlp_metric_exporter(
-                OtelCollectorOptions::builder()
-                    .url(
-                        url.parse()
-                            .map_err(|err: url::ParseError| err.to_string())?,
-                    )
-                    .metric_periodicity(metric_periodicity.unwrap_or_else(|| Duration::new(1, 0)))
-                    .headers(headers)
-                    .global_tags(global_tags)
-                    .build(),
-            )
-            .map_err(|err| err.to_string())?,
-        ) as Arc<dyn CoreMeter>,
+        } => Arc::new(build_otlp_metric_exporter(
+            OtelCollectorOptions::builder()
+                .url(url.parse()?)
+                .metric_periodicity(metric_periodicity.unwrap_or_else(|| Duration::new(1, 0)))
+                .headers(headers)
+                .global_tags(global_tags)
+                .build(),
+        )?) as Arc<dyn CoreMeter>,
         HsTelemetryOptions::PrometheusTelemetryOptions {
             socket_addr,
             global_tags,
@@ -166,8 +163,7 @@ fn init_runtime(
                     .global_tags(global_tags)
                     .counters_total_suffix(counters_total_suffix)
                     .build(),
-            )
-            .map_err(|err| err.to_string())?;
+            )?;
             srv.meter as Arc<dyn CoreMeter>
         }
     };
@@ -221,19 +217,17 @@ pub unsafe extern "C" fn hs_temporal_init_runtime(
             .clone()
     };
 
-    let result: Result<Box<RuntimeRef>, String> =
-        serde_json::from_slice::<HsTelemetryOptions>(telemetry_opts.as_slice())
-            .map_err(|err| err.to_string())
-            .and_then(|telemetry_opts| {
-                let early_options = TelemetryOptions::builder()
-                    .logging(Logger::Forward {
-                        filter: construct_filter_string(Level::INFO, Level::ERROR),
-                    })
-                    .attach_service_name(true)
-                    // .metrics(core_meter)
-                    .build();
-                init_runtime(early_options, telemetry_opts, try_put_mvar)
-            });
+    let result: anyhow::Result<Box<RuntimeRef>> = (|| {
+        let telemetry_opts: HsTelemetryOptions = serde_json::from_slice(telemetry_opts.as_slice())?;
+        let early_options = TelemetryOptions::builder()
+            .logging(Logger::Forward {
+                filter: construct_filter_string(Level::INFO, Level::ERROR),
+            })
+            .attach_service_name(true)
+            // .metrics(core_meter)
+            .build();
+        init_runtime(early_options, telemetry_opts, try_put_mvar)
+    })();
 
     match result {
         Ok(rt) => unsafe {
