@@ -315,6 +315,23 @@ impl<A, E> HsCallback<A, E> {
     }
 }
 
+/// Build a `CArray<u8>` error payload from a displayable error, for entry points
+/// that report failures as UTF-8 error messages through an `error_slot`.
+///
+/// Used to turn malformed-config errors (bad JSON, invalid URLs, unparseable TLS
+/// material, etc.) into a value the Haskell side can observe, instead of a
+/// `.unwrap()`/`.expect()` panic that would abort the whole process for what is
+/// ultimately bad caller input rather than an internal invariant violation.
+///
+/// # Panics
+///
+/// Only if the allocation backing the `CArray` itself fails, which indicates
+/// memory exhaustion rather than a problem with `message`.
+pub(crate) fn hs_error_message(message: impl std::fmt::Display) -> CArray<u8> {
+    CArray::c_repr_of(message.to_string().into_bytes())
+        .expect("failed to allocate an error message for the Haskell FFI boundary")
+}
+
 impl Runtime {
     /// Schedule `fut` on Tokio and report its result through `callback`.
     ///
@@ -506,7 +523,7 @@ pub unsafe extern "C" fn hs_temporal_runtime_free_logs(logs: *const CArray<CArra
 /// # Safety
 /// `runtime` must be a non-null pointer to a live handle returned by
 /// `hs_temporal_init_runtime` or `hs_temporal_clone_runtime`.
-/// 
+///
 /// The caller must keep the source handle alive and prevent concurrent destruction
 /// or mutation of the source wrapper throughout this call.
 #[unsafe(no_mangle)]

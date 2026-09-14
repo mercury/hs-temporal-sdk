@@ -248,7 +248,16 @@ pub fn connect_client(
     config: ClientConfig,
     hs_callback: HsCallback<ClientRef, CArray<u8>>,
 ) {
-    let opts: ClientOptions = config.try_into().unwrap();
+    let opts: ClientOptions = match config.try_into() {
+        Ok(opts) => opts,
+        Err(err) => {
+            hs_callback.put_failure(
+                runtime_ref.runtime.try_put_mvar,
+                runtime::hs_error_message(err),
+            );
+            return;
+        }
+    };
     let runtime = runtime_ref.runtime.clone();
     runtime_ref
         .runtime
@@ -264,10 +273,7 @@ pub fn connect_client(
                         runtime,
                     }),
                 }),
-                Err(e) => {
-                    let err_message = e.to_string().into_bytes();
-                    Err(CArray::c_repr_of(err_message).unwrap())
-                }
+                Err(e) => Err(runtime::hs_error_message(e)),
             }
         })
 }
@@ -287,12 +293,21 @@ pub unsafe extern "C" fn hs_temporal_connect_client(
 ) {
     let runtime_ref = unsafe { &*runtime_ref };
     let config_json = unsafe { CStr::from_ptr(config_json) };
-    let config: ClientConfig = serde_json::from_slice(config_json.to_bytes()).unwrap();
     let hs_callback = runtime::HsCallback {
         cap,
         mvar,
         error_slot,
         result_slot,
+    };
+    let config: ClientConfig = match serde_json::from_slice(config_json.to_bytes()) {
+        Ok(config) => config,
+        Err(err) => {
+            hs_callback.put_failure(
+                runtime_ref.runtime.try_put_mvar,
+                runtime::hs_error_message(err),
+            );
+            return;
+        }
     };
     connect_client(runtime_ref, config, hs_callback);
 }
@@ -391,7 +406,7 @@ where
 /// # Safety
 /// `client` must be a non-null pointer to a live handle returned by
 /// `hs_temporal_connect_client` or `hs_temporal_clone_client`.
-/// 
+///
 /// The caller must keep the source handle alive and prevent concurrent destruction
 /// or mutation of the source wrapper throughout this call.
 #[unsafe(no_mangle)]
