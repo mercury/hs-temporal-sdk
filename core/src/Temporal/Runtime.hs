@@ -1,9 +1,12 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 
 module Temporal.Runtime (
   Runtime,
   CRuntime,
   RuntimeClosedError (..),
+  RuntimeInitializationError (..),
   TelemetryOptions (..),
   Periodicity (..),
   initializeRuntime,
@@ -20,7 +23,9 @@ module Temporal.Runtime (
 import Control.Exception
 import Data.Aeson
 import qualified Data.ByteString.Lazy as BL
+import Data.Text (Text)
 import qualified Data.Vector as V
+import Foreign.Marshal.Alloc (alloca)
 import Foreign.Ptr
 import Foreign.Storable
 import Temporal.Core.CTypes
@@ -29,14 +34,37 @@ import Temporal.Runtime.Internal (Runtime, RuntimeClosedError (..))
 import qualified Temporal.Runtime.Internal as Runtime.Internal
 
 
+-- | Thrown by 'initializeRuntime' when the supplied 'TelemetryOptions' cannot be
+-- turned into a working Core runtime (malformed telemetry config, an invalid OTLP
+-- endpoint URL, a Prometheus exporter that fails to bind, etc.).
+newtype RuntimeInitializationError = RuntimeInitializationError Text
+  deriving stock (Show, Eq)
+  deriving anyclass (Exception)
+
+
 {- | Initialize the Rust runtime and thread-pool.
 
 __NOTE__: You must call 'destroyRuntime' to free the acquired resource; prefer
 'bracketRuntime' for automatic cleanup if possible.
+
+Throws 'RuntimeInitializationError' if the given 'TelemetryOptions' cannot be
+turned into a working Core runtime.
 -}
 initializeRuntime :: TelemetryOptions -> IO Runtime
 initializeRuntime opts = withCArrayBS (BL.toStrict $ encode opts) $ \optsP ->
-  mask_ $ initRuntime optsP tryPutMVarPtr >>= Runtime.Internal.fromHandle
+  mask_ $
+    alloca $ \resultSlot ->
+      alloca $ \errorSlot -> do
+        poke resultSlot nullPtr
+        poke errorSlot nullPtr
+        initRuntime optsP tryPutMVarPtr resultSlot errorSlot
+        errPtr <- peek errorSlot
+        if errPtr /= nullPtr
+          then do
+            message <- peek errPtr >>= cArrayToText
+            rust_dropByteArray errPtr
+            throwIO $ RuntimeInitializationError message
+          else peek resultSlot >>= Runtime.Internal.fromHandle
 
 
 {- | Explicitly destroy a Runtime, releasing its handle.

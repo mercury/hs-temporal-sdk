@@ -93,7 +93,12 @@ data TelemetryOptions
 
 deriveToJSON (defaultOptions {fieldLabelModifier = camelTo2 '_'}) ''TelemetryOptions
 
-foreign import ccall "hs_temporal_init_runtime" initRuntime :: Ptr (CArray Word8) -> TryPutMVarFFI -> IO (Ptr CRuntime)
+foreign import ccall "hs_temporal_init_runtime" initRuntime
+  :: Ptr (CArray Word8)
+  -> TryPutMVarFFI
+  -> Ptr (Ptr CRuntime)
+  -> Ptr (Ptr (CArray Word8))
+  -> IO ()
 foreign import ccall "hs_temporal_free_runtime" freeRuntime :: Ptr CRuntime -> IO ()
 
 data LogLevel

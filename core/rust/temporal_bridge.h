@@ -1091,8 +1091,10 @@ uint64_t hs_temporal_test_runtime_live_count(void);
  *
  * Haskell FFI bridge invariants.
  */
-struct RuntimeRef *hs_temporal_init_runtime(const struct CArray_u8 *telemetry_opts,
-                                            void (*try_put_mvar)(struct Capability, struct MVar*));
+void hs_temporal_init_runtime(const struct CArray_u8 *telemetry_opts,
+                              void (*try_put_mvar)(struct Capability, struct MVar*),
+                              struct RuntimeRef **result_slot,
+                              struct CArray_u8 **error_slot);
 
 /**
  * # Safety

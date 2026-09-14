@@ -124,12 +124,12 @@ fn init_runtime(
     telemetry_config: TelemetryOptions,
     late_telemetry_options: HsTelemetryOptions,
     try_put_mvar: extern "C" fn(capability: Capability, mvar: *mut MVar) -> (),
-) -> Box<RuntimeRef> {
+) -> Result<Box<RuntimeRef>, String> {
     let runtime_options = RuntimeOptions::builder()
         .telemetry_options(telemetry_config)
-        .build()
-        .unwrap();
-    let mut runtime = CoreRuntime::new(runtime_options, TokioRuntimeBuilder::default()).unwrap();
+        .build()?;
+    let mut runtime = CoreRuntime::new(runtime_options, TokioRuntimeBuilder::default())
+        .map_err(|err| err.to_string())?;
 
     let _guard = runtime.tokio_handle().enter();
     let core_meter: Arc<dyn CoreMeter> = match late_telemetry_options {
@@ -142,13 +142,16 @@ fn init_runtime(
         } => Arc::new(
             build_otlp_metric_exporter(
                 OtelCollectorOptions::builder()
-                    .url(url.parse().expect("Invalid URL"))
+                    .url(
+                        url.parse()
+                            .map_err(|err: url::ParseError| err.to_string())?,
+                    )
                     .metric_periodicity(metric_periodicity.unwrap_or_else(|| Duration::new(1, 0)))
                     .headers(headers)
                     .global_tags(global_tags)
                     .build(),
             )
-            .expect("Otel Metric exporter"),
+            .map_err(|err| err.to_string())?,
         ) as Arc<dyn CoreMeter>,
         HsTelemetryOptions::PrometheusTelemetryOptions {
             socket_addr,
@@ -164,14 +167,13 @@ fn init_runtime(
                     .counters_total_suffix(counters_total_suffix)
                     .build(),
             )
-            .expect("Failed to start prometheus exporter");
+            .map_err(|err| err.to_string())?;
             srv.meter as Arc<dyn CoreMeter>
         }
     };
     runtime.telemetry_mut().attach_late_init_metrics(core_meter);
 
-    // TODO need to figure out how to handle errors here
-    Box::new(RuntimeRef {
+    Ok(Box::new(RuntimeRef {
         runtime: Runtime {
             core: Arc::new(CoreRuntimeDeferredDrop::new(
                 Arc::new(runtime),
@@ -179,7 +181,7 @@ fn init_runtime(
             )),
             try_put_mvar,
         },
-    })
+    }))
 }
 
 #[derive(Serialize, Deserialize)]
@@ -208,7 +210,9 @@ pub enum HsTelemetryOptions {
 pub unsafe extern "C" fn hs_temporal_init_runtime(
     telemetry_opts: *const CArray<u8>,
     try_put_mvar: extern "C" fn(Capability, *mut MVar) -> (),
-) -> *mut RuntimeRef {
+    result_slot: *mut *mut RuntimeRef,
+    error_slot: *mut *mut CArray<u8>,
+) {
     let telemetry_opts = unsafe {
         CArray::raw_borrow(telemetry_opts)
             .unwrap()
@@ -216,18 +220,29 @@ pub unsafe extern "C" fn hs_temporal_init_runtime(
             .unwrap()
             .clone()
     };
-    let telemetry_opts: HsTelemetryOptions =
-        serde_json::from_slice(telemetry_opts.as_slice()).expect("Failed to parse");
 
-    let early_options = TelemetryOptions::builder()
-        .logging(Logger::Forward {
-            filter: construct_filter_string(Level::INFO, Level::ERROR),
-        })
-        .attach_service_name(true)
-        // .metrics(core_meter)
-        .build();
-    let rt = init_runtime(early_options, telemetry_opts, try_put_mvar);
-    Box::into_raw(rt)
+    let result: Result<Box<RuntimeRef>, String> =
+        serde_json::from_slice::<HsTelemetryOptions>(telemetry_opts.as_slice())
+            .map_err(|err| err.to_string())
+            .and_then(|telemetry_opts| {
+                let early_options = TelemetryOptions::builder()
+                    .logging(Logger::Forward {
+                        filter: construct_filter_string(Level::INFO, Level::ERROR),
+                    })
+                    .attach_service_name(true)
+                    // .metrics(core_meter)
+                    .build();
+                init_runtime(early_options, telemetry_opts, try_put_mvar)
+            });
+
+    match result {
+        Ok(rt) => unsafe {
+            *result_slot = Box::into_raw(rt);
+        },
+        Err(err) => unsafe {
+            *error_slot = hs_error_message(err).into_raw_pointer_mut();
+        },
+    }
 }
 
 /// Release a `RuntimeRef` handle.

@@ -80,6 +80,11 @@ spec = describe "managed runtime ownership" $ do
         check Unmasked
         mask_ $ check MaskedInterruptible
         uninterruptibleMask_ $ check MaskedUninterruptible
+  it "throws RuntimeInitializationError instead of aborting on a malformed OTLP endpoint URL" $
+    bounded $
+      initializeRuntime (OtelTelemetryOptions "not a url" mempty Nothing mempty)
+        `shouldThrow` \case
+          RuntimeInitializationError _ -> True
 
 
 foreign import ccall "hs_temporal_runtime_fetch_logs" fetchBorrowedLogs :: Ptr CRuntime -> IO (Ptr ())
