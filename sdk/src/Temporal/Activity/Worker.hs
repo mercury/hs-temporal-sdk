@@ -206,7 +206,13 @@ applyActivityTaskStart _tsk tt msg = do
       runningActivity <- asyncLabelledWithUnmask (T.unpack $ T.concat ["temporal/worker/activity/start/", Core.namespace c, "/", Core.taskQueue c]) $ \unmask -> do
         -- The activity /must/ be run in an unmasked context, so it can receive
         -- exceptions and run finalizers during worker shutdown.
-        (ef :: Either SomeException (Either String Payload)) <- unmask . liftIO . UnliftIO.trySyncOrAsync $
+        --
+        -- Install the handler before unmasking: a cancellation (e.g. 'WorkerShutdown')
+        -- may already be pending by the time this thread first runs, and it is
+        -- delivered at the unmask boundary. If 'trySyncOrAsync' were installed inside
+        -- 'unmask', that pending exception would escape the handler, fail this 'Async',
+        -- and be re-raised in the activity poll loop via 'link'.
+        (ef :: Either SomeException (Either String Payload)) <- UnliftIO.trySyncOrAsync . unmask . liftIO $
           w.activityInboundInterceptors.executeActivity env input $ \env' input' ->
             ( case HashMap.lookup info.activityType w.definitions of
                 Nothing -> throwIO $ RuntimeError ("Activity type not found: " <> T.unpack info.activityType)
