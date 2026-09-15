@@ -48,6 +48,7 @@ import qualified Data.Vector as V
 import DiscoverInstances (discoverInstances)
 import GHC.Generics
 import GHC.Stack (SrcLoc (..), callStack, fromCallSiteList)
+import qualified IntegrationSpec.ClientLifecycle as ClientLifecycle
 import IntegrationSpec.HangingWorkflow
 import IntegrationSpec.NoOpWorkflow
 import IntegrationSpec.Signals
@@ -332,6 +333,7 @@ setupTimeSkipping additionalInterceptors fp go = do
 
 spec :: Spec
 spec = do
+  ClientLifecycle.spec
   describe "Exception converters" $ do
     let handlers = mkAnnotatedHandlers standardApplicationFailureHandlers
     it "exception conversion works" $ do

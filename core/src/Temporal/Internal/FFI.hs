@@ -38,8 +38,9 @@ withCArrayText txt f = Text.withCStringLen txt $ \(bytes, len) ->
   Marshal.with (CArray (castPtr bytes) (fromIntegral len)) f
 
 
--- | Peek the result from a Tokio slot. Returns the raw pointer or Nothing.
--- The caller is responsible for freeing the pointer using the appropriate drop function.
+{- | Peek the result from a Tokio slot. Returns the raw pointer or Nothing.
+The caller is responsible for freeing the pointer using the appropriate drop function.
+-}
 peekTokioResult :: TokioSlot a -> IO (Maybe (Ptr a))
 peekTokioResult slot = do
   inner <- peek slot
@@ -48,6 +49,16 @@ peekTokioResult slot = do
     else return (Just inner)
 
 
+{- | Make an asynchronous call to Rust via Tokio.
+
+Once Rust accepts the callback, it owns the stable pointer and must release
+it. The caller must keep the result slots allocated until completion is
+signalled.
+
+The call must return normally after Rust accepts the callback. If it throws
+before acceptance, 'makeTokioAsyncCall' and 'withTokioAsyncCall' release the
+stable pointer and result slots.
+-}
 type TokioCall e a = StablePtr PrimMVar -> Int -> TokioSlot e -> TokioSlot a -> IO ()
 
 
@@ -110,9 +121,10 @@ The caller is responsible for:
 1. Calling the appropriate rust_drop* function on the result
 2. Not using the pointer after freeing it
 
-The cleanup functions are used only when the wait is interrupted, after Rust
-has finished writing the result. On normal return, ownership of the returned
-pointer passes to the caller.
+The submission action must satisfy the ownership contract of 'TokioCall'.
+Interrupting the wait does not cancel the Rust task. The cleanup functions
+run after Rust has finished writing the result if the wait was interrupted.
+On normal return, ownership of the returned pointer passes to the caller.
 
 IMPORTANT: This is a low-level function. Prefer using withTokioAsyncCall
 for automatic memory management and exception safety.
@@ -142,7 +154,10 @@ makeTokioAsyncCall call freeErr freeRes = mask $ \restore -> do
         when (errPtr /= nullPtr) (freeErr errPtr)
         when (resPtr /= nullPtr) (freeRes resPtr)
         freeSlots
-  call sp cap errorSlot resultSlot `onException` freeSlots
+  -- By the TokioCall contract, a submission exception means Rust has not
+  -- accepted the callback (for example, the client was closed). We still own
+  -- the stable pointer and slots and must release both.
+  call sp cap errorSlot resultSlot `onException` (freeStablePtr sp >> freeSlots)
 
   -- 'readMVar' is deliberately non-destructive. If an asynchronous exception
   -- arrives after observing completion but before masking is restored, the
@@ -161,8 +176,10 @@ makeTokioAsyncCall call freeErr freeRes = mask $ \restore -> do
 
 {- | Exception-safe wrapper for Tokio async calls.
 
-This function ensures that Rust-allocated memory is properly freed even if an async
-exception occurs during processing. It uses bracket to guarantee cleanup.
+The submission action must satisfy the ownership contract of 'TokioCall'.
+Results are released after processing, including when processing throws.
+Interrupting the wait does not cancel the Rust task: cleanup waits for its
+completion before releasing the result and slots.
 
 Parameters:
   - call: The FFI call to make
@@ -173,10 +190,14 @@ Parameters:
 -}
 withTokioAsyncCall
   :: TokioCall err res
-  -> (Ptr err -> IO ())  -- ^ Free error
-  -> (Ptr res -> IO ())  -- ^ Free result
-  -> (Ptr err -> IO e)   -- ^ Process error
-  -> (Ptr res -> IO a)   -- ^ Process result
+  -> (Ptr err -> IO ())
+  -- ^ Free error
+  -> (Ptr res -> IO ())
+  -- ^ Free result
+  -> (Ptr err -> IO e)
+  -- ^ Process error
+  -> (Ptr res -> IO a)
+  -- ^ Process result
   -> IO (Either e a)
 withTokioAsyncCall call freeErr freeRes =
   withTokioAsyncCallWithAbandon call freeErr freeRes freeRes
@@ -187,16 +208,25 @@ different cleanup requirements depending on whether the caller receives it.
 
 Most Tokio results use the same destructor in both cases; use
 'withTokioAsyncCall' for those. This variant is for ownership-transferring
-results: @freeRes@ runs after normal processing, while @abandonRes@ runs if an
-async exception interrupts the wait and the Rust task later succeeds.
+results: @freeRes@ runs when processing exits, including on exception, while
+@abandonRes@ runs for a successful result if the wait is interrupted, even if
+Rust has already completed. The cleanup thread waits for completion before
+releasing that result; interruption does not cancel the Rust task.
+
+The submission action must satisfy the ownership contract of 'TokioCall'.
 -}
 withTokioAsyncCallWithAbandon
   :: TokioCall err res
-  -> (Ptr err -> IO ())  -- ^ Free an error result
-  -> (Ptr res -> IO ())  -- ^ Free a normally processed result
-  -> (Ptr res -> IO ())  -- ^ Clean up a successful result produced after an interrupted wait
-  -> (Ptr err -> IO e)   -- ^ Process error
-  -> (Ptr res -> IO a)   -- ^ Process result
+  -> (Ptr err -> IO ())
+  -- ^ Free an error result
+  -> (Ptr res -> IO ())
+  -- ^ Release the result when processing exits, including on exception
+  -> (Ptr res -> IO ())
+  -- ^ Release a successful result when the wait is interrupted
+  -> (Ptr err -> IO e)
+  -- ^ Process error
+  -> (Ptr res -> IO a)
+  -- ^ Process result
   -> IO (Either e a)
 withTokioAsyncCallWithAbandon call freeErr freeRes abandonRes processErr processRes =
   mask $ \restore -> do
@@ -208,7 +238,8 @@ withTokioAsyncCallWithAbandon call freeErr freeRes abandonRes processErr process
     sp <- newStablePtrPrimMVar mvar
     (cap, _) <- threadCapability =<< myThreadId
     let freeSlots = free errorSlot *> free resultSlot
-    call sp cap errorSlot resultSlot `onException` freeSlots
+    -- A TokioCall may throw only before transferring the callback to Rust.
+    call sp cap errorSlot resultSlot `onException` (freeStablePtr sp >> freeSlots)
 
     -- If the wait is interrupted, ownership of the slots and of whatever the
     -- task eventually produces passes to this thread. The Rust bridge keeps its
