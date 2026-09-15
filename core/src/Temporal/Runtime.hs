@@ -47,14 +47,7 @@ withRuntime :: Runtime -> (Ptr Runtime -> IO a) -> IO a
 withRuntime (Runtime ptr) f = f ptr
 
 
--- | Bracket-style wrapper for Runtime that ensures proper cleanup.
---
--- Example:
---
--- @
--- bracketRuntime telemetryOpts $ \\rt -> do
---   ...
--- @
+-- | Bracket runtime acquisition and release.
 bracketRuntime :: TelemetryOptions -> (Runtime -> IO a) -> IO a
 bracketRuntime opts = bracket (initializeRuntime opts) destroyRuntime
 

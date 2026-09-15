@@ -16,6 +16,7 @@ use temporalio_sdk_core::telemetry::{
 use temporalio_sdk_core::{CoreRuntime, RuntimeOptions, TokioRuntimeBuilder};
 use tracing::Level;
 
+#[derive(Clone)]
 pub struct RuntimeRef {
     pub(crate) runtime: Runtime,
 }
@@ -262,7 +263,7 @@ impl Runtime {
     /// Schedule `fut` on Tokio and report its result through `callback`.
     ///
     /// The C ABI entry point must return after scheduling. Haskell then waits on
-    /// an interruptible `takeMVar`; using `block_on` here would instead keep it
+    /// an interruptible `readMVar`; using `block_on` here would instead keep it
     /// inside the foreign call until the future completed, preventing
     /// `timeout` and `killThread` from interrupting the wait.
     pub fn future_result_into_hs<F, T, E>(&self, callback: HsCallback<T, E>, fut: F)
@@ -281,7 +282,7 @@ impl Runtime {
 
         // Detached Tokio tasks do not propagate panics. Supervise this one so
         // a panic remains fail-fast, as it was when `block_on` ran inside the C
-        // ABI call, rather than leaving the Haskell waiter blocked forever. The
+        // ABI call, rather than leaving the Haskell caller blocked forever. The
         // supervisor also keeps Tokio alive until the callback has completed.
         handle.spawn(async move {
             let _runtime = runtime;
@@ -439,4 +440,20 @@ pub unsafe extern "C" fn hs_temporal_runtime_free_logs(logs: *const CArray<CArra
     unsafe {
         drop(CArray::from_raw_pointer(logs));
     }
+}
+
+/// Clone a runtime handle, sharing the underlying runtime.
+///
+/// Release the returned handle exactly once with `hs_temporal_free_runtime`; either handle may outlive the other.
+///
+/// # Safety
+/// `runtime` must be a non-null pointer to a live handle returned by
+/// `hs_temporal_init_runtime` or `hs_temporal_clone_runtime`.
+/// 
+/// The caller must keep the source handle alive and prevent concurrent destruction
+/// or mutation of the source wrapper throughout this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn hs_temporal_clone_runtime(runtime: *const RuntimeRef) -> *mut RuntimeRef {
+    let runtime = unsafe { &*runtime };
+    Box::into_raw(Box::new(runtime.clone()))
 }
