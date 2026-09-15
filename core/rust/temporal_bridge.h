@@ -33,6 +33,9 @@ typedef struct EphemeralServerRef EphemeralServerRef;
 
 typedef struct HaskellSlotSupplierInner HaskellSlotSupplierInner;
 
+/**
+ * The write half of a replay worker's history channel.
+ */
 typedef struct HistoryPusher HistoryPusher;
 
 typedef struct RuntimeRef RuntimeRef;
@@ -1386,7 +1389,7 @@ void hs_temporal_worker_finalize_shutdown(struct WorkerRef *worker,
  *
  * Haskell <-> Tokio FFI bridge invariants.
  */
-void hs_temporal_history_pusher_push_history(struct HistoryPusher *history_pusher,
+void hs_temporal_history_pusher_push_history(const struct HistoryPusher *history_pusher,
                                              const struct CArray_u8 *workflow_id,
                                              const struct CArray_u8 *history_proto,
                                              struct MVar *mvar,
@@ -1399,7 +1402,7 @@ void hs_temporal_history_pusher_push_history(struct HistoryPusher *history_pushe
  *
  * Haskell <-> Tokio FFI bridge invariants.
  */
-void hs_temporal_history_pusher_push_history_json(struct HistoryPusher *history_pusher,
+void hs_temporal_history_pusher_push_history_json(const struct HistoryPusher *history_pusher,
                                                   const struct CArray_u8 *workflow_id,
                                                   const struct CArray_u8 *history_json,
                                                   struct MVar *mvar,
@@ -1429,16 +1432,12 @@ void hs_temporal_history_proto_to_json(const struct CArray_u8 *history_proto,
  * Haskell FFI bridge invariants.
  *
  * The caller must ensure that the argument is a live pointer to a [`HistoryPusher`], typically from across the FFI
- * boundary after having been constructed by [`hs_temporal_new_replay_worker`].
- */
-void hs_temporal_history_pusher_close(struct HistoryPusher *history_pusher);
-
-/**
- * # Safety
+ * boundary after having been constructed by [`hs_temporal_new_replay_worker`], and that no
+ * push is in progress through it.
  *
- * Haskell FFI bridge invariants.
- *
- * The caller must ensure that the argument is a live pointer to a [`HistoryPusher`], typically from across the FFI
- * boundary after having been constructed by [`hs_temporal_new_replay_worker`].
+ * This closes the history stream as well as freeing the box: dropping the last original
+ * `Sender` is what lets the replay worker's stream terminate. It also releases this
+ * handle's runtime reference, which is never the last one, since the replay worker holds
+ * one of its own.
  */
 void hs_temporal_history_pusher_drop(struct HistoryPusher *history_pusher);

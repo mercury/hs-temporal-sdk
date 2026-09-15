@@ -207,7 +207,43 @@ getWorkerConfig :: Worker ty -> WorkerConfig
 getWorkerConfig = workerConfig
 
 
-newtype HistoryPusher = HistoryPusher {historyPusher :: Ptr HistoryPusher}
+{- | The write half of a replay worker's history channel.
+
+This holds the only owning pointer to the Rust allocation, so its lifecycle is tracked
+here rather than in Rust.
+-}
+newtype HistoryPusher = HistoryPusher (MVar (Maybe (Ptr HistoryPusher)))
+
+
+-- | Internal signal that this pusher has already been closed.
+--
+-- 'pushHistory' turns it back into the 'ReplayWorkerClosed' error that Rust
+-- reported for a closed stream.
+--
+-- __NOTE__: This type /must/ not be exported, and 'withHistoryPusher' must
+-- remain its only throw site.
+--
+-- 'orReplayWorkerClosed' is the only handler that can observe this exception,
+-- and no caller can discard it because the throw and the catch both sit inside
+-- 'pushHistory' with no user code in between.
+data HistoryPusherAlreadyClosed = HistoryPusherAlreadyClosed
+  deriving stock (Show)
+
+
+instance Exception HistoryPusherAlreadyClosed
+
+
+{- | Run a synchronous submission against the pusher's pointer.
+
+Meant to be used with 'withScopedTokioCall' so the lock is released before the
+interruptible wait for its result from Tokio, rather than being held for the
+length of the replay.
+-}
+withHistoryPusher :: HistoryPusher -> (Ptr HistoryPusher -> IO ()) -> IO ()
+withHistoryPusher (HistoryPusher slot) f =
+  Control.Concurrent.withMVar slot $ \case
+    Nothing -> throwIO HistoryPusherAlreadyClosed
+    Just ptr -> f ptr
 
 
 type RunId = ByteString
@@ -771,8 +807,13 @@ newReplayWorker r conf =
             then do
               wPtr <- peek wPtrPtr
               hpPtr <- peek hpPtrPtr
-              lifecycle <- Control.Concurrent.newMVar (WorkerOpen wPtr)
-              pure $ Right (Worker lifecycle conf (), HistoryPusher hpPtr)
+              pusher <-
+                (HistoryPusher <$> Control.Concurrent.newMVar (Just hpPtr))
+                  `onException` raw_dropHistoryPusher hpPtr
+              lifecycle <-
+                Control.Concurrent.newMVar (WorkerOpen wPtr)
+                  `onException` (raw_closeWorker wPtr `finally` closeHistory pusher)
+              pure $ Right (Worker lifecycle conf (), pusher)
             else Left <$> getWorkerError errPtr
 
 
@@ -965,19 +1006,28 @@ finalizeShutdown w = mask $ \restore -> do
   restore (Control.Concurrent.readMVar resultVar) >>= either throwIO pure
 
 
+-- | Report a push against a closed pusher the way Rust reported a closed stream.
+orReplayWorkerClosed :: IO (Either WorkerError ()) -> IO (Either WorkerError ())
+orReplayWorkerClosed action =
+  action `catch` \HistoryPusherAlreadyClosed ->
+    pure $ Left $ WorkerError ReplayWorkerClosed "Replay worker is no longer accepting new histories"
+
+
 foreign import ccall "hs_temporal_history_pusher_push_history" raw_pushHistory :: Ptr HistoryPusher -> Ptr (CArray Word8) -> Ptr (CArray Word8) -> TokioCall CWorkerError CUnit
 
 
-pushHistory :: HistoryPusher -> WorkflowId -> Either ByteString History -> IO (Either WorkerError ())
-pushHistory (HistoryPusher hp) wf p =
-  withCArrayBS wf $ \wfPtr ->
-    withCArrayBS (either id encodeMessage p) $ \pPtr ->
-      withTokioAsyncCall
-        (raw_pushHistory hp wfPtr pPtr)
-        rust_dropWorkerError
-        rust_dropUnit
-        (peek >=> peekWorkerError)
-        (\_ -> return ())
+-- | Push a protobuf-encoded workflow history to a replay worker.
+pushHistory :: HistoryPusher -> WorkflowId -> ByteString -> IO (Either WorkerError ())
+pushHistory hp wf protoBytes =
+  orReplayWorkerClosed $
+    withCArrayBS wf $ \wfPtr ->
+      withCArrayBS protoBytes $ \pPtr ->
+        withTokioAsyncCall
+          (withScopedTokioCall (withHistoryPusher hp) $ \ptr -> raw_pushHistory ptr wfPtr pPtr)
+          rust_dropWorkerError
+          rust_dropUnit
+          (peek >=> peekWorkerError)
+          (\_ -> return ())
 
 
 foreign import ccall "hs_temporal_history_pusher_push_history_json" raw_pushHistoryJson :: Ptr HistoryPusher -> Ptr (CArray Word8) -> Ptr (CArray Word8) -> TokioCall CWorkerError CUnit
@@ -987,15 +1037,16 @@ foreign import ccall "hs_temporal_history_pusher_push_history_json" raw_pushHist
 -- The JSON is deserialized on the Rust side, bypassing proto-lens's incomplete
 -- JSON support.
 pushHistoryJson :: HistoryPusher -> WorkflowId -> ByteString -> IO (Either WorkerError ())
-pushHistoryJson (HistoryPusher hp) wf jsonBytes =
-  withCArrayBS wf $ \wfPtr ->
-    withCArrayBS jsonBytes $ \jsonPtr ->
-      withTokioAsyncCall
-        (raw_pushHistoryJson hp wfPtr jsonPtr)
-        rust_dropWorkerError
-        rust_dropUnit
-        (peek >=> peekWorkerError)
-        (\_ -> return ())
+pushHistoryJson hp wf jsonBytes =
+  orReplayWorkerClosed $
+    withCArrayBS wf $ \wfPtr ->
+      withCArrayBS jsonBytes $ \jsonPtr ->
+        withTokioAsyncCall
+          (withScopedTokioCall (withHistoryPusher hp) $ \ptr -> raw_pushHistoryJson ptr wfPtr jsonPtr)
+          rust_dropWorkerError
+          rust_dropUnit
+          (peek >=> peekWorkerError)
+          (\_ -> return ())
 
 
 foreign import ccall "hs_temporal_history_proto_to_json" raw_historyProtoToJson :: Ptr (CArray Word8) -> Ptr (Ptr (CArray Word8)) -> Ptr (Ptr (CArray Word8)) -> IO ()
@@ -1027,12 +1078,27 @@ historyProtoToJson protoBytes =
             pure $ Right bs
 
 
-foreign import ccall "hs_temporal_history_pusher_close" raw_closeHistoryPusher :: Ptr HistoryPusher -> IO ()
+foreign import ccall "hs_temporal_history_pusher_drop" raw_dropHistoryPusher :: Ptr HistoryPusher -> IO ()
 
 
+{- | Close a replay worker's history stream and release its pusher.
+
+Dropping the original sender is what lets the replay worker's stream terminate, so this
+must happen before waiting for that worker to finalize. Repeated calls are no-ops, and a
+history Rust has already accepted keeps its own sender clone, so this cannot cancel a
+push that is already in flight.
+-}
 closeHistory :: HistoryPusher -> IO ()
-closeHistory hp =
-  raw_closeHistoryPusher hp.historyPusher
+closeHistory (HistoryPusher slot) =
+  -- Masked, not 'modifyMVar_': the body frees the allocation, and 'modifyMVar_' would
+  -- run it at the caller's masking state, so an interrupt landing between the free and
+  -- the commit would make it restore a slot naming freed memory.
+  Control.Concurrent.modifyMVarMasked_ slot $ \case
+    Nothing -> pure Nothing
+    Just ptr -> do
+      withFfiThreadLabel "temporal/ffi/drop_history_pusher" $
+        raw_dropHistoryPusher ptr
+      pure Nothing
 
 
 -- | Bracket-style wrapper for Worker that ensures proper cleanup.

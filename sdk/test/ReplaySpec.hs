@@ -3,7 +3,7 @@ module ReplaySpec where
 import Control.Concurrent (newEmptyMVar, putMVar, readMVar, threadDelay, yield)
 import qualified Control.Concurrent.Async as Async
 import Control.Exception (IOException, bracket, catch, fromException, try)
-import Control.Monad (void, when)
+import Control.Monad (replicateM_, void, when)
 import Data.Either (isLeft, isRight)
 import Data.ProtoLens.Encoding (encodeMessage)
 import qualified Data.Text as Text
@@ -95,6 +95,45 @@ spec = do
       result `shouldBe` Right ()
       after <- TestFixture.testResourceDropCount
       after `shouldSatisfy` (> before)
+
+  describe "Replay worker teardown" $ do
+    specify "releases the Core runtime pinned by a replay worker's history pusher" $ do
+      before <- TestFixture.runtimeLiveCount
+      replicateM_ 3 $ bracket newIdleReplayWorker shutdownIdleReplayWorker $ const $ pure ()
+      after <- TestFixture.runtimeLiveCount
+      after `shouldBe` before
+
+    specify "shares repeated history stream closure" $
+      bracket newIdleReplayWorker shutdownIdleReplayWorker $ \(_, historyPusher) ->
+        replicateM_ 3 $ Core.closeHistory historyPusher
+
+    specify "rejects a push after the stream closed" $
+      bracket newIdleReplayWorker shutdownIdleReplayWorker $ \(_, historyPusher) -> do
+        Core.closeHistory historyPusher
+        -- The bytes are never decoded: the closed pusher is rejected before the
+        -- push reaches Rust, so this cannot dereference the freed allocation.
+        pushed <- Core.pushHistory historyPusher "replay-closed-wf" "this is not valid protobuf"
+        case pushed of
+          Right () -> expectationFailure "expected a closed history stream to reject the push"
+          Left err -> err.code `shouldBe` Core.ReplayWorkerClosed
+
+    specify "frees the pusher once when a push races the stream closing" $ do
+      before <- TestFixture.runtimeLiveCount
+      bracket newIdleReplayWorker shutdownIdleReplayWorker $ \(_, historyPusher) -> do
+        start <- newEmptyMVar
+        -- Invalid bytes keep the replay worker's queue empty, so this exercises the
+        -- submission path without leaving a history for teardown to process.
+        pushing <-
+          Async.async $
+            readMVar start *> Core.pushHistory historyPusher "replay-race-wf" "this is not valid protobuf"
+        closing <- Async.async $ readMVar start *> Core.closeHistory historyPusher
+        putMVar start ()
+        -- Either order is legitimate; neither may touch a freed allocation.
+        pushed <- Async.wait pushing
+        pushed `shouldSatisfy` isLeft
+        Async.wait closing
+      after <- TestFixture.runtimeLiveCount
+      after `shouldBe` before
 
   describe "Ephemeral server shutdown" $ do
     specify "shares repeated shutdown results" $
