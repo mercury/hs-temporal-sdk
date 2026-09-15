@@ -23,7 +23,7 @@ typedef uint8_t WorkerErrorCode;
 /**
  * An opaque resource whose destructor is observable from Haskell through
  * [`hs_temporal_test_resource_drop_count`], letting tests prove that a result
- * produced after the Haskell waiter was interrupted is still reclaimed.
+ * produced after the Haskell caller was interrupted is still reclaimed.
  */
 typedef struct CTestResource CTestResource;
 
@@ -33,6 +33,9 @@ typedef struct EphemeralServerRef EphemeralServerRef;
 
 typedef struct HaskellSlotSupplierInner HaskellSlotSupplierInner;
 
+/**
+ * The write half of a replay worker's history channel.
+ */
 typedef struct HistoryPusher HistoryPusher;
 
 typedef struct RuntimeRef RuntimeRef;
@@ -208,6 +211,20 @@ void hs_temporal_drop_client(struct ClientRef *client);
  * Haskell FFI bridge invariants.
  */
 void hs_temporal_drop_rpc_error(struct CRPCError *error);
+
+/**
+ * Clone a client handle, sharing its connection and runtime.
+ *
+ * Release the returned handle exactly once with `hs_temporal_drop_client`; either handle may outlive the other.
+ *
+ * # Safety
+ * `client` must be a non-null pointer to a live handle returned by
+ * `hs_temporal_connect_client` or `hs_temporal_clone_client`.
+ *
+ * The caller must keep the source handle alive and prevent concurrent destruction
+ * or mutation of the source wrapper throughout this call.
+ */
+struct ClientRef *hs_temporal_clone_client(const struct ClientRef *client);
 
 /**
  * # Safety
@@ -1061,6 +1078,15 @@ void hs_list_nexus_endpoints(struct ClientRef *client,
                              struct CArray_u8 **result_slot);
 
 /**
+ * Test-only accessor for [`LIVE_CORE_RUNTIMES`]. See that item's documentation.
+ *
+ * # Safety
+ *
+ * None beyond the usual C ABI calling convention; this reads a global atomic.
+ */
+uint64_t hs_temporal_test_runtime_live_count(void);
+
+/**
  * # Safety
  *
  * Haskell FFI bridge invariants.
@@ -1097,6 +1123,20 @@ const struct CArray_CArray_u8 *hs_temporal_runtime_fetch_logs(struct RuntimeRef 
 void hs_temporal_runtime_free_logs(const struct CArray_CArray_u8 *logs);
 
 /**
+ * Clone a runtime handle, sharing the underlying runtime.
+ *
+ * Release the returned handle exactly once with `hs_temporal_free_runtime`; either handle may outlive the other.
+ *
+ * # Safety
+ * `runtime` must be a non-null pointer to a live handle returned by
+ * `hs_temporal_init_runtime` or `hs_temporal_clone_runtime`.
+ *
+ * The caller must keep the source handle alive and prevent concurrent destruction
+ * or mutation of the source wrapper throughout this call.
+ */
+struct RuntimeRef *hs_temporal_clone_runtime(const struct RuntimeRef *runtime);
+
+/**
  * Resolve with a fresh [`CTestResource`] after `delay_millis` milliseconds.
  *
  * # Safety
@@ -1118,6 +1158,15 @@ void hs_temporal_test_delayed_resource(struct RuntimeRef *runtime,
 void hs_temporal_drop_test_resource(struct CTestResource *resource);
 
 uint64_t hs_temporal_test_resource_drop_count(void);
+
+/**
+ * Test-only accessor for [`LIVE_WORKER_REFS`]. See that item's documentation.
+ *
+ * # Safety
+ *
+ * None beyond the usual C ABI calling convention; this reads a global atomic.
+ */
+uint64_t hs_temporal_test_worker_live_count(void);
 
 /**
  * Create a custom slot supplier handle from Haskell-supplied callback function pointers.
@@ -1181,6 +1230,24 @@ void hs_temporal_drop_unit(struct CUnit *unit);
 void hs_temporal_drop_worker(struct WorkerRef *worker);
 
 /**
+ * Clone a worker handle, sharing its underlying worker and runtime references.
+ *
+ * Returns null if the worker has already begun finalization and consumed its inner
+ * worker; the caller should treat that the same as an already-closed worker.
+ *
+ * Release the returned handle exactly once with `hs_temporal_drop_worker`; either
+ * handle may outlive the other.
+ *
+ * # Safety
+ * `worker` must be a non-null pointer to a live handle returned by
+ * `hs_temporal_new_worker`, `hs_temporal_new_replay_worker`, or `hs_temporal_clone_worker`.
+ *
+ * The caller must keep the source handle alive and prevent concurrent destruction
+ * or mutation of the source wrapper throughout this call.
+ */
+struct WorkerRef *hs_temporal_clone_worker(const struct WorkerRef *worker);
+
+/**
  * # Safety
  *
  * Haskell FFI bridge invariants.
@@ -1195,7 +1262,7 @@ void hs_temporal_new_worker(struct ClientRef *client,
  *
  * Haskell FFI bridge invariants.
  */
-void hs_temporal_new_replay_worker(struct RuntimeRef *runtime,
+void hs_temporal_new_replay_worker(const struct RuntimeRef *runtime,
                                    const struct CArray_u8 *config,
                                    struct WorkerRef **worker_slot,
                                    struct HistoryPusher **history_slot,
@@ -1322,7 +1389,7 @@ void hs_temporal_worker_finalize_shutdown(struct WorkerRef *worker,
  *
  * Haskell <-> Tokio FFI bridge invariants.
  */
-void hs_temporal_history_pusher_push_history(struct HistoryPusher *history_pusher,
+void hs_temporal_history_pusher_push_history(const struct HistoryPusher *history_pusher,
                                              const struct CArray_u8 *workflow_id,
                                              const struct CArray_u8 *history_proto,
                                              struct MVar *mvar,
@@ -1335,7 +1402,7 @@ void hs_temporal_history_pusher_push_history(struct HistoryPusher *history_pushe
  *
  * Haskell <-> Tokio FFI bridge invariants.
  */
-void hs_temporal_history_pusher_push_history_json(struct HistoryPusher *history_pusher,
+void hs_temporal_history_pusher_push_history_json(const struct HistoryPusher *history_pusher,
                                                   const struct CArray_u8 *workflow_id,
                                                   const struct CArray_u8 *history_json,
                                                   struct MVar *mvar,
@@ -1365,16 +1432,12 @@ void hs_temporal_history_proto_to_json(const struct CArray_u8 *history_proto,
  * Haskell FFI bridge invariants.
  *
  * The caller must ensure that the argument is a live pointer to a [`HistoryPusher`], typically from across the FFI
- * boundary after having been constructed by [`hs_temporal_new_replay_worker`].
- */
-void hs_temporal_history_pusher_close(struct HistoryPusher *history_pusher);
-
-/**
- * # Safety
+ * boundary after having been constructed by [`hs_temporal_new_replay_worker`], and that no
+ * push is in progress through it.
  *
- * Haskell FFI bridge invariants.
- *
- * The caller must ensure that the argument is a live pointer to a [`HistoryPusher`], typically from across the FFI
- * boundary after having been constructed by [`hs_temporal_new_replay_worker`].
+ * This closes the history stream as well as freeing the box: dropping the last original
+ * `Sender` is what lets the replay worker's stream terminate. It also releases this
+ * handle's runtime reference, which is never the last one, since the replay worker holds
+ * one of its own.
  */
 void hs_temporal_history_pusher_drop(struct HistoryPusher *history_pusher);

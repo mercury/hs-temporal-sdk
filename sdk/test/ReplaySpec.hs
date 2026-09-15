@@ -1,9 +1,9 @@
 module ReplaySpec where
 
-import Control.Concurrent (threadDelay, yield)
+import Control.Concurrent (newEmptyMVar, putMVar, readMVar, threadDelay, yield)
 import qualified Control.Concurrent.Async as Async
 import Control.Exception (IOException, bracket, catch, fromException, try)
-import Control.Monad (void, when)
+import Control.Monad (replicateM_, void, when)
 import Data.Either (isLeft, isRight)
 import Data.ProtoLens.Encoding (encodeMessage)
 import qualified Data.Text as Text
@@ -14,6 +14,7 @@ import System.Directory (findExecutable, getTemporaryDirectory, removeFile)
 import System.Timeout (timeout)
 import Temporal.Activity
 import qualified Temporal.Client as C
+import qualified Temporal.Core.EphemeralServer as CoreServer
 import qualified Temporal.Core.Internal.TestFixture as TestFixture
 import qualified Temporal.Core.Worker as Core
 import Temporal.Duration
@@ -21,6 +22,7 @@ import qualified Temporal.EphemeralServer as Ephemeral
 import qualified Temporal.EphemeralServer as TemporalDevServerConfig (TemporalDevServerConfig (..))
 import Temporal.Payload
 import Temporal.Replay (readHistoryProtobufFile, writeHistoryProtobufFile)
+import Temporal.Runtime (TelemetryOptions (NoTelemetry), bracketRuntime)
 import Temporal.Worker
 import qualified Temporal.Workflow as W
 import Test.Hspec
@@ -30,6 +32,30 @@ import TestHelpers
 spec :: Spec
 spec = do
   describe "Tokio FFI interruption" $ do
+    specify "frees the worker once when a close races finalization" $ do
+      before <- TestFixture.workerLiveCount
+      (worker, historyPusher) <- newIdleReplayWorker
+      Core.closeHistory historyPusher
+      Core.initiateShutdown worker
+      start <- newEmptyMVar
+      finalizing <- Async.async $ readMVar start *> Core.finalizeShutdown worker
+      closing <- Async.async $ readMVar start *> Core.closeWorker worker
+      putMVar start ()
+      -- The close either waits out an in-flight finalization or finds it already
+      -- settled.
+      -- 
+      -- If it wins the race outright, finalization reports a closed worker
+      -- rather than consuming one that is already gone.
+      closed <- timeout 30_000_000 $ Async.wait closing
+      closed `shouldBe` Just ()
+      outcome <- timeout 30_000_000 $ Async.waitCatch finalizing
+      case outcome of
+        Just (Right (Right ())) -> pure ()
+        Just (Left err) | Just Core.WorkerAlreadyClosed <- fromException err -> pure ()
+        other -> expectationFailure $ "unexpected finalization outcome: " <> show other
+      -- Whichever order they resolved in, the handle is freed exactly once.
+      TestFixture.workerLiveCount `shouldReturn` before
+
     specify "interrupts a blocked poll and reaps its eventual result" $
       bracket newIdleReplayWorker shutdownIdleReplayWorker $ \(worker, _) -> do
         poller <- Async.async $ Core.pollWorkflowActivation worker
@@ -51,9 +77,11 @@ spec = do
 
     specify "frees the Rust result of an interrupted call" $ do
       before <- TestFixture.testResourceDropCount
-      call <- Async.async $ TestFixture.acquireDelayedTestResource globalRuntime 1_000
-      blocked <- timeout 5_000_000 $ waitUntilBlockedOnMVar (Async.asyncThreadId call)
-      blocked `shouldBe` Just ()
+      call <- bracketRuntime NoTelemetry $ \runtime -> do
+        call <- Async.async $ TestFixture.acquireDelayedTestResource runtime 1_000
+        blocked <- timeout 5_000_000 $ waitUntilBlockedOnMVar (Async.asyncThreadId call)
+        blocked `shouldBe` Just ()
+        pure call
       cancelled <- timeout 5_000_000 $ Async.cancel call
       cancelled `shouldBe` Just ()
       -- Interrupting the wait cannot cancel the Rust future; the forked
@@ -68,6 +96,45 @@ spec = do
       after <- TestFixture.testResourceDropCount
       after `shouldSatisfy` (> before)
 
+  describe "Replay worker teardown" $ do
+    specify "releases the Core runtime pinned by a replay worker's history pusher" $ do
+      before <- TestFixture.runtimeLiveCount
+      replicateM_ 3 $ bracket newIdleReplayWorker shutdownIdleReplayWorker $ const $ pure ()
+      after <- TestFixture.runtimeLiveCount
+      after `shouldBe` before
+
+    specify "shares repeated history stream closure" $
+      bracket newIdleReplayWorker shutdownIdleReplayWorker $ \(_, historyPusher) ->
+        replicateM_ 3 $ Core.closeHistory historyPusher
+
+    specify "rejects a push after the stream closed" $
+      bracket newIdleReplayWorker shutdownIdleReplayWorker $ \(_, historyPusher) -> do
+        Core.closeHistory historyPusher
+        -- The bytes are never decoded: the closed pusher is rejected before the
+        -- push reaches Rust, so this cannot dereference the freed allocation.
+        pushed <- Core.pushHistory historyPusher "replay-closed-wf" "this is not valid protobuf"
+        case pushed of
+          Right () -> expectationFailure "expected a closed history stream to reject the push"
+          Left err -> err.code `shouldBe` Core.ReplayWorkerClosed
+
+    specify "frees the pusher once when a push races the stream closing" $ do
+      before <- TestFixture.runtimeLiveCount
+      bracket newIdleReplayWorker shutdownIdleReplayWorker $ \(_, historyPusher) -> do
+        start <- newEmptyMVar
+        -- Invalid bytes keep the replay worker's queue empty, so this exercises the
+        -- submission path without leaving a history for teardown to process.
+        pushing <-
+          Async.async $
+            readMVar start *> Core.pushHistory historyPusher "replay-race-wf" "this is not valid protobuf"
+        closing <- Async.async $ readMVar start *> Core.closeHistory historyPusher
+        putMVar start ()
+        -- Either order is legitimate; neither may touch a freed allocation.
+        pushed <- Async.wait pushing
+        pushed `shouldSatisfy` isLeft
+        Async.wait closing
+      after <- TestFixture.runtimeLiveCount
+      after `shouldBe` before
+
   describe "Ephemeral server shutdown" $ do
     specify "shares repeated shutdown results" $
       bracket newEphemeralServer (void . Ephemeral.shutdownEphemeralServer) $ \server -> do
@@ -76,12 +143,24 @@ spec = do
         first `shouldBe` Right ()
         second `shouldBe` first
 
+    specify "uses a test server after its original runtime scope ends" $ do
+      freePort <- Ephemeral.getFreePort
+      executable <- findExecutable "temporal-test-server" >>= maybe (fail "temporal-test-server executable missing") pure
+      let config = CoreServer.TemporalTestServerConfig (Ephemeral.ExistingPath executable) (Just $ fromIntegral freePort) []
+          acquire = bracketRuntime NoTelemetry $ \runtime ->
+            CoreServer.startTestServer runtime config >>= either (fail . show) pure
+      bracket acquire (void . Ephemeral.shutdownEphemeralServer) $ \server -> do
+        portIsListening freePort `shouldReturn` True
+        Ephemeral.shutdownEphemeralServer server `shouldReturn` Right ()
+
     specify "stops a dev server whose startup wait was interrupted" $ do
       freePort <- Ephemeral.getFreePort
       serverConfig <- devServerConfig freePort
-      starter <- Async.async $ Ephemeral.launchDevServer globalRuntime serverConfig
-      blocked <- timeout 10_000_000 $ waitUntilBlockedOnMVar (Async.asyncThreadId starter)
-      blocked `shouldBe` Just ()
+      starter <- bracketRuntime NoTelemetry $ \runtime -> do
+        starter <- Async.async $ Ephemeral.launchDevServer runtime serverConfig
+        blocked <- timeout 10_000_000 $ waitUntilBlockedOnMVar (Async.asyncThreadId starter)
+        blocked `shouldBe` Just ()
+        pure starter
       cancelled <- timeout 5_000_000 $ Async.cancel starter
       cancelled `shouldBe` Just ()
       -- Interrupting the wait cannot cancel the Rust future, so the server
@@ -122,9 +201,10 @@ spec = do
 
 newIdleReplayWorker :: IO (Core.Worker 'Core.Replay, Core.HistoryPusher)
 newIdleReplayWorker =
-  Core.newReplayWorker globalRuntime Core.defaultWorkerConfig >>= \case
-    Left err -> error $ "failed to create replay worker: " <> show err
-    Right resources -> pure resources
+  bracketRuntime NoTelemetry $ \runtime ->
+    Core.newReplayWorker runtime Core.defaultWorkerConfig >>= \case
+      Left err -> error $ "failed to create replay worker: " <> show err
+      Right resources -> pure resources
 
 
 shutdownIdleReplayWorker :: (Core.Worker 'Core.Replay, Core.HistoryPusher) -> IO ()
@@ -161,7 +241,8 @@ newEphemeralServer :: IO Ephemeral.EphemeralServer
 newEphemeralServer = do
   freePort <- Ephemeral.getFreePort
   serverConfig <- devServerConfig freePort
-  Ephemeral.launchDevServer globalRuntime serverConfig >>= either (error . show) pure
+  bracketRuntime NoTelemetry $ \runtime ->
+    Ephemeral.launchDevServer runtime serverConfig >>= either (error . show) pure
 
 
 waitUntilBlockedOnMVar :: Conc.ThreadId -> IO ()

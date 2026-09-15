@@ -703,7 +703,7 @@ runReplayHistory rt conf history = runWorkerContext conf $ UnliftIO.bracket (sta
   wfId <- maybe (throwIO $ userError "No workflow ID found in history") pure mWfId
   Logging.logDebug $ "Pushing history for workflow ID " <> T.pack (show wfId)
   Logging.logDebug $ T.pack $ show history
-  res <- liftIO $ Core.pushHistory pusher wfId (Left $ encodeMessage history)
+  res <- liftIO $ Core.pushHistory pusher wfId (encodeMessage history)
   Logging.logDebug $ "Pushed history for workflow ID " <> T.pack (show wfId)
   case res of
     Left e -> pure $ Left $ ReplayHistoryFailure {message = e.message}
@@ -723,7 +723,7 @@ runReplayHistoryProto rt conf (WorkflowId wfId) protoBytes = runWorkerContext co
   evictions <- subscribeToEvictions worker
   let wfIdBytes = T.encodeUtf8 wfId
   Logging.logDebug $ "Pushing proto history for workflow ID " <> wfId
-  res <- liftIO $ Core.pushHistory pusher wfIdBytes (Left protoBytes)
+  res <- liftIO $ Core.pushHistory pusher wfIdBytes protoBytes
   Logging.logDebug $ "Pushed proto history for workflow ID " <> wfId
   case res of
     Left e -> pure $ Left $ ReplayHistoryFailure {message = e.message}
