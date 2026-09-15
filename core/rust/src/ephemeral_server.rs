@@ -107,16 +107,24 @@ pub unsafe extern "C" fn hs_temporal_start_dev_server(
     // Capture an owned runtime before constructing the future so creating the
     // returned server never dereferences the raw FFI pointer after an await.
     let server_runtime = runtime_ref.runtime.clone();
-    let mut de = serde_json::Deserializer::from_str(unsafe {
-        std::str::from_utf8_unchecked(CStr::from_ptr(json_string).to_bytes())
-    });
-    let conf =
-        TemporalDevServerConfigDef::deserialize(&mut de).expect("Failed to deserialize config");
     let hs: HsCallback<EphemeralServerRef, CArray<u8>> = HsCallback {
         cap,
         mvar,
         error_slot,
         result_slot,
+    };
+    let mut de = serde_json::Deserializer::from_str(unsafe {
+        std::str::from_utf8_unchecked(CStr::from_ptr(json_string).to_bytes())
+    });
+    let conf = match TemporalDevServerConfigDef::deserialize(&mut de) {
+        Ok(conf) => conf,
+        Err(err) => {
+            hs.put_failure(
+                runtime_ref.runtime.try_put_mvar,
+                crate::runtime::hs_error_message(err),
+            );
+            return;
+        }
     };
     runtime_ref.runtime.future_result_into_hs(hs, async move {
         let result = conf.start_server().await;
@@ -125,10 +133,10 @@ pub unsafe extern "C" fn hs_temporal_start_dev_server(
                 server,
                 runtime: server_runtime,
             }),
-            Err(e) => Err(
-                CArray::c_repr_of(format!("Failed to start server: {}", e).into_bytes())
-                    .expect("Failed to convert error to CArray"),
-            ),
+            Err(e) => Err(crate::runtime::hs_error_message(format!(
+                "Failed to start server: {}",
+                e
+            ))),
         }
     })
 }
@@ -195,15 +203,24 @@ pub unsafe extern "C" fn hs_temporal_start_test_server(
     // See `hs_temporal_start_dev_server`: the future must not retain a borrow
     // derived from the raw runtime pointer after this C call returns.
     let server_runtime = runtime_ref.runtime.clone();
-    let mut de = serde_json::Deserializer::from_str(unsafe {
-        std::str::from_utf8_unchecked(CStr::from_ptr(json_string).to_bytes())
-    });
-    let conf = TestServerConfigDef::deserialize(&mut de).expect("Failed to deserialize config");
     let hs: HsCallback<EphemeralServerRef, CArray<u8>> = HsCallback {
         cap,
         mvar,
         error_slot,
         result_slot,
+    };
+    let mut de = serde_json::Deserializer::from_str(unsafe {
+        std::str::from_utf8_unchecked(CStr::from_ptr(json_string).to_bytes())
+    });
+    let conf = match TestServerConfigDef::deserialize(&mut de) {
+        Ok(conf) => conf,
+        Err(err) => {
+            hs.put_failure(
+                runtime_ref.runtime.try_put_mvar,
+                crate::runtime::hs_error_message(err),
+            );
+            return;
+        }
     };
     runtime_ref.runtime.future_result_into_hs(hs, async move {
         let result = conf.start_server().await;
@@ -212,10 +229,10 @@ pub unsafe extern "C" fn hs_temporal_start_test_server(
                 server,
                 runtime: server_runtime,
             }),
-            Err(e) => Err(
-                CArray::c_repr_of(format!("Failed to start server: {}", e).into_bytes())
-                    .expect("Failed to convert error to CArray"),
-            ),
+            Err(e) => Err(crate::runtime::hs_error_message(format!(
+                "Failed to start server: {}",
+                e
+            ))),
         }
     })
 }

@@ -1,7 +1,12 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 
 module Temporal.Runtime (
   Runtime,
+  CRuntime,
+  RuntimeClosedError (..),
+  RuntimeInitializationError (..),
   TelemetryOptions (..),
   Periodicity (..),
   initializeRuntime,
@@ -10,6 +15,7 @@ module Temporal.Runtime (
   fetchLogs,
   CoreLog (..),
   LogLevel (..),
+
   -- * Resource-safe wrappers
   bracketRuntime,
 ) where
@@ -17,54 +23,85 @@ module Temporal.Runtime (
 import Control.Exception
 import Data.Aeson
 import qualified Data.ByteString.Lazy as BL
+import Data.Text (Text)
 import qualified Data.Vector as V
+import Foreign.Marshal.Alloc (alloca)
 import Foreign.Ptr
 import Foreign.Storable
 import Temporal.Core.CTypes
 import Temporal.Internal.FFI
+import Temporal.Runtime.Internal (Runtime, RuntimeClosedError (..))
+import qualified Temporal.Runtime.Internal as Runtime.Internal
 
 
--- | Initialize the Rust runtime and thread-pool.
---
--- IMPORTANT: You must call 'destroyRuntime' when done, or use 'withRuntime'/'bracketRuntime'
--- for automatic cleanup.
+-- | Thrown by 'initializeRuntime' when the supplied 'TelemetryOptions' cannot be
+-- turned into a working Core runtime (malformed telemetry config, an invalid OTLP
+-- endpoint URL, a Prometheus exporter that fails to bind, etc.).
+newtype RuntimeInitializationError = RuntimeInitializationError Text
+  deriving stock (Show, Eq)
+  deriving anyclass (Exception)
+
+
+{- | Initialize the Rust runtime and thread-pool.
+
+__NOTE__: You must call 'destroyRuntime' to free the acquired resource; prefer
+'bracketRuntime' for automatic cleanup if possible.
+
+Throws 'RuntimeInitializationError' if the given 'TelemetryOptions' cannot be
+turned into a working Core runtime.
+-}
 initializeRuntime :: TelemetryOptions -> IO Runtime
 initializeRuntime opts = withCArrayBS (BL.toStrict $ encode opts) $ \optsP ->
-  mask_ $ do
-    rtP <- initRuntime optsP tryPutMVarPtr
-    return (Runtime rtP)
+  mask_ $
+    alloca $ \resultSlot ->
+      alloca $ \errorSlot -> do
+        poke resultSlot nullPtr
+        poke errorSlot nullPtr
+        initRuntime optsP tryPutMVarPtr resultSlot errorSlot
+        errPtr <- peek errorSlot
+        if errPtr /= nullPtr
+          then do
+            message <- peek errPtr >>= cArrayToText
+            rust_dropByteArray errPtr
+            throwIO $ RuntimeInitializationError message
+          else peek resultSlot >>= Runtime.Internal.fromHandle
 
 
--- | Explicitly destroy a Runtime, freeing its resources immediately.
---
--- This should only be called once, and the Runtime should not be used afterwards.
+{- | Explicitly destroy a Runtime, releasing its handle.
+
+Repeated calls have no effect: existing uses remain valid, but new calls to
+'withRuntime' throw 'RuntimeClosedError'.
+
+Other handles and pending Rust operations keep the underlying runtime object
+alive until they are finalized.
+-}
 destroyRuntime :: Runtime -> IO ()
-destroyRuntime (Runtime ptr) = freeRuntime ptr
+destroyRuntime rt = Runtime.Internal.closeWithCleanup rt (pure ())
 
 
--- | Access the underlying 'Runtime' pointer for calling out to Rust.
-withRuntime :: Runtime -> (Ptr Runtime -> IO a) -> IO a
-withRuntime (Runtime ptr) f = f ptr
+{- | Access the underlying 'CRuntime' pointer for FFI calls.
+
+Acquires an independent handle before running the callback. Once acquired,
+the handle remains valid even if 'destroyRuntime' is called concurrently or
+inside the callback; throws 'RuntimeClosedError' if called on a 'Runtime' that
+has already been destroyed.
+
+The callback must not free the pointer or use it after returning. The callback
+runs without holding the runtime lock and preserves the caller's masking state.
+-}
+withRuntime :: Runtime -> (Ptr CRuntime -> IO a) -> IO a
+withRuntime rt = bracket (Runtime.Internal.cloneHandle rt) freeRuntime
 
 
--- | Bracket-style wrapper for Runtime that ensures proper cleanup.
---
--- Example:
---
--- @
--- bracketRuntime telemetryOpts $ \\rt -> do
---   ...
--- @
+-- | Bracket runtime acquisition and release.
 bracketRuntime :: TelemetryOptions -> (Runtime -> IO a) -> IO a
 bracketRuntime opts = bracket (initializeRuntime opts) destroyRuntime
 
 
-{- | The Rust runtime exports logs to the Haskell runtime. This function fetches
-those logs so they can be fed through a logging framework.
--}
+-- | Fetch logs from the 'Runtime'.
 fetchLogs :: Runtime -> IO (V.Vector CoreLog)
-fetchLogs r = withRuntime r $ \p -> do
-  bracket (raw_fetchLogs p) raw_freeLogs $ \clogs -> do
+fetchLogs r =
+  bracket (withRuntime r raw_fetchLogs) raw_freeLogBuffer $ \clogs -> do
     logs <- peek clogs
     vec <- cArrayToVector cArrayToByteString logs
     V.mapM throwDecodeStrict vec
