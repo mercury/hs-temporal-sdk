@@ -160,12 +160,26 @@ data Worker (ty :: WorkerType) = Worker
   { workerLifecycle :: {-# UNPACK #-} !(MVar (WorkerLifecycle ty))
   , workerConfig :: !WorkerConfig
   , workerClient :: !(InactiveForReplay ty Client)
-  , workerRuntime :: {-# UNPACK #-} !Runtime
   }
 
 
+{- | Run an action with the worker's underlying pointer.
+
+__FIXME__: unlike 'Client', which hands out a refcounted clone of its
+runtime handle for the duration of a call, there is no mechanism such as
+@hs_temporal_clone_worker@ (yet).
+
+The 'workerLifecycle' lock is only held long enough to read the pointer out
+of the 'MVar' before @f@ runs, so a concurrent 'closeWorker' may free the
+underlying @WorkerRef@ (and the runtime it carries) while @f@ is still using
+the pointer it was handed.
+
+The proper fix is a refcounted worker handle mirroring 'Client'/'Connection';
+until that lands, callers are responsible for ensuring 'closeWorker' cannot race
+with an in-flight call through this function.
+-}
 withWorker :: forall ty a. KnownWorkerType ty => Worker ty -> (Ptr (Worker ty) -> IO a) -> IO a
-withWorker w f = withRuntime w.workerRuntime $ \_ -> do
+withWorker w f = do
   ptr <-
     Control.Concurrent.withMVar w.workerLifecycle $ \case
       WorkerOpen ptr -> pure ptr
@@ -697,7 +711,7 @@ newWorker c wc = withClient c $ \cPtr -> do
             then do
               wPtr <- peek wPtrPtr
               lifecycle <- Control.Concurrent.newMVar (WorkerOpen wPtr)
-              pure $ Right $ Worker lifecycle wc c (clientRuntime c)
+              pure $ Right $ Worker lifecycle wc c
             else Left <$> getWorkerError errPtr
 
 
@@ -705,8 +719,11 @@ newWorker c wc = withClient c $ \cPtr -> do
 --
 -- Explicitly close a worker, freeing its resources immediately.
 -- After calling this, the worker must not be used again.
+--
+-- Known gap: this can race with a concurrent call inside 'withWorker'. See
+-- 'withWorker''s documentation for details.
 closeWorker :: Worker ty -> IO ()
-closeWorker (Worker lifecycle _ _ _) = mask_ $ do
+closeWorker (Worker lifecycle _ _) = mask_ $ do
   wp <-
     Control.Concurrent.modifyMVar lifecycle $ \case
       WorkerOpen ptr -> pure (WorkerClosed, ptr)
@@ -720,28 +737,29 @@ closeWorker (Worker lifecycle _ _ _) = mask_ $ do
     raw_closeWorker wp
 
 
-foreign import ccall "hs_temporal_new_replay_worker" raw_newReplayWorker :: Ptr Runtime -> Ptr (CArray Word8) -> Ptr (Ptr (Worker 'Replay)) -> Ptr (Ptr HistoryPusher) -> Ptr (Ptr CWorkerError) -> IO ()
+foreign import ccall "hs_temporal_new_replay_worker" raw_newReplayWorker :: Ptr CRuntime -> Ptr (CArray Word8) -> Ptr (Ptr (Worker 'Replay)) -> Ptr (Ptr HistoryPusher) -> Ptr (Ptr CWorkerError) -> IO ()
 
 
 newReplayWorker :: Runtime -> WorkerConfig -> IO (Either WorkerError (Worker 'Replay, HistoryPusher))
-newReplayWorker r conf = withRuntime r $ \rPtr -> do
-  alloca $ \wPtrPtr -> do
-    alloca $ \hpPtrPtr -> do
-      withCArrayBS (BL.toStrict $ encode conf) $ \confPtr -> do
+newReplayWorker r conf =
+  alloca $ \wPtrPtr ->
+    alloca $ \hpPtrPtr ->
+      withCArrayBS (BL.toStrict $ encode conf) $ \confPtr ->
         alloca $ \errPtrPtr -> mask_ $ do
           poke wPtrPtr nullPtr
           poke hpPtrPtr nullPtr
           poke errPtrPtr nullPtr
 
           withFfiThreadLabel "temporal/ffi/new_replay_worker" $
-            raw_newReplayWorker rPtr confPtr wPtrPtr hpPtrPtr errPtrPtr
+            withRuntime r $ \rPtr ->
+              raw_newReplayWorker rPtr confPtr wPtrPtr hpPtrPtr errPtrPtr
           errPtr <- peek errPtrPtr
           if errPtr == nullPtr
             then do
               wPtr <- peek wPtrPtr
               hpPtr <- peek hpPtrPtr
               lifecycle <- Control.Concurrent.newMVar (WorkerOpen wPtr)
-              pure $ Right (Worker lifecycle conf () r, HistoryPusher hpPtr)
+              pure $ Right (Worker lifecycle conf (), HistoryPusher hpPtr)
             else Left <$> getWorkerError errPtr
 
 
@@ -874,7 +892,7 @@ foreign import ccall "hs_temporal_worker_initiate_shutdown" raw_initiateShutdown
 
 -- | Initiate shutdown.
 initiateShutdown :: KnownWorkerType ty => Worker ty -> IO ()
-initiateShutdown w = withRuntime w.workerRuntime $ \_ -> do
+initiateShutdown w = do
   workerPtr <-
     Control.Concurrent.withMVar w.workerLifecycle $ \case
       WorkerOpen ptr -> pure (Just ptr)
@@ -914,13 +932,12 @@ finalizeShutdown w = mask $ \restore -> do
         forkIO $ do
           outcome <-
             try $
-              withRuntime w.workerRuntime $ \_ ->
-                withTokioAsyncCall
-                  (raw_finalizeShutdown workerPtr)
-                  rust_dropWorkerError
-                  rust_dropUnit
-                  (peek >=> peekWorkerError)
-                  (\_ -> return ())
+              withTokioAsyncCall
+                (raw_finalizeShutdown workerPtr)
+                rust_dropWorkerError
+                rust_dropUnit
+                (peek >=> peekWorkerError)
+                (\_ -> return ())
           Control.Concurrent.putMVar resultVar outcome
     case spawned of
       Left err -> Control.Concurrent.putMVar resultVar (Left err)

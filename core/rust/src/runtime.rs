@@ -3,7 +3,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::future::Future;
 use std::net::SocketAddr;
+use std::ops::Deref;
 use std::os::raw::c_int;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, mpsc};
 use std::time::{Duration, SystemTime};
 use temporalio_common::telemetry::metrics::{CoreMeter, NoOpCoreMeter};
@@ -16,15 +18,21 @@ use temporalio_sdk_core::telemetry::{
 use temporalio_sdk_core::{CoreRuntime, RuntimeOptions, TokioRuntimeBuilder};
 use tracing::Level;
 
+#[derive(Clone)]
 pub struct RuntimeRef {
     pub(crate) runtime: Runtime,
 }
 
+/// A handle to the Core runtime and thread-pool.
+///
+/// `core` is `Arc<CoreRuntimeDeferredDrop>` rather than `Arc<CoreRuntime>` directly: every
+/// clone of `Runtime` shares the same `Arc<CoreRuntimeDeferredDrop>`, so the *last* one
+/// to drop always routes the teardown through `CoreRuntimeDeferredDrop::drop` and its
+/// dropper thread.
 #[derive(Clone)]
 pub(crate) struct Runtime {
-    pub(crate) core: Arc<CoreRuntime>,
+    pub(crate) core: Arc<CoreRuntimeDeferredDrop>,
     pub(crate) try_put_mvar: extern "C" fn(capability: Capability, mvar: *mut MVar) -> (),
-    core_runtime_dropper: mpsc::Sender<Arc<CoreRuntime>>,
 }
 
 /// Drops task-owned Core runtime references outside the Tokio runtime they keep alive.
@@ -46,13 +54,33 @@ fn spawn_core_runtime_dropper() -> mpsc::Sender<Arc<CoreRuntime>> {
     tx
 }
 
-struct CoreRuntimeKeepAlive {
+/// The number of distinct underlying Core runtimes (Tokio thread-pools) currently alive.
+///
+/// This is a *runtime* counter, not a *handle* counter: cloning a `Runtime` does not
+/// change this count. Constructing a brand new Core runtime in `init_runtime` increments
+/// it and only the underlying runtime's actual teardown in `CoreRuntimeDeferredDrop::drop`
+/// decrements it.
+///
+/// This allows tests to observe that every clone of a runtime, including ones a public FFI
+/// entry point never hands back a pointer for has actually been released, not merely that
+/// some `RuntimeRef` pointer was freed.
+static LIVE_CORE_RUNTIMES: AtomicU64 = AtomicU64::new(0);
+
+/// Wraps `Arc<CoreRuntime>` so that dropping the *last* shared reference sends the
+/// underlying runtime to the dropper thread instead of tearing it down in place.
+///
+/// This is what makes it safe for `Runtime::future_result_into_hs` to hand a clone of
+/// this type to a spawned Tokio task: if that task ends up holding the last reference,
+/// its own drop glue never touches `CoreRuntime` directly, so a Tokio worker can never
+/// end up tearing down the very runtime it belongs to.
+pub(crate) struct CoreRuntimeDeferredDrop {
     runtime: Option<Arc<CoreRuntime>>,
     dropper: mpsc::Sender<Arc<CoreRuntime>>,
 }
 
-impl CoreRuntimeKeepAlive {
+impl CoreRuntimeDeferredDrop {
     fn new(runtime: Arc<CoreRuntime>, dropper: mpsc::Sender<Arc<CoreRuntime>>) -> Self {
+        LIVE_CORE_RUNTIMES.fetch_add(1, Ordering::SeqCst);
         Self {
             runtime: Some(runtime),
             dropper,
@@ -60,9 +88,18 @@ impl CoreRuntimeKeepAlive {
     }
 }
 
-impl Drop for CoreRuntimeKeepAlive {
+impl Deref for CoreRuntimeDeferredDrop {
+    type Target = CoreRuntime;
+
+    fn deref(&self) -> &CoreRuntime {
+        self.runtime.as_ref().unwrap()
+    }
+}
+
+impl Drop for CoreRuntimeDeferredDrop {
     fn drop(&mut self) {
         let runtime = self.runtime.take().unwrap();
+        LIVE_CORE_RUNTIMES.fetch_sub(1, Ordering::SeqCst);
         if let Err(runtime) = self.dropper.send(runtime) {
             // Do not unwind and drop `runtime` on a Tokio worker. Losing the
             // Runtime's dropper is an internal lifecycle invariant failure.
@@ -71,6 +108,16 @@ impl Drop for CoreRuntimeKeepAlive {
             std::process::abort();
         }
     }
+}
+
+/// Test-only accessor for [`LIVE_CORE_RUNTIMES`]. See that item's documentation.
+///
+/// # Safety
+///
+/// None beyond the usual C ABI calling convention; this reads a global atomic.
+#[unsafe(no_mangle)]
+pub extern "C" fn hs_temporal_test_runtime_live_count() -> u64 {
+    LIVE_CORE_RUNTIMES.load(Ordering::SeqCst)
 }
 
 fn init_runtime(
@@ -126,9 +173,11 @@ fn init_runtime(
     // TODO need to figure out how to handle errors here
     Box::new(RuntimeRef {
         runtime: Runtime {
-            core: Arc::new(runtime),
+            core: Arc::new(CoreRuntimeDeferredDrop::new(
+                Arc::new(runtime),
+                spawn_core_runtime_dropper(),
+            )),
             try_put_mvar,
-            core_runtime_dropper: spawn_core_runtime_dropper(),
         },
     })
 }
@@ -181,7 +230,15 @@ pub unsafe extern "C" fn hs_temporal_init_runtime(
     Box::into_raw(rt)
 }
 
-fn safe_drop_runtime(runtime: Box<RuntimeRef>) {
+/// Release a `RuntimeRef` handle.
+///
+/// This only drops the handle itself; it does not guarantee the underlying Core runtime
+/// tears down here or on this thread.
+///
+/// The last handle to drop routes the actual teardown through `CoreRuntimeDeferredDrop::drop`
+/// and its dedicated dropper thread, which is what makes dropping this `Box` itself safe
+/// regardless of which thread it is called from.
+fn release_runtime_handle(runtime: Box<RuntimeRef>) {
     drop(runtime)
 }
 
@@ -191,7 +248,7 @@ fn safe_drop_runtime(runtime: Box<RuntimeRef>) {
 /// Haskell FFI bridge invariants.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn hs_temporal_free_runtime(runtime: *mut RuntimeRef) {
-    unsafe { safe_drop_runtime(Box::from_raw(runtime)) };
+    unsafe { release_runtime_handle(Box::from_raw(runtime)) };
 }
 
 #[repr(C)]
@@ -262,7 +319,7 @@ impl Runtime {
     /// Schedule `fut` on Tokio and report its result through `callback`.
     ///
     /// The C ABI entry point must return after scheduling. Haskell then waits on
-    /// an interruptible `takeMVar`; using `block_on` here would instead keep it
+    /// an interruptible `readMVar`; using `block_on` here would instead keep it
     /// inside the foreign call until the future completed, preventing
     /// `timeout` and `killThread` from interrupting the wait.
     pub fn future_result_into_hs<F, T, E>(&self, callback: HsCallback<T, E>, fut: F)
@@ -273,15 +330,14 @@ impl Runtime {
     {
         let handle = self.core.tokio_handle();
         let try_put_mvar = self.try_put_mvar;
-        let runtime =
-            CoreRuntimeKeepAlive::new(self.core.clone(), self.core_runtime_dropper.clone());
+        let runtime = self.core.clone();
         let task = handle.spawn(async move {
             callback.put_result(try_put_mvar, fut.await);
         });
 
         // Detached Tokio tasks do not propagate panics. Supervise this one so
         // a panic remains fail-fast, as it was when `block_on` ran inside the C
-        // ABI call, rather than leaving the Haskell waiter blocked forever. The
+        // ABI call, rather than leaving the Haskell caller blocked forever. The
         // supervisor also keeps Tokio alive until the callback has completed.
         handle.spawn(async move {
             let _runtime = runtime;
@@ -329,9 +385,11 @@ mod tests {
         let core = Arc::new(core);
         let core_weak = Arc::downgrade(&core);
         let runtime = Runtime {
-            core,
+            core: Arc::new(CoreRuntimeDeferredDrop::new(
+                core,
+                spawn_core_runtime_dropper(),
+            )),
             try_put_mvar: notify_haskell,
-            core_runtime_dropper: spawn_core_runtime_dropper(),
         };
 
         let (completed_tx, completed_rx) = mpsc::channel::<()>();
@@ -439,4 +497,20 @@ pub unsafe extern "C" fn hs_temporal_runtime_free_logs(logs: *const CArray<CArra
     unsafe {
         drop(CArray::from_raw_pointer(logs));
     }
+}
+
+/// Clone a runtime handle, sharing the underlying runtime.
+///
+/// Release the returned handle exactly once with `hs_temporal_free_runtime`; either handle may outlive the other.
+///
+/// # Safety
+/// `runtime` must be a non-null pointer to a live handle returned by
+/// `hs_temporal_init_runtime` or `hs_temporal_clone_runtime`.
+/// 
+/// The caller must keep the source handle alive and prevent concurrent destruction
+/// or mutation of the source wrapper throughout this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn hs_temporal_clone_runtime(runtime: *const RuntimeRef) -> *mut RuntimeRef {
+    let runtime = unsafe { &*runtime };
+    Box::into_raw(Box::new(runtime.clone()))
 }

@@ -45,7 +45,7 @@ pub unsafe extern "C" fn hs_count_workflow_executions(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -76,7 +76,7 @@ pub unsafe extern "C" fn hs_create_schedule(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -107,7 +107,7 @@ pub unsafe extern "C" fn hs_delete_schedule(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -138,7 +138,7 @@ pub unsafe extern "C" fn hs_deprecate_namespace(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -169,7 +169,7 @@ pub unsafe extern "C" fn hs_describe_namespace(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -200,7 +200,7 @@ pub unsafe extern "C" fn hs_describe_schedule(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -231,7 +231,7 @@ pub unsafe extern "C" fn hs_describe_task_queue(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -262,7 +262,7 @@ pub unsafe extern "C" fn hs_describe_workflow_execution(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -293,7 +293,7 @@ pub unsafe extern "C" fn hs_get_cluster_info(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -324,7 +324,7 @@ pub unsafe extern "C" fn hs_get_search_attributes(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -355,7 +355,7 @@ pub unsafe extern "C" fn hs_get_system_info(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -386,7 +386,7 @@ pub unsafe extern "C" fn hs_get_worker_build_id_compatibility(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -417,7 +417,7 @@ pub unsafe extern "C" fn hs_get_workflow_execution_history(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -448,7 +448,7 @@ pub unsafe extern "C" fn hs_get_workflow_execution_history_reverse(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -479,7 +479,7 @@ pub unsafe extern "C" fn hs_list_archived_workflow_executions(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -510,7 +510,7 @@ pub unsafe extern "C" fn hs_list_closed_workflow_executions(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -541,7 +541,7 @@ pub unsafe extern "C" fn hs_list_namespaces(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -572,7 +572,7 @@ pub unsafe extern "C" fn hs_list_open_workflow_executions(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -603,7 +603,7 @@ pub unsafe extern "C" fn hs_list_schedule_matching_times(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -634,7 +634,7 @@ pub unsafe extern "C" fn hs_list_schedules(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -665,7 +665,7 @@ pub unsafe extern "C" fn hs_list_task_queue_partitions(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -696,7 +696,7 @@ pub unsafe extern "C" fn hs_list_workflow_executions(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -727,7 +727,7 @@ pub unsafe extern "C" fn hs_patch_schedule(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -758,7 +758,7 @@ pub unsafe extern "C" fn hs_poll_activity_task_queue(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -789,7 +789,7 @@ pub unsafe extern "C" fn hs_poll_workflow_execution_update(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -820,7 +820,7 @@ pub unsafe extern "C" fn hs_poll_workflow_task_queue(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -851,7 +851,7 @@ pub unsafe extern "C" fn hs_query_workflow(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -882,7 +882,7 @@ pub unsafe extern "C" fn hs_record_activity_task_heartbeat(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -913,7 +913,7 @@ pub unsafe extern "C" fn hs_record_activity_task_heartbeat_by_id(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -944,7 +944,7 @@ pub unsafe extern "C" fn hs_register_namespace(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -975,7 +975,7 @@ pub unsafe extern "C" fn hs_request_cancel_workflow_execution(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1006,7 +1006,7 @@ pub unsafe extern "C" fn hs_reset_sticky_task_queue(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1037,7 +1037,7 @@ pub unsafe extern "C" fn hs_reset_workflow_execution(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1068,7 +1068,7 @@ pub unsafe extern "C" fn hs_respond_activity_task_canceled(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1099,7 +1099,7 @@ pub unsafe extern "C" fn hs_respond_activity_task_canceled_by_id(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1130,7 +1130,7 @@ pub unsafe extern "C" fn hs_respond_activity_task_completed(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1161,7 +1161,7 @@ pub unsafe extern "C" fn hs_respond_activity_task_completed_by_id(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1192,7 +1192,7 @@ pub unsafe extern "C" fn hs_respond_activity_task_failed(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1223,7 +1223,7 @@ pub unsafe extern "C" fn hs_respond_activity_task_failed_by_id(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1254,7 +1254,7 @@ pub unsafe extern "C" fn hs_respond_query_task_completed(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1285,7 +1285,7 @@ pub unsafe extern "C" fn hs_respond_workflow_task_completed(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1316,7 +1316,7 @@ pub unsafe extern "C" fn hs_respond_workflow_task_failed(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1347,7 +1347,7 @@ pub unsafe extern "C" fn hs_scan_workflow_executions(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1378,7 +1378,7 @@ pub unsafe extern "C" fn hs_signal_with_start_workflow_execution(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1409,7 +1409,7 @@ pub unsafe extern "C" fn hs_signal_workflow_execution(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1440,7 +1440,7 @@ pub unsafe extern "C" fn hs_start_workflow_execution(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1471,7 +1471,7 @@ pub unsafe extern "C" fn hs_terminate_workflow_execution(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1502,7 +1502,7 @@ pub unsafe extern "C" fn hs_update_namespace(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1533,7 +1533,7 @@ pub unsafe extern "C" fn hs_update_schedule(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1564,7 +1564,7 @@ pub unsafe extern "C" fn hs_update_workflow_execution(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1595,7 +1595,7 @@ pub unsafe extern "C" fn hs_update_worker_build_id_compatibility(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1626,7 +1626,7 @@ pub unsafe extern "C" fn hs_get_current_time(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1657,7 +1657,7 @@ pub unsafe extern "C" fn hs_lock_time_skipping(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1688,7 +1688,7 @@ pub unsafe extern "C" fn hs_sleep_until(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1719,7 +1719,7 @@ pub unsafe extern "C" fn hs_sleep(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1750,7 +1750,7 @@ pub unsafe extern "C" fn hs_unlock_time_skipping_with_sleep(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1781,7 +1781,7 @@ pub unsafe extern "C" fn hs_unlock_time_skipping(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1812,7 +1812,7 @@ pub unsafe extern "C" fn hs_add_or_update_remote_cluster(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1843,7 +1843,7 @@ pub unsafe extern "C" fn hs_add_search_attributes(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1874,7 +1874,7 @@ pub unsafe extern "C" fn hs_delete_namespace(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1905,7 +1905,7 @@ pub unsafe extern "C" fn hs_list_clusters(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1936,7 +1936,7 @@ pub unsafe extern "C" fn hs_list_search_attributes(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1967,7 +1967,7 @@ pub unsafe extern "C" fn hs_remove_remote_cluster(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -1998,7 +1998,7 @@ pub unsafe extern "C" fn hs_remove_search_attributes(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -2029,7 +2029,7 @@ pub unsafe extern "C" fn hs_create_nexus_endpoint(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -2060,7 +2060,7 @@ pub unsafe extern "C" fn hs_delete_nexus_endpoint(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -2091,7 +2091,7 @@ pub unsafe extern "C" fn hs_get_nexus_endpoint(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 
@@ -2122,7 +2122,7 @@ pub unsafe extern "C" fn hs_list_nexus_endpoints(
     error_slot: *mut *mut CRPCError,
     result_slot: *mut *mut CArray<u8>,
 ) {
-    let client = unsafe { &mut *client };
+    let client = unsafe { &(*client).inner };
     let mut retry_client = client.retry_client.clone();
     let call: TemporalCall = unsafe { (&*c_call).into() };
 

@@ -14,6 +14,7 @@ import System.Directory (findExecutable, getTemporaryDirectory, removeFile)
 import System.Timeout (timeout)
 import Temporal.Activity
 import qualified Temporal.Client as C
+import qualified Temporal.Core.EphemeralServer as CoreServer
 import qualified Temporal.Core.Internal.TestFixture as TestFixture
 import qualified Temporal.Core.Worker as Core
 import Temporal.Duration
@@ -21,6 +22,7 @@ import qualified Temporal.EphemeralServer as Ephemeral
 import qualified Temporal.EphemeralServer as TemporalDevServerConfig (TemporalDevServerConfig (..))
 import Temporal.Payload
 import Temporal.Replay (readHistoryProtobufFile, writeHistoryProtobufFile)
+import Temporal.Runtime (TelemetryOptions (NoTelemetry), bracketRuntime)
 import Temporal.Worker
 import qualified Temporal.Workflow as W
 import Test.Hspec
@@ -51,9 +53,11 @@ spec = do
 
     specify "frees the Rust result of an interrupted call" $ do
       before <- TestFixture.testResourceDropCount
-      call <- Async.async $ TestFixture.acquireDelayedTestResource globalRuntime 1_000
-      blocked <- timeout 5_000_000 $ waitUntilBlockedOnMVar (Async.asyncThreadId call)
-      blocked `shouldBe` Just ()
+      call <- bracketRuntime NoTelemetry $ \runtime -> do
+        call <- Async.async $ TestFixture.acquireDelayedTestResource runtime 1_000
+        blocked <- timeout 5_000_000 $ waitUntilBlockedOnMVar (Async.asyncThreadId call)
+        blocked `shouldBe` Just ()
+        pure call
       cancelled <- timeout 5_000_000 $ Async.cancel call
       cancelled `shouldBe` Just ()
       -- Interrupting the wait cannot cancel the Rust future; the forked
@@ -76,12 +80,24 @@ spec = do
         first `shouldBe` Right ()
         second `shouldBe` first
 
+    specify "uses a test server after its original runtime scope ends" $ do
+      freePort <- Ephemeral.getFreePort
+      executable <- findExecutable "temporal-test-server" >>= maybe (fail "temporal-test-server executable missing") pure
+      let config = CoreServer.TemporalTestServerConfig (Ephemeral.ExistingPath executable) (Just $ fromIntegral freePort) []
+          acquire = bracketRuntime NoTelemetry $ \runtime ->
+            CoreServer.startTestServer runtime config >>= either (fail . show) pure
+      bracket acquire (void . Ephemeral.shutdownEphemeralServer) $ \server -> do
+        portIsListening freePort `shouldReturn` True
+        Ephemeral.shutdownEphemeralServer server `shouldReturn` Right ()
+
     specify "stops a dev server whose startup wait was interrupted" $ do
       freePort <- Ephemeral.getFreePort
       serverConfig <- devServerConfig freePort
-      starter <- Async.async $ Ephemeral.launchDevServer globalRuntime serverConfig
-      blocked <- timeout 10_000_000 $ waitUntilBlockedOnMVar (Async.asyncThreadId starter)
-      blocked `shouldBe` Just ()
+      starter <- bracketRuntime NoTelemetry $ \runtime -> do
+        starter <- Async.async $ Ephemeral.launchDevServer runtime serverConfig
+        blocked <- timeout 10_000_000 $ waitUntilBlockedOnMVar (Async.asyncThreadId starter)
+        blocked `shouldBe` Just ()
+        pure starter
       cancelled <- timeout 5_000_000 $ Async.cancel starter
       cancelled `shouldBe` Just ()
       -- Interrupting the wait cannot cancel the Rust future, so the server
@@ -122,9 +138,10 @@ spec = do
 
 newIdleReplayWorker :: IO (Core.Worker 'Core.Replay, Core.HistoryPusher)
 newIdleReplayWorker =
-  Core.newReplayWorker globalRuntime Core.defaultWorkerConfig >>= \case
-    Left err -> error $ "failed to create replay worker: " <> show err
-    Right resources -> pure resources
+  bracketRuntime NoTelemetry $ \runtime ->
+    Core.newReplayWorker runtime Core.defaultWorkerConfig >>= \case
+      Left err -> error $ "failed to create replay worker: " <> show err
+      Right resources -> pure resources
 
 
 shutdownIdleReplayWorker :: (Core.Worker 'Core.Replay, Core.HistoryPusher) -> IO ()
@@ -161,7 +178,8 @@ newEphemeralServer :: IO Ephemeral.EphemeralServer
 newEphemeralServer = do
   freePort <- Ephemeral.getFreePort
   serverConfig <- devServerConfig freePort
-  Ephemeral.launchDevServer globalRuntime serverConfig >>= either (error . show) pure
+  bracketRuntime NoTelemetry $ \runtime ->
+    Ephemeral.launchDevServer runtime serverConfig >>= either (error . show) pure
 
 
 waitUntilBlockedOnMVar :: Conc.ThreadId -> IO ()
