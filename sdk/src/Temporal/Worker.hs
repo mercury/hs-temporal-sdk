@@ -948,6 +948,19 @@ waitWorker (Temporal.Worker.Worker {workerType, workerWorkflowLoop, workerActivi
       pure ()
 
 
+{- | How many activities this worker still has in flight.
+
+This is the worker's own view: an activity whose handler has finished is removed here
+before its completion necessarily reaches the server, so a zero result does not prove
+Core considers the worker drained. Always zero for a replay worker.
+-}
+runningActivityCount :: (MonadIO m) => Temporal.Worker.Worker actEnv -> m Int
+runningActivityCount (Temporal.Worker.Worker {workerType, workerActivityWorker}) =
+  case workerType of
+    Core.SReplay -> pure 0
+    Core.SReal -> liftIO $ atomically $ StmMap.size workerActivityWorker.runningActivities
+
+
 -- logs <- liftIO $ fetchLogs globalRuntime
 -- forM_ logs $ \l -> do
 --   Logging.logInfo $ Text.pack $ show l
@@ -1096,9 +1109,25 @@ shutdownBounded worker@Temporal.Worker.Worker {workerCore, workerTracer} = OT.in
     OT.inSpan workerTracer "finalizeShutdown" defaultSpanArguments . restore $
       timeout finalizeTimeoutMicros (liftIO $ Core.finalizeShutdown workerCore)
   case finalized of
-    Nothing -> throwIO $ RuntimeError "Worker.shutdown: finalizeShutdown timed out"
+    Nothing -> do
+      -- Core reports poll shutdown only once its activity sources are depleted, so the
+      -- wait above should have covered the drain. Reaching here with activities still
+      -- running means the configured graceful period was too short for them, which is a
+      -- different fault from finalization itself failing to make progress.
+      stillRunning <- runningActivityCount worker
+      if stillRunning > 0
+        then
+          throwIO $
+            ShutdownBlockedByActivities
+              { outstandingActivities = stillRunning
+              , namespace = Core.namespace coreConfig
+              , taskQueue = Core.taskQueue coreConfig
+              }
+        else throwIO $ RuntimeError "Worker.shutdown: finalizeShutdown timed out"
     Just (Left err) -> throwIO err
     Just (Right ()) -> pure ()
+  where
+    coreConfig = Core.getWorkerConfig workerCore
 
 
 -- | Subscribe to evictions from the worker. This is not generally needed, but can be useful for debugging.
