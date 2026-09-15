@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::str;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use temporalio_common::Worker;
 use temporalio_common::errors::{PollError, WorkflowErrorType};
@@ -31,6 +32,43 @@ use serde::{Deserialize, Serialize};
 pub struct WorkerRef {
     worker: Option<Arc<temporalio_sdk_core::Worker>>,
     runtime: runtime::Runtime,
+}
+
+/// Number of live `WorkerRef` handles, not the distinct workers themselves.
+///
+/// Every successful `hs_temporal_new_worker`, `hs_temporal_new_replay_worker`,
+/// and `hs_temporal_clone_worker` call increments this; every `WorkerRef`
+/// drop decrements it.
+///
+/// This lets tests confirm that clones acquired by `withWorker` are always released
+/// exactly once, even when concurrent `closeWorker` calls are raced against the
+/// original handle.
+static LIVE_WORKER_REFS: AtomicU64 = AtomicU64::new(0);
+
+impl WorkerRef {
+    fn new(worker: Arc<temporalio_sdk_core::Worker>, runtime: runtime::Runtime) -> Self {
+        LIVE_WORKER_REFS.fetch_add(1, Ordering::SeqCst);
+        Self {
+            worker: Some(worker),
+            runtime,
+        }
+    }
+}
+
+impl Drop for WorkerRef {
+    fn drop(&mut self) {
+        LIVE_WORKER_REFS.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// Test-only accessor for [`LIVE_WORKER_REFS`]. See that item's documentation.
+///
+/// # Safety
+///
+/// None beyond the usual C ABI calling convention; this reads a global atomic.
+#[unsafe(no_mangle)]
+pub extern "C" fn hs_temporal_test_worker_live_count() -> u64 {
+    LIVE_WORKER_REFS.load(Ordering::SeqCst)
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -667,6 +705,7 @@ pub unsafe extern "C" fn hs_temporal_drop_unit(unit: *mut CUnit) {
 }
 
 fn new_worker(client: &client::ClientRef, config: WorkerConfig) -> Result<WorkerRef, WorkerError> {
+    let client = &client.inner;
     enter_sync!(&client.runtime);
     let config: temporalio_sdk_core::WorkerConfig = config.try_into()?;
     let worker = temporalio_sdk_core::init_worker(
@@ -678,10 +717,7 @@ fn new_worker(client: &client::ClientRef, config: WorkerConfig) -> Result<Worker
         code: WorkerErrorCode::InitWorkerFailed,
         message: format!("Failed creating worker: {}", err),
     })?;
-    Ok(WorkerRef {
-        worker: Some(Arc::new(worker)),
-        runtime: client.runtime.clone(),
-    })
+    Ok(WorkerRef::new(Arc::new(worker), client.runtime.clone()))
 }
 
 // TODO: [publish-crate]
@@ -691,6 +727,32 @@ fn new_worker(client: &client::ClientRef, config: WorkerConfig) -> Result<Worker
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn hs_temporal_drop_worker(worker: *mut WorkerRef) {
     unsafe { drop(Box::from_raw(worker)) }
+}
+
+/// Clone a worker handle, sharing its underlying worker and runtime references.
+///
+/// Returns null if the worker has already begun finalization and consumed its inner
+/// worker; the caller should treat that the same as an already-closed worker.
+///
+/// Release the returned handle exactly once with `hs_temporal_drop_worker`; either
+/// handle may outlive the other.
+///
+/// # Safety
+/// `worker` must be a non-null pointer to a live handle returned by
+/// `hs_temporal_new_worker`, `hs_temporal_new_replay_worker`, or `hs_temporal_clone_worker`.
+///
+/// The caller must keep the source handle alive and prevent concurrent destruction
+/// or mutation of the source wrapper throughout this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn hs_temporal_clone_worker(worker: *const WorkerRef) -> *mut WorkerRef {
+    let worker = unsafe { &*worker };
+    match worker.worker.as_ref() {
+        Some(inner) => Box::into_raw(Box::new(WorkerRef::new(
+            inner.clone(),
+            worker.runtime.clone(),
+        ))),
+        None => std::ptr::null_mut(),
+    }
 }
 
 // TODO: [publish-crate]
@@ -706,7 +768,7 @@ pub unsafe extern "C" fn hs_temporal_new_worker(
 ) {
     let client_ref = unsafe { client.as_ref() }.expect("client is null");
     let config_json = unsafe { CArray::raw_borrow(config).unwrap() };
-    let config = serde_json::from_slice(&config_json.as_rust().unwrap().clone()).map_err(|err| {
+    let config = serde_json::from_slice(&config_json.as_rust().unwrap()).map_err(|err| {
         WorkerError {
             code: WorkerErrorCode::InvalidWorkerConfig,
             message: format!("{}", err),
@@ -746,16 +808,16 @@ fn new_replay_worker(
     enter_sync!(runtime_ref.runtime);
     let config: temporalio_sdk_core::WorkerConfig = config.try_into()?;
     let (history_pusher, stream) = HistoryPusher::new(runtime_ref.runtime.clone());
-    let worker = WorkerRef {
-        worker: Some(Arc::new(
+    let worker = WorkerRef::new(
+        Arc::new(
             temporalio_sdk_core::init_replay_worker(ReplayWorkerInput::new(config, stream))
                 .map_err(|err| WorkerError {
                     code: WorkerErrorCode::InitReplayWorkerFailed,
                     message: format!("Failed creating replay worker: {}", err),
                 })?,
-        )),
-        runtime: runtime_ref.runtime.clone(),
-    };
+        ),
+        runtime_ref.runtime.clone(),
+    );
 
     Ok((worker, history_pusher))
 }
@@ -766,13 +828,13 @@ fn new_replay_worker(
 /// Haskell FFI bridge invariants.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn hs_temporal_new_replay_worker(
-    runtime: *mut runtime::RuntimeRef,
+    runtime: *const runtime::RuntimeRef,
     config: *const CArray<u8>,
     worker_slot: *mut *mut WorkerRef,
     history_slot: *mut *mut HistoryPusher,
     error_slot: *mut *mut CWorkerError,
 ) {
-    let runtime_ref = unsafe { runtime.as_ref() }.expect("client is null");
+    let runtime_ref = unsafe { runtime.as_ref() }.expect("runtime is null");
     let config_json = unsafe { CArray::raw_borrow(config).unwrap() };
     let config =
         serde_json::from_slice(&config_json.as_rust().unwrap()).map_err(|err| WorkerError {
@@ -1103,7 +1165,7 @@ pub unsafe extern "C" fn hs_temporal_worker_complete_workflow_activation(
 ) {
     let worker = unsafe { &*worker };
     let proto: &CArray<u8> = unsafe { CArray::raw_borrow(proto).unwrap() };
-    let proto: &[u8] = &proto.as_rust().unwrap().clone();
+    let proto: &[u8] = &proto.as_rust().unwrap();
     let hs = HsCallback {
         mvar,
         cap,
@@ -1128,7 +1190,7 @@ pub unsafe extern "C" fn hs_temporal_worker_complete_activity_task(
 ) {
     let worker = unsafe { &*worker };
     let proto: &CArray<u8> = unsafe { CArray::raw_borrow(proto).unwrap() };
-    let proto: &[u8] = &proto.as_rust().unwrap().clone();
+    let proto: &[u8] = &proto.as_rust().unwrap();
     let hs = HsCallback {
         mvar,
         cap,
@@ -1175,7 +1237,7 @@ pub unsafe extern "C" fn hs_temporal_worker_complete_nexus_task(
 ) {
     let worker = unsafe { &*worker };
     let proto: &CArray<u8> = unsafe { CArray::raw_borrow(proto).unwrap() };
-    let proto: &[u8] = &proto.as_rust().unwrap().clone();
+    let proto: &[u8] = &proto.as_rust().unwrap();
     let hs = HsCallback {
         mvar,
         cap,
@@ -1198,7 +1260,7 @@ pub unsafe extern "C" fn hs_temporal_worker_record_activity_heartbeat(
 ) {
     let worker = unsafe { &*worker };
     let proto: &CArray<u8> = unsafe { CArray::raw_borrow(proto).unwrap() };
-    let proto: &[u8] = &proto.as_rust().unwrap().clone();
+    let proto: &[u8] = &proto.as_rust().unwrap();
     let result = worker.record_activity_heartbeat(proto);
     match result {
         Ok(_) => unsafe {
@@ -1226,7 +1288,7 @@ pub unsafe extern "C" fn hs_temporal_worker_request_workflow_eviction(
 ) {
     let worker = unsafe { &*worker };
     let run_id: &CArray<u8> = unsafe { CArray::raw_borrow(run_id).unwrap() };
-    let run_id: &[u8] = &run_id.as_rust().unwrap().clone();
+    let run_id: &[u8] = &run_id.as_rust().unwrap();
     let run_id: &str = unsafe { str::from_utf8_unchecked(run_id) };
     worker.request_workflow_eviction(run_id)
 }
@@ -1263,71 +1325,69 @@ pub unsafe extern "C" fn hs_temporal_worker_finalize_shutdown(
     worker.finalize_shutdown(hs)
 }
 
+/// The write half of a replay worker's history channel.
 pub struct HistoryPusher {
-    tx: Option<Sender<HistoryForReplay>>,
+    tx: Sender<HistoryForReplay>,
     runtime: runtime::Runtime,
 }
 
 impl HistoryPusher {
     fn new(runtime: runtime::Runtime) -> (Self, ReceiverStream<HistoryForReplay>) {
         let (tx, rx) = channel(1);
-        (
-            Self {
-                tx: Some(tx),
-                runtime,
-            },
-            ReceiverStream::new(rx),
-        )
+        (Self { tx, runtime }, ReceiverStream::new(rx))
     }
 }
 
 impl HistoryPusher {
     fn push_history(
         &self,
-        workflow_id: &str,
-        history_proto: &[u8],
+        workflow_id: String,
+        history_proto: Vec<u8>,
         hs: HsCallback<CUnit, CWorkerError>,
     ) {
-        let history = History::decode(history_proto).map_err(|err| WorkerError {
-            code: WorkerErrorCode::InvalidProto,
-            message: format!("Invalid proto: {}", err),
-        });
-        self.send_history(workflow_id, history, hs)
+        self.send_history(workflow_id, history_proto, hs, |bytes| {
+            History::decode(bytes).map_err(|err| WorkerError {
+                code: WorkerErrorCode::InvalidProto,
+                message: format!("Invalid proto: {}", err),
+            })
+        })
     }
 
     fn push_history_json(
         &self,
-        workflow_id: &str,
-        history_json: &[u8],
+        workflow_id: String,
+        history_json: Vec<u8>,
         hs: HsCallback<CUnit, CWorkerError>,
     ) {
-        let history = serde_json::from_slice::<History>(history_json).map_err(|err| WorkerError {
-            code: WorkerErrorCode::InvalidProto,
-            message: format!("Invalid history JSON: {}", err),
-        });
-        self.send_history(workflow_id, history, hs)
+        self.send_history(workflow_id, history_json, hs, |bytes| {
+            serde_json::from_slice::<History>(bytes).map_err(|err| WorkerError {
+                code: WorkerErrorCode::InvalidProto,
+                message: format!("Invalid history JSON: {}", err),
+            })
+        })
     }
 
-    fn send_history(
+    /// Schedule a history for replay, decoding it inside the spawned task.
+    ///
+    /// Haskell locks this pusher's lifecycle slot across the submission and
+    /// cannot be interrupted until it returns, so decoding here would block a
+    /// concurrent close and defer the caller's own cancellation for the length
+    /// of the decode.
+    fn send_history<F>(
         &self,
-        workflow_id: &str,
-        history: Result<History, WorkerError>,
+        workflow_id: String,
+        history_bytes: Vec<u8>,
         hs: HsCallback<CUnit, CWorkerError>,
-    ) {
-        let wfid = workflow_id.to_string();
-        let tx = if let Some(tx) = self.tx.as_ref() {
-            Ok(tx.clone())
-        } else {
-            Err(WorkerError {
-                code: WorkerErrorCode::ReplayWorkerClosed,
-                message: "Replay worker is no longer accepting new histories".to_string(),
-            })
-        };
+        decode: F,
+    ) where
+        F: FnOnce(&[u8]) -> Result<History, WorkerError> + Send + 'static,
+    {
+        let tx = self.tx.clone();
         self.runtime.future_result_into_hs(hs, async move {
-            let history = history.map_err(|err| CWorkerError::c_repr_of(err).unwrap())?;
-            let tx = tx.map_err(|err| CWorkerError::c_repr_of(err).unwrap())?;
+            let history =
+                decode(&history_bytes).map_err(|err| CWorkerError::c_repr_of(err).unwrap())?;
 
-            tx.send(HistoryForReplay::new(history, wfid))
+            tx.send(HistoryForReplay::new(history, workflow_id))
                 .await
                 .map_err(|_| {
                     CWorkerError::c_repr_of(WorkerError {
@@ -1340,10 +1400,6 @@ impl HistoryPusher {
             Ok(CUnit {})
         })
     }
-
-    fn close(&mut self) {
-        self.tx.take();
-    }
 }
 
 // TODO: [publish-crate]
@@ -1352,7 +1408,7 @@ impl HistoryPusher {
 /// Haskell <-> Tokio FFI bridge invariants.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn hs_temporal_history_pusher_push_history(
-    history_pusher: *mut HistoryPusher,
+    history_pusher: *const HistoryPusher,
     workflow_id: *const CArray<u8>,
     history_proto: *const CArray<u8>,
     mvar: *mut MVar,
@@ -1360,12 +1416,11 @@ pub unsafe extern "C" fn hs_temporal_history_pusher_push_history(
     error_slot: *mut *mut CWorkerError,
     result_slot: *mut *mut CUnit,
 ) {
-    let history_pusher = unsafe { &mut *history_pusher };
+    let history_pusher = unsafe { &*history_pusher };
     let workflow_id: &CArray<u8> = unsafe { CArray::raw_borrow(workflow_id).unwrap() };
-    let workflow_id = workflow_id.as_rust().unwrap().clone();
-    let workflow_id: &str = unsafe { str::from_utf8_unchecked(&workflow_id) };
+    let workflow_id = unsafe { String::from_utf8_unchecked(workflow_id.as_rust().unwrap()) };
     let history_proto: &CArray<u8> = unsafe { CArray::raw_borrow(history_proto).unwrap() };
-    let history_proto: &[u8] = &history_proto.as_rust().unwrap().clone();
+    let history_proto = history_proto.as_rust().unwrap();
     history_pusher.push_history(
         workflow_id,
         history_proto,
@@ -1384,7 +1439,7 @@ pub unsafe extern "C" fn hs_temporal_history_pusher_push_history(
 /// Haskell <-> Tokio FFI bridge invariants.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn hs_temporal_history_pusher_push_history_json(
-    history_pusher: *mut HistoryPusher,
+    history_pusher: *const HistoryPusher,
     workflow_id: *const CArray<u8>,
     history_json: *const CArray<u8>,
     mvar: *mut MVar,
@@ -1392,12 +1447,11 @@ pub unsafe extern "C" fn hs_temporal_history_pusher_push_history_json(
     error_slot: *mut *mut CWorkerError,
     result_slot: *mut *mut CUnit,
 ) {
-    let history_pusher = unsafe { &mut *history_pusher };
+    let history_pusher = unsafe { &*history_pusher };
     let workflow_id: &CArray<u8> = unsafe { CArray::raw_borrow(workflow_id).unwrap() };
-    let workflow_id = workflow_id.as_rust().unwrap().clone();
-    let workflow_id: &str = unsafe { str::from_utf8_unchecked(&workflow_id) };
+    let workflow_id = unsafe { String::from_utf8_unchecked(workflow_id.as_rust().unwrap()) };
     let history_json: &CArray<u8> = unsafe { CArray::raw_borrow(history_json).unwrap() };
-    let history_json: &[u8] = &history_json.as_rust().unwrap().clone();
+    let history_json = history_json.as_rust().unwrap();
     history_pusher.push_history_json(
         workflow_id,
         history_json,
@@ -1427,7 +1481,7 @@ pub unsafe extern "C" fn hs_temporal_history_proto_to_json(
     error_slot: *mut *mut CArray<u8>,
 ) {
     let history_proto: &CArray<u8> = unsafe { CArray::raw_borrow(history_proto).unwrap() };
-    let history_proto_bytes: Vec<u8> = history_proto.as_rust().unwrap().clone();
+    let history_proto_bytes: Vec<u8> = history_proto.as_rust().unwrap();
 
     match History::decode(history_proto_bytes.as_slice()) {
         Ok(history) => match serde_json::to_vec(&history) {
@@ -1457,20 +1511,13 @@ pub unsafe extern "C" fn hs_temporal_history_proto_to_json(
 /// Haskell FFI bridge invariants.
 ///
 /// The caller must ensure that the argument is a live pointer to a [`HistoryPusher`], typically from across the FFI
-/// boundary after having been constructed by [`hs_temporal_new_replay_worker`].
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn hs_temporal_history_pusher_close(history_pusher: *mut HistoryPusher) {
-    let history_pusher = unsafe { &mut *history_pusher };
-    history_pusher.close()
-}
-
-// TODO: [publish-crate]
-/// # Safety
+/// boundary after having been constructed by [`hs_temporal_new_replay_worker`], and that no
+/// push is in progress through it.
 ///
-/// Haskell FFI bridge invariants.
-///
-/// The caller must ensure that the argument is a live pointer to a [`HistoryPusher`], typically from across the FFI
-/// boundary after having been constructed by [`hs_temporal_new_replay_worker`].
+/// This closes the history stream as well as freeing the box: dropping the last original
+/// `Sender` is what lets the replay worker's stream terminate. It also releases this
+/// handle's runtime reference, which is never the last one, since the replay worker holds
+/// one of its own.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn hs_temporal_history_pusher_drop(history_pusher: *mut HistoryPusher) {
     let history_pusher = unsafe { Box::from_raw(history_pusher) };
