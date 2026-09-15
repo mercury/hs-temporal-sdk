@@ -731,10 +731,8 @@ validateWorker w =
 
 
 getWorkerError :: Ptr CWorkerError -> IO WorkerError
-getWorkerError errPtr = do
-  err <- peek errPtr >>= peekWorkerError
-  rust_dropWorkerError errPtr
-  return err
+getWorkerError errPtr =
+  (peek errPtr >>= peekWorkerError) `finally` rust_dropWorkerError errPtr
 
 
 -- note: removed the Runtime argument from the C function since the runtime can be accessed from the client. Might want to add it back later if

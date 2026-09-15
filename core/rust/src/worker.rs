@@ -768,7 +768,7 @@ pub unsafe extern "C" fn hs_temporal_new_worker(
 ) {
     let client_ref = unsafe { client.as_ref() }.expect("client is null");
     let config_json = unsafe { CArray::raw_borrow(config).unwrap() };
-    let config = serde_json::from_slice(&config_json.as_rust().unwrap().clone()).map_err(|err| {
+    let config = serde_json::from_slice(&config_json.as_rust().unwrap()).map_err(|err| {
         WorkerError {
             code: WorkerErrorCode::InvalidWorkerConfig,
             message: format!("{}", err),
@@ -1165,7 +1165,7 @@ pub unsafe extern "C" fn hs_temporal_worker_complete_workflow_activation(
 ) {
     let worker = unsafe { &*worker };
     let proto: &CArray<u8> = unsafe { CArray::raw_borrow(proto).unwrap() };
-    let proto: &[u8] = &proto.as_rust().unwrap().clone();
+    let proto: &[u8] = &proto.as_rust().unwrap();
     let hs = HsCallback {
         mvar,
         cap,
@@ -1190,7 +1190,7 @@ pub unsafe extern "C" fn hs_temporal_worker_complete_activity_task(
 ) {
     let worker = unsafe { &*worker };
     let proto: &CArray<u8> = unsafe { CArray::raw_borrow(proto).unwrap() };
-    let proto: &[u8] = &proto.as_rust().unwrap().clone();
+    let proto: &[u8] = &proto.as_rust().unwrap();
     let hs = HsCallback {
         mvar,
         cap,
@@ -1237,7 +1237,7 @@ pub unsafe extern "C" fn hs_temporal_worker_complete_nexus_task(
 ) {
     let worker = unsafe { &*worker };
     let proto: &CArray<u8> = unsafe { CArray::raw_borrow(proto).unwrap() };
-    let proto: &[u8] = &proto.as_rust().unwrap().clone();
+    let proto: &[u8] = &proto.as_rust().unwrap();
     let hs = HsCallback {
         mvar,
         cap,
@@ -1260,7 +1260,7 @@ pub unsafe extern "C" fn hs_temporal_worker_record_activity_heartbeat(
 ) {
     let worker = unsafe { &*worker };
     let proto: &CArray<u8> = unsafe { CArray::raw_borrow(proto).unwrap() };
-    let proto: &[u8] = &proto.as_rust().unwrap().clone();
+    let proto: &[u8] = &proto.as_rust().unwrap();
     let result = worker.record_activity_heartbeat(proto);
     match result {
         Ok(_) => unsafe {
@@ -1288,7 +1288,7 @@ pub unsafe extern "C" fn hs_temporal_worker_request_workflow_eviction(
 ) {
     let worker = unsafe { &*worker };
     let run_id: &CArray<u8> = unsafe { CArray::raw_borrow(run_id).unwrap() };
-    let run_id: &[u8] = &run_id.as_rust().unwrap().clone();
+    let run_id: &[u8] = &run_id.as_rust().unwrap();
     let run_id: &str = unsafe { str::from_utf8_unchecked(run_id) };
     worker.request_workflow_eviction(run_id)
 }
@@ -1481,7 +1481,7 @@ pub unsafe extern "C" fn hs_temporal_history_proto_to_json(
     error_slot: *mut *mut CArray<u8>,
 ) {
     let history_proto: &CArray<u8> = unsafe { CArray::raw_borrow(history_proto).unwrap() };
-    let history_proto_bytes: Vec<u8> = history_proto.as_rust().unwrap().clone();
+    let history_proto_bytes: Vec<u8> = history_proto.as_rust().unwrap();
 
     match History::decode(history_proto_bytes.as_slice()) {
         Ok(history) => match serde_json::to_vec(&history) {
