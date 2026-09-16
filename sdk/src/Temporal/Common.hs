@@ -210,8 +210,13 @@ data RetryPolicy = RetryPolicy
   -- * Setting the value to 1 means a single execution attempt and no retries.
   -- * Setting the value to a negative integer results in an error when the execution is invoked.
   --
-  -- Use case: Use this attribute to ensure that retries do not continue indefinitely. However, in the majority of cases, we recommend relying on the Workflow Execution Timeout,
-  -- in the case of Workflows, or Schedule-To-Close Timeout, in the case of Activities, to limit the total duration of retries instead of using this attribute.
+  -- Use case: Use this attribute to ensure that retries do not
+  -- continue indefinitely. However, if your use case is such that
+  -- late is wrong and it's better to just abort if things take too
+  -- long, consider the Workflow Execution Timeout (in the case of
+  -- Workflows) or Schedule-To-Close Timeout (in the case of
+  -- Activities) to limit the total duration of retries instead of
+  -- using this attribute.
   , nonRetryableErrorTypes :: Vector Text
   -- ^ Description: Specifies errors that shouldn't be retried.
   --
