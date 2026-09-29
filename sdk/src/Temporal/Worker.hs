@@ -790,6 +790,18 @@ startWorker client conf = provideCallStack $ runWorkerContext conf $ inSpan "sta
   -- worker here or it leaks.
   (`UnliftIO.onException` liftIO (destroyUnstartedCoreWorker (pure ()) workerCore)) $ do
     liftIO (Core.validateWorker workerCore) >>= either throwIO pure
+    -- Evaluate the parts of the config that the poll loops and 'shutdown'
+    -- read through strict record fields before any of those threads exist.
+    -- Otherwise the workflow loop, the activity loop and later the shutdown
+    -- thread all force the same lazy definitions at once; when several
+    -- workers share one unevaluated 'Definitions' value that race has
+    -- deadlocked on blackholes in practice.
+    liftIO $ do
+      _ <- evaluate conf.wfDefs
+      _ <- evaluate conf.actDefs
+      _ <- evaluate conf.interceptorConfig
+      _ <- evaluate conf.payloadProcessor
+      pure ()
     workerEvictionEmitter <- newBroadcastTChanIO
     workerShutdownState <- UnliftIO.newMVar WorkerShutdownNotStarted
     runningWorkflows <- liftIO StmMap.newIO
@@ -926,7 +938,9 @@ startWorker client conf = provideCallStack $ runWorkerContext conf $ inSpan "sta
                     , "taskQueue="
                     , Core.taskQueue conf.coreConfig
                     ]
-      pure Temporal.Worker.Worker {..}
+      -- Construct the (strict-field) record here rather than leaving it to
+      -- the first caller of 'shutdown'.
+      liftIO $ evaluate Temporal.Worker.Worker {..}
 
 
 {- | Wait for a worker to exit. This waits for both the workflow and activity loops to complete.
