@@ -1,16 +1,18 @@
 module ReplaySpec where
 
-import Control.Concurrent (threadDelay, yield)
+import Control.Concurrent (ThreadId, myThreadId, threadDelay, yield)
 import qualified Control.Concurrent.Async as Async
 import Control.Exception (IOException, bracket, catch, fromException, try)
 import Control.Monad (void, when)
 import Data.Either (isLeft, isRight)
+import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import Data.ProtoLens.Encoding (encodeMessage)
 import qualified Data.Text as Text
 import qualified GHC.Conc.Sync as Conc
 import qualified Network.Socket as N
 import RequireCallStack (provideCallStack)
 import System.Directory (findExecutable, getTemporaryDirectory, removeFile)
+import System.IO.Unsafe (unsafePerformIO)
 import System.Timeout (timeout)
 import Temporal.Activity
 import qualified Temporal.Client as C
@@ -117,7 +119,43 @@ spec = do
           Nothing -> expectationFailure "worker could not be restarted after interrupted startup"
           Just worker -> shutdown worker
 
+      specify "evaluates the config on the calling thread before forking the poll loops" $ \TestEnv {baseConf, coreClient} -> do
+        -- Regression test for a blackhole deadlock: when the poll loops and
+        -- 'shutdown' were left to force the same lazy config thunks, workers
+        -- sharing one unevaluated 'Definitions' value could wedge. Each field
+        -- below records the thread that first forces it, which must be the
+        -- thread that called 'startWorker'.
+        let conf = configure () replayActivityDef baseConf
+        wfDefsRef <- newIORef Nothing
+        actDefsRef <- newIORef Nothing
+        interceptorsRef <- newIORef Nothing
+        processorRef <- newIORef Nothing
+        let trackedConf =
+              conf
+                { wfDefs = recordForcingThread wfDefsRef conf.wfDefs
+                , actDefs = recordForcingThread actDefsRef conf.actDefs
+                , interceptorConfig = recordForcingThread interceptorsRef conf.interceptorConfig
+                , payloadProcessor = recordForcingThread processorRef conf.payloadProcessor
+                }
+        callerThread <- myThreadId
+        bracket (startWorker coreClient trackedConf) shutdown $ \_ -> do
+          readIORef wfDefsRef `shouldReturn` Just callerThread
+          readIORef actDefsRef `shouldReturn` Just callerThread
+          readIORef interceptorsRef `shouldReturn` Just callerThread
+          readIORef processorRef `shouldReturn` Just callerThread
+
     tests
+
+
+-- | Return the value unchanged, recording the first thread to force the result.
+recordForcingThread :: IORef (Maybe ThreadId) -> a -> a
+recordForcingThread ref x = unsafePerformIO $ do
+  threadId <- myThreadId
+  atomicModifyIORef' ref $ \case
+    Nothing -> (Just threadId, ())
+    firstThread -> (firstThread, ())
+  pure x
+{-# NOINLINE recordForcingThread #-}
 
 
 newIdleReplayWorker :: IO (Core.Worker 'Core.Replay, Core.HistoryPusher)
