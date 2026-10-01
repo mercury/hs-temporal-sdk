@@ -23,7 +23,7 @@ typedef uint8_t WorkerErrorCode;
 /**
  * An opaque resource whose destructor is observable from Haskell through
  * [`hs_temporal_test_resource_drop_count`], letting tests prove that a result
- * produced after the Haskell waiter was interrupted is still reclaimed.
+ * produced after the Haskell caller was interrupted is still reclaimed.
  */
 typedef struct CTestResource CTestResource;
 
@@ -208,6 +208,20 @@ void hs_temporal_drop_client(struct ClientRef *client);
  * Haskell FFI bridge invariants.
  */
 void hs_temporal_drop_rpc_error(struct CRPCError *error);
+
+/**
+ * Clone a client handle, sharing its connection and runtime.
+ *
+ * Release the returned handle exactly once with `hs_temporal_drop_client`; either handle may outlive the other.
+ *
+ * # Safety
+ * `client` must be a non-null pointer to a live handle returned by
+ * `hs_temporal_connect_client` or `hs_temporal_clone_client`.
+ *
+ * The caller must keep the source handle alive and prevent concurrent destruction
+ * or mutation of the source wrapper throughout this call.
+ */
+struct ClientRef *hs_temporal_clone_client(const struct ClientRef *client);
 
 /**
  * # Safety
@@ -1095,6 +1109,20 @@ const struct CArray_CArray_u8 *hs_temporal_runtime_fetch_logs(struct RuntimeRef 
  * Haskell FFI bridge invariants.
  */
 void hs_temporal_runtime_free_logs(const struct CArray_CArray_u8 *logs);
+
+/**
+ * Clone a runtime handle, sharing the underlying runtime.
+ *
+ * Release the returned handle exactly once with `hs_temporal_free_runtime`; either handle may outlive the other.
+ *
+ * # Safety
+ * `runtime` must be a non-null pointer to a live handle returned by
+ * `hs_temporal_init_runtime` or `hs_temporal_clone_runtime`.
+ *
+ * The caller must keep the source handle alive and prevent concurrent destruction
+ * or mutation of the source wrapper throughout this call.
+ */
+struct RuntimeRef *hs_temporal_clone_runtime(const struct RuntimeRef *runtime);
 
 /**
  * Resolve with a fresh [`CTestResource`] after `delay_millis` milliseconds.

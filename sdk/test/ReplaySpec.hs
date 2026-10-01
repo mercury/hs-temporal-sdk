@@ -23,6 +23,7 @@ import qualified Temporal.EphemeralServer as Ephemeral
 import qualified Temporal.EphemeralServer as TemporalDevServerConfig (TemporalDevServerConfig (..))
 import Temporal.Payload
 import Temporal.Replay (readHistoryProtobufFile, writeHistoryProtobufFile)
+import Temporal.Runtime (TelemetryOptions (NoTelemetry), bracketRuntime)
 import Temporal.Worker
 import qualified Temporal.Workflow as W
 import Test.Hspec
@@ -160,9 +161,10 @@ recordForcingThread ref x = unsafePerformIO $ do
 
 newIdleReplayWorker :: IO (Core.Worker 'Core.Replay, Core.HistoryPusher)
 newIdleReplayWorker =
-  Core.newReplayWorker globalRuntime Core.defaultWorkerConfig >>= \case
-    Left err -> error $ "failed to create replay worker: " <> show err
-    Right resources -> pure resources
+  bracketRuntime NoTelemetry $ \runtime ->
+    Core.newReplayWorker runtime Core.defaultWorkerConfig >>= \case
+      Left err -> error $ "failed to create replay worker: " <> show err
+      Right resources -> pure resources
 
 
 shutdownIdleReplayWorker :: (Core.Worker 'Core.Replay, Core.HistoryPusher) -> IO ()

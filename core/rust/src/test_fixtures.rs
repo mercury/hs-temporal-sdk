@@ -15,7 +15,7 @@ static TEST_RESOURCE_DROPS: AtomicU64 = AtomicU64::new(0);
 
 /// An opaque resource whose destructor is observable from Haskell through
 /// [`hs_temporal_test_resource_drop_count`], letting tests prove that a result
-/// produced after the Haskell waiter was interrupted is still reclaimed.
+/// produced after the Haskell caller was interrupted is still reclaimed.
 pub struct CTestResource {
     _private: u8,
 }
