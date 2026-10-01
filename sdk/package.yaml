@@ -150,6 +150,7 @@ tests:
     main: Main.hs
     source-dirs: test
     other-modules:
+      IntegrationSpec.ClientLifecycle,
       ActivationLoopSpec,
       Spec,
       ClientHistorySpec,

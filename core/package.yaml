@@ -63,3 +63,16 @@ library:
   when:
     - condition: os(darwin)
       frameworks: [Security, CoreFoundation, SystemConfiguration]
+
+tests:
+  temporal-sdk-core-tests:
+    main: Main.hs
+    source-dirs: test
+    other-modules:
+      - ClientConnectionSpec
+    ghc-options: -threaded -rtsopts
+    dependencies:
+      - base >= 4.18 && < 5
+      - async
+      - hspec
+      - temporal-sdk-core

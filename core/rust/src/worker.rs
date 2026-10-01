@@ -667,6 +667,7 @@ pub unsafe extern "C" fn hs_temporal_drop_unit(unit: *mut CUnit) {
 }
 
 fn new_worker(client: &client::ClientRef, config: WorkerConfig) -> Result<WorkerRef, WorkerError> {
+    let client = &client.inner;
     enter_sync!(&client.runtime);
     let config: temporalio_sdk_core::WorkerConfig = config.try_into()?;
     let worker = temporalio_sdk_core::init_worker(
