@@ -116,6 +116,7 @@
                   (self.haskellOverlays.dependencies.default final)
                   (self.haskellOverlays.dependencies.ghc910 final)
                   (self.haskellOverlays.hs-temporal-sdk final)
+                  (import ./nix/overlays/haskell/strict-warnings.nix final)
                 ]
               );
             };
