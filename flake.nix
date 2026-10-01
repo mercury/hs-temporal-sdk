@@ -69,7 +69,7 @@
           temporal-test-server = pkgs.temporal-test-server;
           update-temporal-revision = import ./nix/packages/update-temporal-revision.nix {
             inherit pkgs;
-            rustToolchain = inputs.fenix.packages.${pkgs.system}.stable.toolchain;
+            rustToolchain = pkgs.temporal-bridge-rust-toolchain.defaultToolchain;
           };
           # Uses the same `proto-lens-protoc` as the default development shell.
           protogen = pkgs.callPackage ./nix/packages/protogen.nix {

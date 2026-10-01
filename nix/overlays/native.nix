@@ -4,5 +4,9 @@ let
 in
 {
   temporal-test-server = final.callPackage ../packages/temporal-test-server.nix { };
-  inherit (temporalBridgeDrvs) temporal_bridge temporal-sdk-core-src;
+  inherit (temporalBridgeDrvs)
+    temporal_bridge
+    temporal-sdk-core-src
+    temporal-bridge-rust-toolchain
+    ;
 }
