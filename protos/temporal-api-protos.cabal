@@ -15,8 +15,6 @@ build-type:     Simple
 
 library
   exposed-modules:
-      Proto.Dependencies.Gogoproto.Gogo
-      Proto.Dependencies.Gogoproto.Gogo_Fields
       Proto.Health.V1.Health
       Proto.Health.V1.Health_Fields
       Proto.Rpc.Status
