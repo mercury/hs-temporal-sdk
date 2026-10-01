@@ -42,7 +42,19 @@
             };
           shells = inputs.nixpkgs.lib.genAttrs ghcVersions (version: mkShell version);
         in
-        shells // { default = shells.ghc910; }
+        shells
+        // {
+          default = shells.ghc910;
+          # A small shell with the Rust toolchain that builds the bridge. CI
+          # runs `cargo fmt`, `cargo clippy` and `cargo test` in it.
+          rust = pkgs.mkShell {
+            packages = [
+              pkgs.temporal-bridge-rust-toolchain.defaultToolchain
+              pkgs.protobuf
+            ] ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isDarwin [ pkgs.apple-sdk ];
+            PROTOC = "${pkgs.protobuf}/bin/protoc";
+          };
+        }
       );
 
       packages = flakeUtils.forAllSystems (
