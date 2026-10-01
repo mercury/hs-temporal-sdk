@@ -71,6 +71,10 @@
             inherit pkgs;
             rustToolchain = inputs.fenix.packages.${pkgs.system}.stable.toolchain;
           };
+          # Uses the same `proto-lens-protoc` as the default development shell.
+          protogen = pkgs.callPackage ./nix/packages/protogen.nix {
+            inherit (pkgs.haskell.packages.ghc910) proto-lens-protoc;
+          };
         }
       );
 
