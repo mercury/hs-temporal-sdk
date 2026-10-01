@@ -75,6 +75,7 @@
           protogen = pkgs.callPackage ./nix/packages/protogen.nix {
             inherit (pkgs.haskell.packages.ghc910) proto-lens-protoc;
           };
+          check-generated = pkgs.callPackage ./nix/packages/check-generated.nix { };
         }
       );
 
