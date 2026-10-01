@@ -61,14 +61,8 @@ foreign import ccall "hs_temporal_drop_byte_array" rust_dropByteArray :: Ptr (CA
 type TryPutMVarFFI = FunPtr (Ptr CInt -> Ptr (MVar ()) -> IO ())
 foreign import ccall "&hs_try_putmvar" tryPutMVarPtr :: TryPutMVarFFI
 
--- | A handle to the Rust Tokio runtime and thread-pool.
---
--- You almost always should use the 'globalRuntime' value, which is initialized
--- once for the entire process.
---
--- This now wraps a raw Ptr instead of ForeignPtr. Use ResourceT or bracket
--- wrappers to ensure proper cleanup.
-newtype Runtime = Runtime (Ptr Runtime)
+-- | Marker type for @RuntimeRef*@, a handle to the Rust Tokio runtime and thread-pool.
+data CRuntime
 
 data Periodicity
   = Periodicity
@@ -99,8 +93,8 @@ data TelemetryOptions
 
 deriveToJSON (defaultOptions {fieldLabelModifier = camelTo2 '_'}) ''TelemetryOptions
 
-foreign import ccall "hs_temporal_init_runtime" initRuntime :: Ptr (CArray Word8) -> TryPutMVarFFI -> IO (Ptr Runtime)
-foreign import ccall "hs_temporal_free_runtime" freeRuntime :: Ptr Runtime -> IO ()
+foreign import ccall "hs_temporal_init_runtime" initRuntime :: Ptr (CArray Word8) -> TryPutMVarFFI -> IO (Ptr CRuntime)
+foreign import ccall "hs_temporal_free_runtime" freeRuntime :: Ptr CRuntime -> IO ()
 
 data LogLevel
   = Trace
@@ -138,8 +132,8 @@ data CoreLog = CoreLog
 
 deriveJSON (defaultOptions {fieldLabelModifier = camelTo2 '_'}) ''CoreLog
 
-foreign import ccall "hs_temporal_runtime_fetch_logs" raw_fetchLogs :: Ptr Runtime -> IO (Ptr (CArray (CArray Word8)))
-foreign import ccall "hs_temporal_runtime_free_logs" raw_freeLogs :: Ptr (CArray (CArray Word8)) -> IO ()
+foreign import ccall "hs_temporal_runtime_fetch_logs" raw_fetchLogs :: Ptr CRuntime -> IO (Ptr (CArray (CArray Word8)))
+foreign import ccall "hs_temporal_runtime_free_logs" raw_freeLogBuffer :: Ptr (CArray (CArray Word8)) -> IO ()
 
 data RpcError = RpcError
   { code :: Word32

@@ -34,6 +34,7 @@ library:
   other-modules:
     - Temporal.Core.CTypes
     - Temporal.Core.Client.HealthService # NOTE: WIP stub, don't expose it
+    - Temporal.Runtime.Internal
     - Temporal.Internal.FFI
     - Paths_temporal_sdk_core
   dependencies:
@@ -63,3 +64,17 @@ library:
   when:
     - condition: os(darwin)
       frameworks: [Security, CoreFoundation, SystemConfiguration]
+
+tests:
+  temporal-sdk-core-tests:
+    main: Main.hs
+    source-dirs: test
+    other-modules:
+      - ClientConnectionSpec
+      - RuntimeSpec
+    ghc-options: -threaded -rtsopts
+    dependencies:
+      - base >= 4.18 && < 5
+      - async
+      - hspec
+      - temporal-sdk-core

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ffi::CStr;
 use std::str::{FromStr, from_utf8_unchecked};
+use std::sync::Arc;
 use std::time::Duration;
 use temporalio_client::{
     ClientOptions, ConfiguredClient, RetryClient, RetryOptions, TemporalServiceClient, TlsOptions,
@@ -212,7 +213,12 @@ impl From<&RpcCall> for TemporalCall {
     }
 }
 
+#[derive(Clone)]
 pub struct ClientRef {
+    pub(crate) inner: Arc<SharedClient>,
+}
+
+pub(crate) struct SharedClient {
     pub(crate) retry_client: Client,
     pub(crate) runtime: runtime::Runtime,
 }
@@ -253,8 +259,10 @@ pub fn connect_client(
 
             match retry_client_result {
                 Ok(retry_client) => Ok(ClientRef {
-                    retry_client,
-                    runtime,
+                    inner: Arc::new(SharedClient {
+                        retry_client,
+                        runtime,
+                    }),
                 }),
                 Err(e) => {
                     let err_message = e.to_string().into_bytes();
@@ -374,4 +382,20 @@ where
         })
         .unwrap()),
     }
+}
+
+/// Clone a client handle, sharing its connection and runtime.
+///
+/// Release the returned handle exactly once with `hs_temporal_drop_client`; either handle may outlive the other.
+///
+/// # Safety
+/// `client` must be a non-null pointer to a live handle returned by
+/// `hs_temporal_connect_client` or `hs_temporal_clone_client`.
+/// 
+/// The caller must keep the source handle alive and prevent concurrent destruction
+/// or mutation of the source wrapper throughout this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn hs_temporal_clone_client(client: *const ClientRef) -> *mut ClientRef {
+    let client = unsafe { &*client };
+    Box::into_raw(Box::new(client.clone()))
 }

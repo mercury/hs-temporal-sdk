@@ -115,15 +115,15 @@ newEphemeralServer ptr = EphemeralServer ptr <$> newSingleFlight
 
 foreign import ccall "hs_temporal_start_dev_server"
   raw_startDevServer
-    :: Ptr Runtime
+    :: Ptr CRuntime
     -> CString
     -> TokioCall (CArray Word8) EphemeralServer
 
 
 startDevServer :: Runtime -> TemporalDevServerConfig -> IO (Either ByteString EphemeralServer)
-startDevServer r c = withRuntime r $ \rp -> useAsCString (BL.toStrict (encode c)) $ \cstr ->
+startDevServer r c = useAsCString (BL.toStrict (encode c)) $ \cstr ->
   withTokioAsyncCallWithAbandon
-    (raw_startDevServer rp cstr)
+    (withScopedTokioCall (withRuntime r) $ \rp -> raw_startDevServer rp cstr)
     rust_dropByteArray
     -- Normal completion transfers this pointer to 'EphemeralServer'.
     (\_ -> pure ())
@@ -178,15 +178,15 @@ deriveToJSON (defaultOptions {fieldLabelModifier = camelTo2 '_'}) ''TemporalTest
 
 foreign import ccall "hs_temporal_start_test_server"
   raw_startTestServer
-    :: Ptr Runtime
+    :: Ptr CRuntime
     -> CString
     -> TokioCall (CArray Word8) EphemeralServer
 
 
 startTestServer :: Runtime -> TemporalTestServerConfig -> IO (Either ByteString EphemeralServer)
-startTestServer r conf = withRuntime r $ \rp -> useAsCString (BL.toStrict $ encode conf) $ \cstr ->
+startTestServer r conf = useAsCString (BL.toStrict $ encode conf) $ \cstr ->
   withTokioAsyncCallWithAbandon
-    (raw_startTestServer rp cstr)
+    (withScopedTokioCall (withRuntime r) $ \rp -> raw_startTestServer rp cstr)
     rust_dropByteArray
     -- Normal completion transfers this pointer to 'EphemeralServer'.
     (\_ -> pure ())

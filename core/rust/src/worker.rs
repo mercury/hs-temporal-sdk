@@ -667,6 +667,7 @@ pub unsafe extern "C" fn hs_temporal_drop_unit(unit: *mut CUnit) {
 }
 
 fn new_worker(client: &client::ClientRef, config: WorkerConfig) -> Result<WorkerRef, WorkerError> {
+    let client = &client.inner;
     enter_sync!(&client.runtime);
     let config: temporalio_sdk_core::WorkerConfig = config.try_into()?;
     let worker = temporalio_sdk_core::init_worker(
@@ -766,13 +767,13 @@ fn new_replay_worker(
 /// Haskell FFI bridge invariants.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn hs_temporal_new_replay_worker(
-    runtime: *mut runtime::RuntimeRef,
+    runtime: *const runtime::RuntimeRef,
     config: *const CArray<u8>,
     worker_slot: *mut *mut WorkerRef,
     history_slot: *mut *mut HistoryPusher,
     error_slot: *mut *mut CWorkerError,
 ) {
-    let runtime_ref = unsafe { runtime.as_ref() }.expect("client is null");
+    let runtime_ref = unsafe { runtime.as_ref() }.expect("runtime is null");
     let config_json = unsafe { CArray::raw_borrow(config).unwrap() };
     let config =
         serde_json::from_slice(&config_json.as_rust().unwrap()).map_err(|err| WorkerError {

@@ -41,6 +41,7 @@ flag external_lib
 library
   exposed-modules:
       Temporal.Core.Client
+      Temporal.Core.Client.Internal.Connection
       Temporal.Core.Client.OperatorService
       Temporal.Core.Client.TestService
       Temporal.Core.Client.WorkflowService
@@ -51,6 +52,7 @@ library
   other-modules:
       Temporal.Core.CTypes
       Temporal.Core.Client.HealthService
+      Temporal.Runtime.Internal
       Temporal.Internal.FFI
       Paths_temporal_sdk_core
   autogen-modules:
@@ -113,3 +115,44 @@ library
         Security
         CoreFoundation
         SystemConfiguration
+
+test-suite temporal-sdk-core-tests
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      ClientConnectionSpec
+      RuntimeSpec
+  hs-source-dirs:
+      test
+  default-extensions:
+      BangPatterns
+      BlockArguments
+      DataKinds
+      DerivingStrategies
+      FlexibleContexts
+      FlexibleInstances
+      GADTs
+      GeneralizedNewtypeDeriving
+      InstanceSigs
+      LambdaCase
+      MultiParamTypeClasses
+      NamedFieldPuns
+      NumericUnderscores
+      RankNTypes
+      OverloadedRecordDot
+      OverloadedStrings
+      RecordWildCards
+      ScopedTypeVariables
+      StandaloneDeriving
+      TypeApplications
+      TypeFamilies
+      TypeOperators
+      UndecidableInstances
+      ViewPatterns
+  ghc-options: -g -Wall -threaded -rtsopts
+  build-depends:
+      async
+    , base >=4.18 && <5
+    , hspec
+    , temporal-sdk-core
+  default-language: Haskell2010
