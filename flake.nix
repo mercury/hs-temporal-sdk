@@ -42,7 +42,19 @@
             };
           shells = inputs.nixpkgs.lib.genAttrs ghcVersions (version: mkShell version);
         in
-        shells // { default = shells.ghc910; }
+        shells
+        // {
+          default = shells.ghc910;
+          # A small shell with the Rust toolchain that builds the bridge. CI
+          # runs `cargo fmt`, `cargo clippy` and `cargo test` in it.
+          rust = pkgs.mkShell {
+            packages = [
+              pkgs.temporal-bridge-rust-toolchain.defaultToolchain
+              pkgs.protobuf
+            ] ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isDarwin [ pkgs.apple-sdk ];
+            PROTOC = "${pkgs.protobuf}/bin/protoc";
+          };
+        }
       );
 
       packages = flakeUtils.forAllSystems (
@@ -69,8 +81,13 @@
           temporal-test-server = pkgs.temporal-test-server;
           update-temporal-revision = import ./nix/packages/update-temporal-revision.nix {
             inherit pkgs;
-            rustToolchain = inputs.fenix.packages.${pkgs.system}.stable.toolchain;
+            rustToolchain = pkgs.temporal-bridge-rust-toolchain.defaultToolchain;
           };
+          # Uses the same `proto-lens-protoc` as the default development shell.
+          protogen = pkgs.callPackage ./nix/packages/protogen.nix {
+            inherit (pkgs.haskell.packages.ghc910) proto-lens-protoc;
+          };
+          check-generated = pkgs.callPackage ./nix/packages/check-generated.nix { };
         }
       );
 
@@ -99,6 +116,7 @@
                   (self.haskellOverlays.dependencies.default final)
                   (self.haskellOverlays.dependencies.ghc910 final)
                   (self.haskellOverlays.hs-temporal-sdk final)
+                  (import ./nix/overlays/haskell/strict-warnings.nix final)
                 ]
               );
             };

@@ -6,5 +6,7 @@ cpp_compat = false
 
 [parse]
 parse_deps = true
-include = ["temporal_bridge", "ffi-convert", "temporal_client"]
-extra_bindings = ["ffi-convert", "temporal_client"]
+# Only these crates define types or functions that cross the FFI boundary.
+# The temporalio-* crates stay behind opaque pointers such as `ClientRef`.
+include = ["temporal_bridge", "ffi-convert"]
+extra_bindings = ["ffi-convert"]

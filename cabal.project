@@ -1,1 +1,11 @@
 packages: */*.cabal
+
+-- Make some warnings errors when you build this repository with cabal. Keep
+-- this list in sync with nix/overlays/haskell/strict-warnings.nix, which does
+-- the same for the Nix builds in CI. Packages that depend on these packages
+-- do not read this file, so their builds do not change.
+package temporal-sdk
+  ghc-options: -Werror=incomplete-patterns -Werror=incomplete-uni-patterns -Werror=incomplete-record-updates
+
+package temporal-sdk-core
+  ghc-options: -Werror=incomplete-patterns -Werror=incomplete-uni-patterns -Werror=incomplete-record-updates

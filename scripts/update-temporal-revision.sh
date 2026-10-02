@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Script to update Temporal SDK dependencies to a specific revision
-# Usage: ./update-temporal-revision.sh [revision|next]
-#   - no args: update to latest master
-#   - "next": update to next commit after current
-#   - <hash>: update to specific commit hash
+# Update the pinned temporalio/sdk-rust revision and regenerate every artifact
+# that depends on it.
+#
+# Usage: update-temporal-revision.sh [OPTION] [REVISION|next]
+#   - no args: update to the latest commit on the default branch
+#   - "next":  update to the commit after the current pin
+#   - <ref>:   update to a specific commit (a full SHA, a short SHA or a tag)
+#
+# See docs/upgrading-rust-sdk.md for the complete upgrade procedure.
 
 # Colors for output
 readonly RED='\033[0;31m'
@@ -15,40 +19,37 @@ readonly BLUE='\033[0;34m'
 readonly NC='\033[0m' # No Color
 
 # Configuration
-readonly GITHUB_REPO="temporalio/sdk-core"
-readonly DEFAULT_BRANCH="master"
-readonly CARGO_TOML_PATH="core/rust/Cargo.toml"
-readonly TEMPORAL_DEPENDENCIES=(
-  "temporal-client"
-  "temporal-sdk-core"
-  "temporal-sdk-core-api"
-  "temporal-sdk-core-protos"
-  "rustfsm"
-)
+readonly GITHUB_REPO="temporalio/sdk-rust"
+readonly GIT_URL="https://github.com/$GITHUB_REPO"
+readonly DEFAULT_BRANCH="main"
+readonly RUST_DIR="core/rust"
+readonly CARGO_TOML_PATH="$RUST_DIR/Cargo.toml"
+# `next` searches this many pages of 100 commits for the current pin.
+readonly MAX_HISTORY_PAGES=20
 
-# Function to print colored output
 log_info() {
-  echo -e "${BLUE}[INFO]${NC} $*"
+	echo -e "${BLUE}[INFO]${NC} $*" >&2
 }
 
 log_warn() {
-  echo -e "${YELLOW}[WARN]${NC} $*" >&2
+	echo -e "${YELLOW}[WARN]${NC} $*" >&2
 }
 
 log_error() {
-  echo -e "${RED}[ERROR]${NC} $*" >&2
+	echo -e "${RED}[ERROR]${NC} $*" >&2
 }
 
 log_success() {
-  echo -e "${GREEN}[SUCCESS]${NC} $*"
+	echo -e "${GREEN}[SUCCESS]${NC} $*" >&2
 }
 
-# Function to show usage
 show_usage() {
-  cat <<EOF
-Usage: $0 [OPTION] [REVISION]
+	cat <<EOF
+Usage: update-temporal-revision [OPTION] [REVISION]
 
-Update Temporal SDK dependencies to a specific revision.
+Update the $GITHUB_REPO dependencies in $CARGO_TOML_PATH to one revision, then
+regenerate Cargo.lock, Cargo.nix, crate-hashes.json, temporal_bridge.h and the
+Haskell protobuf modules.
 
 Options:
     -h, --help          Show this help message
@@ -56,436 +57,353 @@ Options:
     -d, --dry-run       Show what would be done without making changes
 
 Arguments:
-    REVISION            Specific commit hash to update to
-    next                Update to the next commit after current
-    (no argument)       Update to latest commit on master branch
+    REVISION            Commit to update to (full SHA, short SHA or tag)
+    next                Update to the next commit after the current pin
+    (no argument)       Update to the latest commit on the $DEFAULT_BRANCH branch
 
 Examples:
-    $0                    # Update to latest master
-    $0 next              # Update to next commit after current
-    $0 abc123def         # Update to specific commit hash
-    $0 --dry-run next    # Show what would be done
+    update-temporal-revision                # Update to latest $DEFAULT_BRANCH
+    update-temporal-revision next           # Update to the next commit
+    update-temporal-revision abc123def      # Update to a specific commit
+    update-temporal-revision --dry-run next # Show what would be done
+
+Run it from the repository, for example with 'nix run .#update-temporal-revision'.
+It calls 'nix run .#protogen', so 'nix' must be on PATH.
 
 Environment Variables:
-    GITHUB_TOKEN         GitHub personal access token (optional, increases rate limits)
+    GITHUB_TOKEN         GitHub token (optional, increases rate limits)
 
 EOF
 }
 
-# Function to check if required tools are available
 check_dependencies() {
-  local missing_tools=()
+	local missing_tools=()
 
-  for tool in curl jq tomlq cargo crate2nix; do
-    if ! command -v "$tool" >/dev/null 2>&1; then
-      missing_tools+=("$tool")
-    fi
-  done
+	for tool in curl jq tomlq cargo crate2nix cbindgen git nix; do
+		if ! command -v "$tool" >/dev/null 2>&1; then
+			missing_tools+=("$tool")
+		fi
+	done
 
-  if [[ ${#missing_tools[@]} -gt 0 ]]; then
-    log_error "Missing required tools: ${missing_tools[*]}"
-    log_error "Please install the missing tools and try again."
-    exit 1
-  fi
+	if [[ ${#missing_tools[@]} -gt 0 ]]; then
+		log_error "Missing required tools: ${missing_tools[*]}"
+		log_error "Run this script with 'nix run .#update-temporal-revision' or from the development shell."
+		exit 1
+	fi
 }
 
-# Function to validate we're in the correct directory
-check_working_directory() {
-  if [[ ! -f $CARGO_TOML_PATH ]]; then
-    log_error "Cargo.toml not found at $CARGO_TOML_PATH"
-    log_error "Please run this script from the project root directory."
-    exit 1
-  fi
+curl_github() {
+	local url="$1"
+	local curl_args=(
+		--silent
+		--show-error
+		--fail
+		--location
+		--header "Accept: application/vnd.github+json"
+	)
+
+	if [[ -n ${GITHUB_TOKEN:-} ]]; then
+		curl_args+=(--header "Authorization: Bearer $GITHUB_TOKEN")
+	fi
+
+	curl "${curl_args[@]}" "$url"
 }
 
-# Function to check GitHub API rate limits
 check_rate_limit() {
-  local curl_args=("-s" "https://api.github.com/rate_limit")
+	local rate_limit_info
+	if ! rate_limit_info=$(curl_github "https://api.github.com/rate_limit"); then
+		log_warn "Could not check rate limit"
+		return 0
+	fi
 
-  if [[ -n ${GITHUB_TOKEN:-} ]]; then
-    curl_args+=("-H" "Authorization: token $GITHUB_TOKEN")
-  fi
+	local remaining reset_time
+	remaining=$(jq -r ".resources.core.remaining" <<<"$rate_limit_info")
+	reset_time=$(jq -r ".resources.core.reset" <<<"$rate_limit_info")
 
-  local rate_limit_info
-  if ! rate_limit_info=$(curl "${curl_args[@]}"); then
-    log_warn "Could not check rate limit"
-    return 0
-  fi
+	if [[ $remaining == "null" || -z $remaining ]]; then
+		log_warn "Could not check rate limit"
+		return 0
+	fi
 
-  local remaining reset_time
-  remaining=$(echo "$rate_limit_info" | jq -r ".resources.core.remaining")
-  reset_time=$(echo "$rate_limit_info" | jq -r ".resources.core.reset")
+	log_info "API rate limit: $remaining requests remaining"
 
-  if [[ $remaining == "null" || -z $remaining ]]; then
-    log_warn "Could not check rate limit"
-    return 0
-  fi
-
-  log_info "API rate limit: $remaining requests remaining"
-
-  if [[ $remaining -lt 10 ]]; then
-    local reset_date
-    reset_date=$(date -r "$reset_time" 2>/dev/null || echo "unknown")
-    log_warn "Low API rate limit remaining. Reset time: $reset_date"
-  fi
+	if [[ $remaining -lt 10 ]]; then
+		local reset_date
+		reset_date=$(date -r "$reset_time" 2>/dev/null || echo "unknown")
+		log_warn "Low API rate limit remaining. Reset time: $reset_date"
+	fi
 }
 
-# Function to make GitHub API requests safely
 github_api_request() {
-  local endpoint="$1"
-  local curl_args=("-s" "https://api.github.com/$endpoint")
+	local endpoint="$1"
 
-  if [[ -n ${GITHUB_TOKEN:-} ]]; then
-    curl_args+=("-H" "Authorization: token $GITHUB_TOKEN")
-  fi
+	local response
+	if ! response=$(curl_github "https://api.github.com/$endpoint"); then
+		log_error "GitHub API request failed: $endpoint"
+		return 1
+	fi
 
-  local response
-  if ! response=$(curl "${curl_args[@]}"); then
-    log_error "Failed to make GitHub API request to $endpoint"
-    return 1
-  fi
-
-  echo "$response"
+	echo "$response"
 }
 
-# Function to get the latest commit hash from GitHub API
-get_latest_revision() {
-  local branch="${1:-$DEFAULT_BRANCH}"
-  log_info "Fetching latest revision from $GITHUB_REPO $branch branch..." >&2
+# Print the full SHA of a commit-ish (branch, tag, full or short SHA).
+resolve_revision() {
+	local ref="$1"
+	log_info "Resolving '$ref' in $GITHUB_REPO..."
 
-  local response
-  if ! response=$(github_api_request "repos/$GITHUB_REPO/commits/$branch"); then
-    return 1
-  fi
+	local response
+	if ! response=$(github_api_request "repos/$GITHUB_REPO/commits/$ref"); then
+		return 1
+	fi
 
-  local latest_commit
-  latest_commit=$(echo "$response" | jq -r ".sha")
+	local sha
+	sha=$(jq -r ".sha" <<<"$response")
 
-  if [[ $latest_commit == "null" || -z $latest_commit ]]; then
-    log_error "Failed to fetch latest revision from GitHub API" >&2
-    return 1
-  fi
+	if [[ ! $sha =~ ^[0-9a-f]{40}$ ]]; then
+		log_error "GitHub API did not return a commit for '$ref'"
+		return 1
+	fi
 
-  log_info "Latest commit: $latest_commit" >&2
-  echo "$latest_commit"
+	log_info "Resolved '$ref' to $sha"
+	echo "$sha"
 }
 
-# Function to get the next commit hash after the current one
+# Print the commit that comes directly after the current revision on the
+# default branch. The API lists commits newest first.
 get_next_revision() {
-  local current_revision="$1"
-  local branch="${2:-$DEFAULT_BRANCH}"
-  log_info "Fetching next revision after $current_revision from $GITHUB_REPO $branch branch..." >&2
+	local current_revision="$1"
+	log_info "Fetching the commit after $current_revision on $GITHUB_REPO $DEFAULT_BRANCH..."
 
-  local page=1
-  local found_current=false
-  local next_commit=""
+	local newer_sha=""
+	local page
+	for ((page = 1; page <= MAX_HISTORY_PAGES; page++)); do
+		log_info "Checking page $page..."
 
-  while [[ $page -le 10 ]]; do # Limit to 10 pages to avoid infinite loops
-    log_info "Checking page $page..." >&2
+		local response
+		if ! response=$(github_api_request "repos/$GITHUB_REPO/commits?sha=$DEFAULT_BRANCH&per_page=100&page=$page"); then
+			return 1
+		fi
 
-    local response
-    if ! response=$(github_api_request "repos/$GITHUB_REPO/commits?sha=$branch&per_page=100&page=$page"); then
-      return 1
-    fi
+		if [[ $(jq -r "type" <<<"$response") != "array" ]]; then
+			log_error "Invalid response from GitHub API"
+			return 1
+		fi
 
-    # Check if we got a valid response
-    if [[ $(echo "$response" | jq -r "type") != "array" ]]; then
-      log_error "Invalid response from GitHub API" >&2
-      return 1
-    fi
+		local shas
+		shas=$(jq -r ".[].sha" <<<"$response")
+		if [[ -z $shas ]]; then
+			break
+		fi
 
-    # Process each commit in the page
-    local commit_count
-    commit_count=$(echo "$response" | jq "length")
+		local sha
+		while read -r sha; do
+			if [[ $sha == "$current_revision" ]]; then
+				if [[ -z $newer_sha ]]; then
+					log_error "$current_revision is already the latest commit on $DEFAULT_BRANCH"
+					return 1
+				fi
+				log_info "Found next commit: $newer_sha"
+				echo "$newer_sha"
+				return 0
+			fi
+			newer_sha="$sha"
+		done <<<"$shas"
+	done
 
-    if [[ $commit_count -eq 0 ]]; then
-      break # No more commits
-    fi
-
-    # Check if current revision is in this page
-    local current_index=-1
-    for i in $(seq 0 $((commit_count - 1))); do
-      local commit_sha
-      commit_sha=$(echo "$response" | jq -r ".[$i].sha")
-      if [[ $commit_sha == "$current_revision" ]]; then
-        current_index=$i
-        log_info "Found current revision at index $i on page $page" >&2
-        break
-      fi
-    done
-
-    if [[ $current_index -ge 0 ]]; then
-      # Found the current revision, get the next commit (previous in the array since it's reverse chronological)
-      if [[ $current_index -gt 0 ]]; then
-        next_commit=$(echo "$response" | jq -r ".[$((current_index - 1))].sha")
-        log_info "Found next commit: $next_commit" >&2
-        found_current=true
-        break
-      else
-        # Current revision is the first commit on this page, check next page
-        log_info "Current revision is first on page $page, checking next page..." >&2
-        page=$((page + 1))
-        continue
-      fi
-    fi
-
-    log_info "Current revision not found on page $page, checking next page..." >&2
-    page=$((page + 1))
-  done
-
-  if [[ $found_current != "true" ]]; then
-    log_error "Could not find current revision $current_revision in recent commit history" >&2
-    return 1
-  fi
-
-  if [[ $next_commit == "null" || -z $next_commit ]]; then
-    log_error "No next revision found after $current_revision" >&2
-    return 1
-  fi
-
-  echo "$next_commit"
+	log_error "Could not find $current_revision in the last $((MAX_HISTORY_PAGES * 100)) commits of $DEFAULT_BRANCH"
+	return 1
 }
 
-# Function to extract current revision from Cargo.toml
+# Print the names of the dependencies that come from GIT_URL.
+get_temporal_dependencies() {
+	# shellcheck disable=SC2016 # `$url` is a jq variable.
+	tomlq -r --arg url "$GIT_URL" \
+		'.dependencies | to_entries[] | select((.value | type) == "object" and .value.git == $url) | .key' \
+		"$CARGO_TOML_PATH"
+}
+
+get_dependency_revision() {
+	local dep="$1"
+	# shellcheck disable=SC2016 # `$dep` is a jq variable.
+	tomlq -r --arg dep "$dep" '.dependencies[$dep].rev' "$CARGO_TOML_PATH"
+}
+
+# Print the revision that all temporal dependencies share.
 get_current_revision() {
-  local cargo_toml="$1"
-  for dep in "${TEMPORAL_DEPENDENCIES[@]}"; do
-    local rev
-    rev=$(tomlq ".dependencies.\"$dep\".rev" "$cargo_toml" 2>/dev/null | tr -d '"')
-    if [[ -n $rev && $rev != "null" ]]; then
-      echo "$rev"
-      return 0
-    fi
-  done
-  log_warn "No current revision found in $cargo_toml"
-  return 1
+	local deps=("$@")
+	local current=""
+
+	local dep rev
+	for dep in "${deps[@]}"; do
+		rev=$(get_dependency_revision "$dep")
+		if [[ ! $rev =~ ^[0-9a-f]{40}$ ]]; then
+			log_error "Dependency $dep does not pin a full commit SHA (rev = '$rev')"
+			return 1
+		fi
+		if [[ -n $current && $rev != "$current" ]]; then
+			log_error "Dependencies pin different revisions ($current and $rev)"
+			return 1
+		fi
+		current="$rev"
+	done
+
+	echo "$current"
 }
 
-# Function to update Cargo.toml with new revision
 update_cargo_toml() {
-  local cargo_toml="$1"
-  local new_revision="$2"
-  local dry_run="${3:-false}"
+	local new_revision="$1"
+	shift
+	local deps=("$@")
 
-  log_info "Updating $cargo_toml with revision $new_revision"
+	log_info "Updating $CARGO_TOML_PATH to revision $new_revision"
 
-  if [[ $dry_run == "true" ]]; then
-    log_info "DRY RUN: Would update the following dependencies:"
-    for dep in "${TEMPORAL_DEPENDENCIES[@]}"; do
-      log_info "  - $dep"
-    done
-    return 0
-  fi
+	local url_pattern="${GIT_URL//./\\.}"
+	sed -i.bak -E \
+		"\\|git = \"${url_pattern}\"|s|rev = \"[^\"]*\"|rev = \"${new_revision}\"|" \
+		"$CARGO_TOML_PATH"
+	rm -f "$CARGO_TOML_PATH.bak"
 
-  # Create a backup
-  cp "$cargo_toml" "$cargo_toml.backup"
-  log_info "Backup created at $cargo_toml.backup"
+	local dep rev failed=false
+	for dep in "${deps[@]}"; do
+		rev=$(get_dependency_revision "$dep")
+		if [[ $rev == "$new_revision" ]]; then
+			log_info "  $dep: rev = $rev"
+		else
+			log_error "  $dep was not updated (rev = '$rev')"
+			failed=true
+		fi
+	done
 
-  # Use the simplest possible approach: process each dependency individually
-  local temp_file
-  temp_file=$(mktemp)
-
-  # Copy the original file
-  cp "$cargo_toml" "$temp_file"
-
-  # Update each temporal dependency individually
-  for dep in "${TEMPORAL_DEPENDENCIES[@]}"; do
-    # Use sed to replace only lines that contain this specific dependency
-    if sed -i.bak "/$dep = { git = \"https:\/\/github\.com\/temporalio\/sdk-core\"/s/rev = \"[a-f0-9]*\"/rev = \"$new_revision\"/" "$temp_file"; then
-      log_info "Updated dependency: $dep"
-    else
-      log_warn "Failed to update dependency: $dep"
-    fi
-    # Remove the backup file created by sed
-    rm -f "$temp_file.bak" 2>/dev/null || true
-  done
-
-  # Replace the original file
-  mv "$temp_file" "$cargo_toml"
-
-  # Remove the backup after a successful update
-  rm -f "$cargo_toml.backup" 2>/dev/null || true
-
-  log_success "Updated $cargo_toml with revision $new_revision"
+	if [[ $failed == "true" ]]; then
+		log_error "Could not update every dependency. Edit $CARGO_TOML_PATH by hand."
+		return 1
+	fi
 }
 
-# Function to verify changes
-verify_changes() {
-  local cargo_toml="$1"
-  local expected_revision="$2"
+# Regenerate every artifact that depends on the pinned revision. Each step
+# needs the previous one, so stop at the first failure. The callers use this
+# function in a condition, where `set -e` does not apply, so every step
+# returns explicitly.
+regenerate_artifacts() {
+	log_info "Updating Cargo.lock (cargo metadata)..."
+	cargo metadata --format-version 1 --manifest-path "$CARGO_TOML_PATH" >/dev/null || return 1
 
-  log_info "Verifying changes..."
-  local updated_deps
-  updated_deps=$(grep -A 1 -B 1 "temporalio/sdk-core" "$cargo_toml" || true)
+	log_info "Regenerating Cargo.nix and crate-hashes.json (crate2nix generate)..."
+	(cd "$RUST_DIR" && crate2nix generate) || return 1
 
-  if [[ -n $updated_deps ]]; then
-    log_info "Updated dependencies:"
-    echo "$updated_deps"
-  fi
+	log_info "Regenerating temporal_bridge.h (bindgen.sh)..."
+	(cd "$RUST_DIR" && bash bindgen.sh) || return 1
 
-  # Verify all dependencies were updated
-  for dep in "${TEMPORAL_DEPENDENCIES[@]}"; do
-    # Escape special characters in the dependency name for grep
-    local escaped_dep
-    escaped_dep="${dep//[][.*^$()+?{|]/\\&}"
-    local escaped_repo
-    escaped_repo="${GITHUB_REPO//[][.*^$()+?{|]/\\&}"
-    local escaped_revision
-    escaped_revision="${expected_revision//[][.*^$()+?{|]/\\&}"
-
-    if ! grep -q "$escaped_dep = { git = \"https://github.com/$escaped_repo\", rev = \"$escaped_revision\"" "$cargo_toml"; then
-      log_warn "Dependency $dep may not have been updated correctly"
-    fi
-  done
+	# protogen reads the protos from the source that Cargo.nix pins. A new
+	# `nix run` evaluates the Cargo.nix that crate2nix just wrote.
+	log_info "Regenerating Haskell protobuf modules (nix run .#protogen)..."
+	nix run "$repo_root#protogen" || return 1
 }
 
-# Function to update Cargo.lock and regenerate crate2nix files
-update_dependencies() {
-  local dry_run="${1:-false}"
-
-  if [[ $dry_run == "true" ]]; then
-    log_info "DRY RUN: Would run 'cargo build' and 'crate2nix generate'"
-    return 0
-  fi
-
-  log_info "Building project to update Cargo.lock and verify dependencies..."
-  cd core/rust || exit 1
-
-  local build_success=true
-  if ! cargo build; then
-    log_warn "Failed to build project - dependencies may be incompatible, but continuing with crate2nix"
-    build_success=false
-  fi
-
-  log_info "Running crate2nix generate..."
-  if ! crate2nix generate; then
-    log_error "Failed to generate crate2nix files"
-    return 1
-  fi
-
-  if [[ $build_success == "true" ]]; then
-    log_success "Successfully built project and regenerated crate2nix files"
-  else
-    log_success "Regenerated crate2nix files (build failed but continuing)"
-  fi
-}
-
-# Main script logic
 main() {
-  local verbose=false
-  local dry_run=false
-  local revision=""
+	local dry_run=false
+	local revision=""
 
-  # Parse command line arguments
-  while [[ $# -gt 0 ]]; do
-    case $1 in
-    -h | --help)
-      show_usage
-      exit 0
-      ;;
-    -v | --verbose)
-      verbose=true
-      shift
-      ;;
-    -d | --dry-run)
-      dry_run=true
-      shift
-      ;;
-    -*)
-      log_error "Unknown option: $1"
-      show_usage
-      exit 1
-      ;;
-    *)
-      revision="$1"
-      shift
-      ;;
-    esac
-  done
+	while [[ $# -gt 0 ]]; do
+		case $1 in
+		-h | --help)
+			show_usage
+			exit 0
+			;;
+		-v | --verbose)
+			set -x
+			shift
+			;;
+		-d | --dry-run)
+			dry_run=true
+			shift
+			;;
+		-*)
+			log_error "Unknown option: $1"
+			show_usage >&2
+			exit 1
+			;;
+		*)
+			if [[ -n $revision ]]; then
+				log_error "Only one revision argument is allowed"
+				exit 1
+			fi
+			revision="$1"
+			shift
+			;;
+		esac
+	done
 
-  # Set verbose mode
-  if [[ $verbose == "true" ]]; then
-    set -x
-  fi
+	check_dependencies
 
-  # Check dependencies and working directory
-  check_dependencies
-  check_working_directory
+	repo_root="$(git rev-parse --show-toplevel)"
+	cd "$repo_root"
 
-  # Check for GitHub token and rate limits
-  if [[ -z ${GITHUB_TOKEN:-} ]]; then
-    log_warn "No GITHUB_TOKEN environment variable found."
-    log_warn "You can set it to increase API rate limits from 60/hour to 5000/hour:"
-    log_warn "  export GITHUB_TOKEN=your_github_personal_access_token"
-    log_warn "  # or add it to your shell profile"
-    echo
-  fi
+	if [[ ! -f $CARGO_TOML_PATH ]]; then
+		log_error "Cargo.toml not found at $repo_root/$CARGO_TOML_PATH"
+		exit 1
+	fi
 
-  check_rate_limit
+	if [[ -z ${GITHUB_TOKEN:-} ]]; then
+		log_warn "GITHUB_TOKEN is not set. GitHub API rate limits are 60 requests per hour."
+	fi
+	check_rate_limit
 
-  # Determine the revision to update to
-  local target_revision
-  local revision_determination_success=true
+	local deps=()
+	mapfile -t deps < <(get_temporal_dependencies)
 
-  if [[ -z $revision ]]; then
-    # No arguments provided, fetch latest from master branch
-    if ! target_revision=$(get_latest_revision "$DEFAULT_BRANCH"); then
-      log_error "Failed to get latest revision from GitHub API"
-      revision_determination_success=false
-    fi
-  elif [[ $revision == "next" ]]; then
-    # Get the current revision from Cargo.toml
-    local current_revision
-    if ! current_revision=$(get_current_revision "$CARGO_TOML_PATH"); then
-      log_info "No current revision found, getting latest from $DEFAULT_BRANCH..."
-      if ! target_revision=$(get_latest_revision "$DEFAULT_BRANCH"); then
-        log_error "Failed to get latest revision from GitHub API"
-        revision_determination_success=false
-      fi
-    else
-      log_info "Current revision: $current_revision"
-      if ! target_revision=$(get_next_revision "$current_revision" "$DEFAULT_BRANCH"); then
-        log_error "Failed to get next revision from GitHub API"
-        revision_determination_success=false
-      fi
-    fi
-  else
-    # Treat the argument as a commit hash
-    target_revision="$revision"
-  fi
+	if [[ ${#deps[@]} -eq 0 ]]; then
+		log_error "No dependencies with git = \"$GIT_URL\" found in $CARGO_TOML_PATH"
+		exit 1
+	fi
+	log_info "Temporal dependencies: ${deps[*]}"
 
-  if [[ $revision_determination_success != "true" ]]; then
-    log_error "Cannot proceed without a valid revision"
-    exit 1
-  fi
+	local current_revision
+	current_revision=$(get_current_revision "${deps[@]}")
+	log_info "Current revision: $current_revision"
 
-  log_info "Target revision: $target_revision"
+	local target_revision
+	case "$revision" in
+	"")
+		target_revision=$(resolve_revision "$DEFAULT_BRANCH")
+		;;
+	next)
+		target_revision=$(get_next_revision "$current_revision")
+		;;
+	*)
+		target_revision=$(resolve_revision "$revision")
+		;;
+	esac
 
-  # Update Cargo.toml
-  local cargo_update_success=true
-  if ! update_cargo_toml "$CARGO_TOML_PATH" "$target_revision" "$dry_run"; then
-    log_warn "Cargo.toml update failed, but continuing with other steps"
-    cargo_update_success=false
-  fi
+	log_info "Target revision: $target_revision"
+	if [[ $target_revision == "$current_revision" ]]; then
+		log_info "The target is the current revision. Regenerating the artifacts anyway."
+	fi
 
-  # Verify the changes
-  if [[ $dry_run != "true" ]]; then
-    verify_changes "$CARGO_TOML_PATH" "$target_revision"
-  fi
+	if [[ $dry_run == "true" ]]; then
+		log_info "DRY RUN: would set rev = \"$target_revision\" for: ${deps[*]}"
+		log_info "DRY RUN: would run 'cargo metadata', 'crate2nix generate', 'bindgen.sh', 'nix run .#protogen' and 'cargo build'"
+		log_info "Compare: https://github.com/$GITHUB_REPO/compare/$current_revision...$target_revision"
+		exit 0
+	fi
 
-  # Update dependencies
-  local deps_success=true
-  if ! update_dependencies "$dry_run"; then
-    log_warn "Some dependency update steps failed, but continuing with commit"
-    deps_success=false
-  fi
+	update_cargo_toml "$target_revision" "${deps[@]}"
 
-  if [[ $cargo_update_success == "true" && $deps_success == "true" ]]; then
-    log_success "Successfully updated Temporal SDK to revision $target_revision"
-  else
-    log_success "Updated Temporal SDK to revision $target_revision (some steps failed but changes were made)"
-  fi
+	if ! regenerate_artifacts; then
+		log_error "Regeneration failed. The working tree has partial changes."
+		exit 1
+	fi
+
+	log_info "Building the bridge (cargo build)..."
+	if ! (cd "$RUST_DIR" && cargo build); then
+		log_error "The generated artifacts are up to date, but the bridge does not build."
+		log_error "Fix core/rust/src, then follow docs/upgrading-rust-sdk.md."
+		exit 1
+	fi
+
+	log_success "Updated $GITHUB_REPO to $target_revision"
+	log_info "Changes from $current_revision: https://github.com/$GITHUB_REPO/compare/$current_revision...$target_revision"
+	log_info "Next: fix the Haskell code and run the checks in docs/upgrading-rust-sdk.md."
 }
 
-# Run main function with all arguments
 main "$@"

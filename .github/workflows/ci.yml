@@ -34,3 +34,64 @@ jobs:
 
       - name: Build SDK test suite & bridge
         run: nix build '.#hs-temporal-suite-ghc910' '.#temporal-bridge' --print-build-logs
+
+  generated:
+    name: Generated files are up to date
+    runs-on: namespace-profile-mercury-oss-linux
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Mounts /nix from the Namespace cache volume; must run before Nix is
+      # installed so the store lands on the volume.
+      - name: Set up nix cache
+        uses: namespacelabs/nscloud-cache-action@c5f8dab7560444c4bf8dbc64f1b203431873c547 # v1.6.1
+        with:
+          cache: nix
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@96951a368ba55167b55f1c916f7d416bac6505fe # v31.10.3
+        with:
+          extra_nix_config: |
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+            extra-substituters = https://devenv.cachix.org
+            extra-trusted-public-keys = devenv.cachix.org-1:w1cLUi8dv3hnoSPGAuibQv+f9TZLr6cv/Hm9XgU50cw=
+
+      # Fails if protos/, temporal_bridge.h, Cargo.nix, crate-hashes.json or
+      # Cargo.lock differ from what their generators produce.
+      - name: Check generated files
+        run: nix run '.#check-generated'
+
+  rust:
+    name: Rust checks (core/rust)
+    runs-on: namespace-profile-mercury-oss-linux
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Mounts /nix from the Namespace cache volume; must run before Nix is
+      # installed so the store lands on the volume.
+      - name: Set up nix cache
+        uses: namespacelabs/nscloud-cache-action@c5f8dab7560444c4bf8dbc64f1b203431873c547 # v1.6.1
+        with:
+          cache: nix
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@96951a368ba55167b55f1c916f7d416bac6505fe # v31.10.3
+        with:
+          extra_nix_config: |
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+            extra-substituters = https://devenv.cachix.org
+            extra-trusted-public-keys = devenv.cachix.org-1:w1cLUi8dv3hnoSPGAuibQv+f9TZLr6cv/Hm9XgU50cw=
+
+      # The `rust` shell has the toolchain that builds the bridge
+      # (nix/packages/temporal-bridge.nix), so lints and tests use the shipped
+      # compiler. The Nix build of the bridge does not run `cargo test`.
+      - name: cargo fmt
+        run: nix develop '.#rust' --command cargo fmt --manifest-path core/rust/Cargo.toml --check
+
+      - name: cargo clippy
+        run: nix develop '.#rust' --command cargo clippy --manifest-path core/rust/Cargo.toml --all-targets -- -D warnings
+
+      - name: cargo test
+        run: nix develop '.#rust' --command cargo test --manifest-path core/rust/Cargo.toml

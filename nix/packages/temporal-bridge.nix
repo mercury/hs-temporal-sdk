@@ -5,6 +5,9 @@
   ...
 }:
 let
+  # The Rust toolchain that builds the bridge. It is exported as
+  # `temporal-bridge-rust-toolchain` so that CI and the upgrade tooling use the
+  # same compiler.
   toolchain = fenix.toolchainOf {
     channel = "stable";
     date = "2025-11-10";
@@ -53,4 +56,5 @@ in
 {
   temporal_bridge = cargoNix.rootCrate.build.lib;
   temporal-sdk-core-src = cargoNix.internal.crates.temporalio-sdk-core.src;
+  temporal-bridge-rust-toolchain = toolchain;
 }

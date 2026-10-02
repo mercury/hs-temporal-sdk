@@ -20,12 +20,21 @@ jobs:
           cache: nix
 
       - name: Install Nix
-        uses: cachix/install-nix-action@4e002c8ec80594ecd40e759629461e26c8abed15 # V27
+        uses: cachix/install-nix-action@96951a368ba55167b55f1c916f7d416bac6505fe # v31.10.3
+        with:
+          extra_nix_config: |
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
 
+      # Updates core/rust/Cargo.toml, Cargo.lock, Cargo.nix, crate-hashes.json,
+      # temporal_bridge.h and protos/. A bump usually needs bridge and Haskell
+      # fixes, so a failure still commits the partial result for a human to
+      # finish (see docs/upgrading-rust-sdk.md).
       - name: Run update script
         id: update-script
         continue-on-error: true
         run: nix run .#update-temporal-revision
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check for changes and create branch
         run: |
@@ -39,7 +48,9 @@ jobs:
             echo "Update script completed with errors (but continuing to commit any changes)"
           fi
 
-          if ! git diff --quiet; then
+          # `git status` also reports new untracked files, such as new
+          # generated proto modules.
+          if [[ -n "$(git status --porcelain)" ]]; then
             branch="auto/update-temporal-revision-$(date +%Y%m%d)"
             git checkout -b "$branch"
             git add .

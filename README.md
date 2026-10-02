@@ -53,6 +53,9 @@ Inside the development shell, you can use cabal commands as usual. Cabal is the 
 - `nix build .#{packageName}-{ghcVersion}` builds the given package for a given GHC version.
 - `nix build .#temporal_bridge` builds the Rust library (`temporal_bridge`) that provides bindings to the Temporal Core library.
 - `devenv up` starts a local Temporal server for development and testing purposes.
+- `nix run .#check-generated` checks that the generated files (`protos/`, `core/rust/temporal_bridge.h`, `core/rust/Cargo.nix`, `core/rust/Cargo.lock`) match their sources.
+
+To upgrade the Temporal Rust SDK that `temporal-sdk-core` wraps, follow [docs/upgrading-rust-sdk.md](docs/upgrading-rust-sdk.md).
 
 The flake.nix file defines different shells for each supported GHC version (`ghc96`, `ghc98`, `ghc910`). You can enter the shell for a specific GHC version with the following command:
 
