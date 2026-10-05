@@ -14,6 +14,12 @@
   * `initializeRuntime` throws `RuntimeInitializationError` for invalid
     telemetry options, an invalid OpenTelemetry collector URL, a failed
     OpenTelemetry exporter, or a Prometheus exporter that cannot bind.
+  * `connectClient` reports an invalid configuration (for example an
+    unparsable `targetUrl`, or TLS with only one of `clientCert` and
+    `clientPrivateKey`) as `ClientConnectionError`.
+  * `startDevServer` and `startTestServer` return `Left` for a configuration
+    that the bridge cannot decode.
+  * Error messages that contain a NUL byte no longer abort the process.
 
 ### New API
 
