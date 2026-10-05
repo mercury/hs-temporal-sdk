@@ -51,6 +51,10 @@ data EphemeralExe
   = -- | Existing path on the filesystem for the executable.
     ExistingPath FilePath
   | -- | Download the executable if not already there.
+    --
+    -- The arguments are the version, the destination directory (the user
+    -- temporary directory if 'Nothing'), and how many seconds to keep the
+    -- cached download ('Nothing' keeps it forever).
     CachedDownload EphemeralExeVersion (Maybe FilePath) (Maybe Word64)
 
 
@@ -60,16 +64,20 @@ instance ToJSON EphemeralExe where
       [ "type" .= String "ExistingPath"
       , "contents" .= path
       ]
-  toJSON (CachedDownload version destDir ttl) =
+  toJSON (CachedDownload version destDir ttlSeconds) =
     object
       [ "type" .= String "CachedDownload"
       , "contents"
           .= object
             [ "version" .= version
             , "dest_dir" .= destDir
+            , "ttl" .= fmap durationFromSeconds ttlSeconds
             ]
-      , "ttl" .= ttl
       ]
+    where
+      -- The bridge decodes a Rust @Duration@.
+      durationFromSeconds :: Word64 -> Value
+      durationFromSeconds secs = object ["secs" .= secs, "nanos" .= (0 :: Word32)]
 
 
 data TemporalDevServerConfig = TemporalDevServerConfig
