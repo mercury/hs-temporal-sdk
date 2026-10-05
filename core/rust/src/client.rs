@@ -92,6 +92,7 @@ impl TryFrom<ClientConfig> for ClientOptions {
             .client_name(cfg.client_name)
             .client_version(cfg.client_version)
             .identity(cfg.identity)
+            .headers(cfg.metadata)
             .retry_options(retry_cfg)
             .maybe_api_key(cfg.api_key)
             .maybe_tls_options(tls_cfg)
@@ -379,6 +380,16 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::runtime::test_support::{TestWaiter, error_text, new_test_runtime, test_cap};
+    use serde_json::json;
+    use std::ffi::CString;
+    use std::net::SocketAddr;
+    use std::sync::{Arc, Mutex};
+    use std::task::{Context, Poll};
+    use tonic::codegen::Service;
+    use tonic::codegen::http::{HeaderMap, Request, Response};
+    use tonic::server::NamedService;
+    use tonic::transport::server::TcpIncoming;
 
     /// Owns a Haskell-style metadata list for the duration of a test.
     struct HashMapEntries {
@@ -427,5 +438,170 @@ mod tests {
         let three = [("a", "1"), ("b", ""), ("c", "3")];
         let entries = HashMapEntries::new(&three);
         assert_eq!(unsafe { convert_hashmap(entries.head()) }, to_map(&three));
+    }
+
+    fn full_client_config() -> serde_json::Value {
+        json!({
+            "target_url": "https://temporal.example:7233",
+            "client_name": "client-name",
+            "client_version": "1.2.3",
+            "metadata": {"x-one": "1", "x-two": "2"},
+            "api_key": "secret",
+            "identity": "worker@host",
+            "tls_config": {
+                "server_root_ca_cert": [1, 2, 3],
+                "domain": "tls.example",
+                "client_cert": [4, 5],
+                "client_private_key": [6, 7]
+            },
+            "retry_config": {
+                "initial_interval_millis": 11,
+                "randomization_factor": 0.25,
+                "multiplier": 1.5,
+                "max_interval_millis": 22,
+                "max_elapsed_time_millis": 33,
+                "max_retries": 4
+            }
+        })
+    }
+
+    fn connect_with_raw_config(config: &std::ffi::CStr) -> Result<ClientRef, CArray<u8>> {
+        let runtime = new_test_runtime();
+        let mut waiter = TestWaiter::<ClientRef, CArray<u8>>::new();
+        unsafe {
+            hs_temporal_connect_client(
+                &runtime,
+                config.as_ptr(),
+                waiter.mvar(),
+                test_cap(),
+                &mut *waiter.error_slot,
+                &mut *waiter.result_slot,
+            )
+        };
+        waiter.wait()
+    }
+
+    /// A local WorkflowService that records the headers of each request and
+    /// answers `Unimplemented`. Core accepts that answer to the
+    /// `get_system_info` call it makes when it connects.
+    #[derive(Clone, Default)]
+    struct HeaderRecorder {
+        requests: Arc<Mutex<Vec<HeaderMap>>>,
+    }
+
+    impl NamedService for HeaderRecorder {
+        const NAME: &'static str = "temporal.api.workflowservice.v1.WorkflowService";
+    }
+
+    impl<B> Service<Request<B>> for HeaderRecorder {
+        type Response = Response<tonic::body::Body>;
+        type Error = std::convert::Infallible;
+        type Future = std::future::Ready<Result<Self::Response, Self::Error>>;
+
+        fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn call(&mut self, request: Request<B>) -> Self::Future {
+            self.requests
+                .lock()
+                .unwrap()
+                .push(request.headers().clone());
+            std::future::ready(Ok(tonic::Status::unimplemented("recorded").into_http()))
+        }
+    }
+
+    impl HeaderRecorder {
+        /// Serve on a free local port until the returned Tokio runtime is dropped.
+        fn start() -> (tokio::runtime::Runtime, SocketAddr, Self) {
+            let server = tokio::runtime::Runtime::new().unwrap();
+            let listener = server
+                .block_on(tokio::net::TcpListener::bind("127.0.0.1:0"))
+                .unwrap();
+            let addr = listener.local_addr().unwrap();
+            let recorder = Self::default();
+            server.spawn(
+                tonic::transport::Server::builder()
+                    .add_service(recorder.clone())
+                    .serve_with_incoming(TcpIncoming::from(listener)),
+            );
+            (server, addr, recorder)
+        }
+
+        fn last_request(&self) -> HeaderMap {
+            let requests = self.requests.lock().unwrap();
+            requests
+                .last()
+                .cloned()
+                .expect("the server received no request")
+        }
+    }
+
+    fn header<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
+        headers.get(name).map(|value| value.to_str().unwrap())
+    }
+
+    fn connect_to_recorder(addr: SocketAddr) -> ClientRef {
+        let mut config = full_client_config();
+        config["target_url"] = json!(format!("http://{addr}"));
+        config["tls_config"] = json!(null);
+        config["retry_config"] = json!(null);
+        let config = CString::new(config.to_string()).unwrap();
+        connect_with_raw_config(&config)
+            .map_err(error_text)
+            .expect("the client connects to the local server")
+    }
+
+    #[test]
+    fn connect_sends_client_metadata_as_headers() {
+        let (_server, addr, recorder) = HeaderRecorder::start();
+        let _client = connect_to_recorder(addr);
+
+        let headers = recorder.last_request();
+        assert_eq!(header(&headers, "x-one"), Some("1"));
+        assert_eq!(header(&headers, "x-two"), Some("2"));
+        assert_eq!(header(&headers, "authorization"), Some("Bearer secret"));
+        assert_eq!(header(&headers, "client-name"), Some("client-name"));
+        assert_eq!(header(&headers, "client-version"), Some("1.2.3"));
+    }
+
+    #[test]
+    fn rpc_call_sends_per_call_metadata() {
+        let (_server, addr, recorder) = HeaderRecorder::start();
+        let mut client = connect_to_recorder(addr);
+
+        let request = CArray::c_repr_of(Vec::<u8>::new()).unwrap();
+        let metadata =
+            HashMapEntries::new(&[("x-call-a", "1"), ("x-call-b", "2"), ("x-call-c", "3")]);
+        let call = RpcCall {
+            req: &request,
+            retry: false,
+            metadata: metadata.head(),
+            timeout_millis: std::ptr::null(),
+        };
+        let mut waiter = TestWaiter::<CArray<u8>, CRPCError>::new();
+        unsafe {
+            crate::rpc::hs_get_system_info(
+                &mut client,
+                &call,
+                waiter.mvar(),
+                test_cap(),
+                &mut *waiter.error_slot,
+                &mut *waiter.result_slot,
+            )
+        };
+        let err: RPCError = waiter
+            .wait()
+            .expect_err("the local server answers Unimplemented")
+            .as_rust()
+            .unwrap();
+        assert_eq!(err.code, tonic::Code::Unimplemented as u32);
+
+        let headers = recorder.last_request();
+        assert_eq!(header(&headers, "x-call-a"), Some("1"));
+        assert_eq!(header(&headers, "x-call-b"), Some("2"));
+        assert_eq!(header(&headers, "x-call-c"), Some("3"));
+        // Client-wide headers still apply.
+        assert_eq!(header(&headers, "x-one"), Some("1"));
     }
 }

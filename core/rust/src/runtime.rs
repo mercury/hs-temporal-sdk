@@ -382,6 +382,84 @@ mod tests {
     }
 }
 
+/// Helpers that stand in for the Haskell side of a bridge call in unit tests.
+#[cfg(test)]
+pub(crate) mod test_support {
+    use super::*;
+    use std::sync::mpsc;
+
+    extern "C" fn notify_test_waiter(_: Capability, mvar: *mut MVar) {
+        let sender = unsafe { &*mvar.cast::<mpsc::Sender<()>>() };
+        let _ = sender.send(());
+    }
+
+    pub(crate) fn new_test_runtime() -> RuntimeRef {
+        let core = CoreRuntime::new(
+            RuntimeOptions::builder().build().unwrap(),
+            TokioRuntimeBuilder::default(),
+        )
+        .unwrap();
+        RuntimeRef {
+            runtime: Runtime {
+                core: Arc::new(core),
+                try_put_mvar: notify_test_waiter,
+                core_runtime_dropper: spawn_core_runtime_dropper(),
+            },
+        }
+    }
+
+    /// The result and error slots and the wake-up channel of one async call.
+    pub(crate) struct TestWaiter<A, E> {
+        sender: *mut mpsc::Sender<()>,
+        receiver: mpsc::Receiver<()>,
+        pub(crate) result_slot: Box<*mut A>,
+        pub(crate) error_slot: Box<*mut E>,
+    }
+
+    impl<A: RawPointerConverter<A>, E: RawPointerConverter<E>> TestWaiter<A, E> {
+        pub(crate) fn new() -> Self {
+            let (sender, receiver) = mpsc::channel();
+            Self {
+                sender: Box::into_raw(Box::new(sender)),
+                receiver,
+                result_slot: Box::new(std::ptr::null_mut()),
+                error_slot: Box::new(std::ptr::null_mut()),
+            }
+        }
+
+        pub(crate) fn mvar(&self) -> *mut MVar {
+            self.sender.cast()
+        }
+
+        pub(crate) fn wait(self) -> Result<A, E> {
+            self.receiver
+                .recv_timeout(Duration::from_secs(10))
+                .expect("the bridge call never woke its waiter");
+            unsafe {
+                if self.error_slot.is_null() {
+                    Ok(A::from_raw_pointer_mut(*self.result_slot).unwrap())
+                } else {
+                    Err(E::from_raw_pointer_mut(*self.error_slot).unwrap())
+                }
+            }
+        }
+    }
+
+    impl<A, E> Drop for TestWaiter<A, E> {
+        fn drop(&mut self) {
+            unsafe { drop(Box::from_raw(self.sender)) };
+        }
+    }
+
+    pub(crate) fn test_cap() -> Capability {
+        Capability { cap_num: -1 }
+    }
+
+    pub(crate) fn error_text(error: CArray<u8>) -> String {
+        String::from_utf8(error.as_rust().unwrap()).unwrap()
+    }
+}
+
 // TODO: [publish-crate]
 /// # Safety
 ///
