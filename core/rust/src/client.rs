@@ -172,7 +172,7 @@ pub unsafe fn convert_hashmap(hashmap: *const HaskellHashMapEntries) -> HashMap<
             ))
         };
         map.insert(key.to_string(), value.to_string());
-        hashmap_ptr = unsafe { (*hashmap).next };
+        hashmap_ptr = hashmap_val.next;
     }
 
     map
@@ -373,5 +373,59 @@ where
             details: err.details().into(),
         })
         .unwrap()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Owns a Haskell-style metadata list for the duration of a test.
+    struct HashMapEntries {
+        entries: Box<[HaskellHashMapEntries]>,
+    }
+
+    impl HashMapEntries {
+        fn new(pairs: &[(&'static str, &'static str)]) -> Self {
+            let mut entries: Box<[HaskellHashMapEntries]> = pairs
+                .iter()
+                .map(|(key, value)| HaskellHashMapEntries {
+                    key: key.as_ptr(),
+                    key_len: key.len(),
+                    value: value.as_ptr(),
+                    value_len: value.len(),
+                    next: std::ptr::null(),
+                })
+                .collect();
+            let base = entries.as_mut_ptr();
+            for i in 1..entries.len() {
+                unsafe { (*base.add(i - 1)).next = base.add(i) };
+            }
+            Self { entries }
+        }
+
+        fn head(&self) -> *const HaskellHashMapEntries {
+            self.entries.first().map_or(std::ptr::null(), |e| e)
+        }
+    }
+
+    fn to_map(pairs: &[(&str, &str)]) -> HashMap<String, String> {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn convert_hashmap_reads_every_entry() {
+        assert_eq!(unsafe { convert_hashmap(std::ptr::null()) }, HashMap::new());
+
+        let one = [("authorization", "Bearer token")];
+        let entries = HashMapEntries::new(&one);
+        assert_eq!(unsafe { convert_hashmap(entries.head()) }, to_map(&one));
+
+        let three = [("a", "1"), ("b", ""), ("c", "3")];
+        let entries = HashMapEntries::new(&three);
+        assert_eq!(unsafe { convert_hashmap(entries.head()) }, to_map(&three));
     }
 }
