@@ -1,4 +1,4 @@
-use ffi_convert::{AsRust, CArray, CDrop, CDropError, CReprOf, RawBorrow, RawPointerConverter};
+use ffi_convert::{AsRust, CArray, CDrop, CDropError, CReprOf, RawPointerConverter};
 use libc::c_char;
 use prost::Message;
 use std::collections::{HashMap, HashSet};
@@ -25,7 +25,9 @@ use tokio::sync::mpsc::{Sender, channel};
 use tokio_stream::wrappers::ReceiverStream;
 
 use crate::client;
-use crate::runtime::{self, Capability, HsCallback, MVar};
+use crate::runtime::{
+    self, Capability, HsCallback, MVar, byte_array, c_string_safe, copy_byte_array,
+};
 use serde::{Deserialize, Serialize};
 
 pub struct WorkerRef {
@@ -108,24 +110,31 @@ impl TryFrom<&TunerConfig> for TunerHolderOptions {
                 .build()
         });
 
-        let any_resource_based = matches!(
-            cfg.workflow_slot_supplier,
-            Some(SlotSupplierConfig::ResourceBased { .. })
-        ) || matches!(
-            cfg.activity_slot_supplier,
-            Some(SlotSupplierConfig::ResourceBased { .. })
-        ) || matches!(
-            cfg.local_activity_slot_supplier,
-            Some(SlotSupplierConfig::ResourceBased { .. })
-        ) || matches!(
-            cfg.nexus_slot_supplier,
-            Some(SlotSupplierConfig::ResourceBased { .. })
-        );
+        let suppliers = [
+            &cfg.workflow_slot_supplier,
+            &cfg.activity_slot_supplier,
+            &cfg.local_activity_slot_supplier,
+            &cfg.nexus_slot_supplier,
+        ];
+        let any_resource_based = suppliers
+            .iter()
+            .any(|s| matches!(s, Some(SlotSupplierConfig::ResourceBased { .. })));
 
         if any_resource_based && maybe_resource_opts.is_none() {
             return Err(WorkerError {
                 code: WorkerErrorCode::InvalidWorkerConfig,
                 message: "resource_based_tuner_options must be set when any slot supplier is resource_based".to_string(),
+            });
+        }
+
+        // Converting a custom supplier dereferences its handle.
+        if suppliers
+            .iter()
+            .any(|s| matches!(s, Some(SlotSupplierConfig::Custom { handle: 0 })))
+        {
+            return Err(WorkerError {
+                code: WorkerErrorCode::InvalidWorkerConfig,
+                message: "custom slot supplier handle is null".to_string(),
             });
         }
 
@@ -624,12 +633,37 @@ pub struct WorkerError {
     message: String,
 }
 
+impl std::fmt::Display for WorkerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+impl WorkerError {
+    fn new(code: WorkerErrorCode, message: impl Into<String>) -> Self {
+        Self {
+            code,
+            message: message.into(),
+        }
+    }
+}
+
 #[repr(C)]
 #[derive(CReprOf, AsRust, RawPointerConverter, CDrop)]
 #[target_type(WorkerError)]
 pub struct CWorkerError {
     code: WorkerErrorCode,
     message: *const c_char,
+}
+
+impl From<WorkerError> for CWorkerError {
+    fn from(err: WorkerError) -> Self {
+        CWorkerError::c_repr_of(WorkerError {
+            message: c_string_safe(err.message),
+            ..err
+        })
+        .expect("a message without NUL bytes has a C representation")
+    }
 }
 
 struct FormattedError {
@@ -641,6 +675,15 @@ struct FormattedError {
 #[target_type(FormattedError)]
 pub struct CWorkerValidationError {
     message: *const c_char,
+}
+
+impl From<String> for CWorkerValidationError {
+    fn from(message: String) -> Self {
+        CWorkerValidationError::c_repr_of(FormattedError {
+            message: c_string_safe(message),
+        })
+        .expect("a message without NUL bytes has a C representation")
+    }
 }
 
 // TODO: [publish-crate]
@@ -716,39 +759,51 @@ pub unsafe extern "C" fn hs_temporal_new_worker(
     result_slot: *mut *mut WorkerRef,
     error_slot: *mut *mut CWorkerError,
 ) {
-    let client_ref = unsafe { client.as_ref() }.expect("client is null");
-    let config_json = unsafe { CArray::raw_borrow(config).unwrap() };
-    let config = serde_json::from_slice(&config_json.as_rust().unwrap().clone()).map_err(|err| {
-        WorkerError {
-            code: WorkerErrorCode::InvalidWorkerConfig,
-            message: format!("{}", err),
-        }
-    });
-
-    match config {
-        Ok(config) => {
-            let result = new_worker(client_ref, config);
-            match result {
-                Ok(worker_ref) => {
-                    unsafe { *result_slot = Box::into_raw(Box::new(worker_ref)) };
-                }
-                Err(worker_error) => {
-                    unsafe {
-                        *error_slot = CWorkerError::c_repr_of(worker_error)
-                            .unwrap()
-                            .into_raw_pointer_mut()
-                    };
-                }
-            }
-        }
-        Err(worker_error) => {
-            unsafe {
-                *error_slot = CWorkerError::c_repr_of(worker_error)
-                    .unwrap()
-                    .into_raw_pointer_mut()
-            };
-        }
+    let result = unsafe { client.as_ref() }
+        .ok_or_else(|| WorkerError::new(WorkerErrorCode::SDKError, "client is null"))
+        .and_then(|client_ref| {
+            let config = unsafe { read_worker_config(config) }?;
+            new_worker(client_ref, config)
+        });
+    match result {
+        Ok(worker_ref) => unsafe { *result_slot = Box::into_raw(Box::new(worker_ref)) },
+        Err(worker_error) => unsafe {
+            *error_slot = CWorkerError::from(worker_error).into_raw_pointer_mut()
+        },
     }
+}
+
+/// Parse the worker configuration sent by `Temporal.Core.Worker`.
+pub(crate) fn parse_worker_config(json: &[u8]) -> Result<WorkerConfig, WorkerError> {
+    serde_json::from_slice(json).map_err(|err| {
+        WorkerError::new(
+            WorkerErrorCode::InvalidWorkerConfig,
+            format!("Invalid worker config: {err}"),
+        )
+    })
+}
+
+/// # Safety
+///
+/// See [runtime::copy_byte_array].
+unsafe fn read_worker_config(config: *const CArray<u8>) -> Result<WorkerConfig, WorkerError> {
+    let json = unsafe { copy_byte_array(config, "worker config") }
+        .map_err(|message| WorkerError::new(WorkerErrorCode::InvalidWorkerConfig, message))?;
+    parse_worker_config(&json)
+}
+
+/// Read a caller-supplied byte array, reporting a null pointer as `code`.
+///
+/// # Safety
+///
+/// See [runtime::copy_byte_array].
+unsafe fn read_bytes(
+    array: *const CArray<u8>,
+    description: &str,
+    code: WorkerErrorCode,
+) -> Result<Vec<u8>, WorkerError> {
+    unsafe { copy_byte_array(array, description) }
+        .map_err(|message| WorkerError::new(code, message))
 }
 
 fn new_replay_worker(
@@ -784,173 +839,159 @@ pub unsafe extern "C" fn hs_temporal_new_replay_worker(
     history_slot: *mut *mut HistoryPusher,
     error_slot: *mut *mut CWorkerError,
 ) {
-    let runtime_ref = unsafe { runtime.as_ref() }.expect("client is null");
-    let config_json = unsafe { CArray::raw_borrow(config).unwrap() };
-    let config =
-        serde_json::from_slice(&config_json.as_rust().unwrap()).map_err(|err| WorkerError {
-            code: WorkerErrorCode::InvalidWorkerConfig,
-            message: format!("{}", err),
+    let result = unsafe { runtime.as_ref() }
+        .ok_or_else(|| WorkerError::new(WorkerErrorCode::SDKError, "runtime is null"))
+        .and_then(|runtime_ref| {
+            let config = unsafe { read_worker_config(config) }?;
+            new_replay_worker(runtime_ref, config)
         });
+    match result {
+        Ok((worker_ref, history_pusher)) => unsafe {
+            *worker_slot = Box::into_raw(Box::new(worker_ref));
+            *history_slot = Box::into_raw(Box::new(history_pusher));
+        },
+        Err(worker_error) => unsafe {
+            *error_slot = CWorkerError::from(worker_error).into_raw_pointer_mut()
+        },
+    }
+}
 
-    match config {
-        Ok(config) => {
-            let result = new_replay_worker(runtime_ref, config);
-            match result {
-                Ok((worker_ref, history_pusher)) => unsafe {
-                    *worker_slot = Box::into_raw(Box::new(worker_ref));
-                    *history_slot = Box::into_raw(Box::new(history_pusher));
-                },
-                Err(worker_error) => {
-                    unsafe {
-                        *error_slot = CWorkerError::c_repr_of(worker_error)
-                            .unwrap()
-                            .into_raw_pointer_mut()
-                    };
-                }
-            }
+fn poll_error(err: PollError, failure_prefix: &str) -> WorkerError {
+    match err {
+        PollError::ShutDown => {
+            WorkerError::new(WorkerErrorCode::PollShutdownError, "Poll shutdown error")
         }
-        Err(worker_error) => {
-            unsafe {
-                *error_slot = CWorkerError::c_repr_of(worker_error)
-                    .unwrap()
-                    .into_raw_pointer_mut()
-            };
-        }
+        err => WorkerError::new(
+            WorkerErrorCode::PollFailure,
+            format!("{failure_prefix}{err}"),
+        ),
     }
 }
 
 impl WorkerRef {
+    /// The Core worker, unless finalization has already taken it.
+    ///
+    /// Haskell checks the worker lifecycle before each call, but a call can
+    /// still race with `finalize_shutdown`; report that as `code`.
+    fn core_worker(
+        &self,
+        code: WorkerErrorCode,
+    ) -> Result<Arc<temporalio_sdk_core::Worker>, WorkerError> {
+        self.worker
+            .clone()
+            .ok_or_else(|| WorkerError::new(code, "Worker finalization has already started"))
+    }
+
+    fn spawn_reporting<T, F>(&self, hs: HsCallback<T, CWorkerError>, fut: F)
+    where
+        F: Future<Output = Result<T, WorkerError>> + Send + 'static,
+        T: RawPointerConverter<T> + 'static,
+    {
+        spawn_reporting(&self.runtime, hs, fut)
+    }
+
     fn poll_workflow_activation(&self, hs: HsCallback<CArray<u8>, CWorkerError>) {
-        let worker = self.worker.as_ref().unwrap().clone();
-        self.runtime.future_result_into_hs(hs, async move {
-            let bytes = match worker.poll_workflow_activation().await {
-                Ok(act) => Ok(act.encode_to_vec()),
-                Err(PollError::ShutDown) => Err(WorkerError {
-                    code: WorkerErrorCode::PollShutdownError,
-                    message: "Poll shutdown error".to_string(),
-                }),
-                Err(err) => Err(WorkerError {
-                    code: WorkerErrorCode::PollFailure,
-                    message: format!("{}", err),
-                }),
-            };
-            Ok(
-                CArray::c_repr_of(bytes.map_err(|err| CWorkerError::c_repr_of(err).unwrap())?)
-                    .unwrap(),
-            )
+        let worker = self.core_worker(WorkerErrorCode::PollShutdownError);
+        self.spawn_reporting(hs, async move {
+            let act = worker?
+                .poll_workflow_activation()
+                .await
+                .map_err(|err| poll_error(err, ""))?;
+            Ok(byte_array(act.encode_to_vec()))
         })
     }
 
     fn poll_activity_task(&self, hs: HsCallback<CArray<u8>, CWorkerError>) {
-        let worker = self.worker.as_ref().unwrap().clone();
-        self.runtime.future_result_into_hs(hs, async move {
-            let bytes = (match worker.poll_activity_task().await {
-                Ok(task) => Ok(task.encode_to_vec()),
-                Err(PollError::ShutDown) => Err(WorkerError {
-                    code: WorkerErrorCode::PollShutdownError,
-                    message: "Poll shutdown error".to_string(),
-                }),
-                Err(err) => Err(WorkerError {
-                    code: WorkerErrorCode::PollFailure,
-                    message: format!("Poll failure: {}", err),
-                }),
-            })
-            .map_err(|err| CWorkerError::c_repr_of(err).unwrap());
-            Ok(CArray::c_repr_of(bytes?).unwrap())
-        })
-    }
-
-    fn complete_workflow_activation(&self, hs: HsCallback<CUnit, CWorkerError>, proto: &[u8]) {
-        let worker = self.worker.as_ref().unwrap().clone();
-        let completion = WorkflowActivationCompletion::decode(proto);
-        self.runtime.future_result_into_hs(hs, async move {
-            let completion = completion.map_err(|err| {
-                CWorkerError::c_repr_of(WorkerError {
-                    code: WorkerErrorCode::InvalidProto,
-                    message: format!("Invalid proto: {}", err),
-                })
-                .unwrap()
-            })?;
-            worker
-                .complete_workflow_activation(completion)
+        let worker = self.core_worker(WorkerErrorCode::PollShutdownError);
+        self.spawn_reporting(hs, async move {
+            let task = worker?
+                .poll_activity_task()
                 .await
-                .map_err(|err| {
-                    CWorkerError::c_repr_of(WorkerError {
-                        code: WorkerErrorCode::CompletionFailure,
-                        message: format!("{}", err),
-                    })
-                    .unwrap()
-                })?;
-            Ok(CUnit {})
-        })
-    }
-
-    fn complete_activity_task(&self, hs: HsCallback<CUnit, CWorkerError>, proto: &[u8]) {
-        let worker = self.worker.as_ref().unwrap().clone();
-        let completion = ActivityTaskCompletion::decode(proto);
-        self.runtime.future_result_into_hs(hs, async move {
-            let completion = completion.map_err(|err| {
-                CWorkerError::c_repr_of(WorkerError {
-                    code: WorkerErrorCode::InvalidProto,
-                    message: format!("{}", err),
-                })
-                .unwrap()
-            })?;
-            worker
-                .complete_activity_task(completion)
-                .await
-                .map_err(|err| {
-                    CWorkerError::c_repr_of(WorkerError {
-                        code: WorkerErrorCode::CompletionFailure,
-                        message: format!("{}", err),
-                    })
-                    .unwrap()
-                })?;
-            Ok(CUnit {})
+                .map_err(|err| poll_error(err, "Poll failure: "))?;
+            Ok(byte_array(task.encode_to_vec()))
         })
     }
 
     fn poll_nexus_task(&self, hs: HsCallback<CArray<u8>, CWorkerError>) {
-        let worker = self.worker.as_ref().unwrap().clone();
-        self.runtime.future_result_into_hs(hs, async move {
-            let bytes = match worker.poll_nexus_task().await {
-                Ok(task) => Ok(task.encode_to_vec()),
-                Err(PollError::ShutDown) => Err(WorkerError {
-                    code: WorkerErrorCode::PollShutdownError,
-                    message: "Poll shutdown error".to_string(),
-                }),
-                Err(err) => Err(WorkerError {
-                    code: WorkerErrorCode::PollFailure,
-                    message: format!("Poll failure: {}", err),
-                }),
-            };
-            Ok(
-                CArray::c_repr_of(bytes.map_err(|err| CWorkerError::c_repr_of(err).unwrap())?)
-                    .unwrap(),
-            )
+        let worker = self.core_worker(WorkerErrorCode::PollShutdownError);
+        self.spawn_reporting(hs, async move {
+            let task = worker?
+                .poll_nexus_task()
+                .await
+                .map_err(|err| poll_error(err, "Poll failure: "))?;
+            Ok(byte_array(task.encode_to_vec()))
         })
     }
 
-    fn complete_nexus_task(&self, hs: HsCallback<CUnit, CWorkerError>, proto: &[u8]) {
-        let worker = self.worker.as_ref().unwrap().clone();
-        let completion = NexusTaskCompletion::decode(proto);
-        self.runtime.future_result_into_hs(hs, async move {
-            let completion = completion.map_err(|err| {
-                CWorkerError::c_repr_of(WorkerError {
-                    code: WorkerErrorCode::InvalidProto,
-                    message: format!("Invalid proto: {}", err),
-                })
-                .unwrap()
-            })?;
-            worker
+    fn complete_workflow_activation(
+        &self,
+        hs: HsCallback<CUnit, CWorkerError>,
+        proto: Result<Vec<u8>, WorkerError>,
+    ) {
+        let worker = self.core_worker(WorkerErrorCode::CompletionFailure);
+        let completion = proto.and_then(|proto| {
+            WorkflowActivationCompletion::decode(proto.as_slice()).map_err(|err| {
+                WorkerError::new(
+                    WorkerErrorCode::InvalidProto,
+                    format!("Invalid proto: {}", err),
+                )
+            })
+        });
+        self.spawn_reporting(hs, async move {
+            let completion = completion?;
+            worker?
+                .complete_workflow_activation(completion)
+                .await
+                .map_err(|err| {
+                    WorkerError::new(WorkerErrorCode::CompletionFailure, format!("{}", err))
+                })?;
+            Ok(CUnit {})
+        })
+    }
+
+    fn complete_activity_task(
+        &self,
+        hs: HsCallback<CUnit, CWorkerError>,
+        proto: Result<Vec<u8>, WorkerError>,
+    ) {
+        let worker = self.core_worker(WorkerErrorCode::CompletionFailure);
+        let completion = proto.and_then(|proto| {
+            ActivityTaskCompletion::decode(proto.as_slice())
+                .map_err(|err| WorkerError::new(WorkerErrorCode::InvalidProto, format!("{}", err)))
+        });
+        self.spawn_reporting(hs, async move {
+            let completion = completion?;
+            worker?
+                .complete_activity_task(completion)
+                .await
+                .map_err(|err| {
+                    WorkerError::new(WorkerErrorCode::CompletionFailure, format!("{}", err))
+                })?;
+            Ok(CUnit {})
+        })
+    }
+
+    fn complete_nexus_task(
+        &self,
+        hs: HsCallback<CUnit, CWorkerError>,
+        proto: Result<Vec<u8>, WorkerError>,
+    ) {
+        let worker = self.core_worker(WorkerErrorCode::CompletionFailure);
+        let completion = proto.and_then(|proto| {
+            NexusTaskCompletion::decode(proto.as_slice()).map_err(|err| {
+                WorkerError::new(
+                    WorkerErrorCode::InvalidProto,
+                    format!("Invalid proto: {}", err),
+                )
+            })
+        });
+        self.spawn_reporting(hs, async move {
+            let completion = completion?;
+            worker?
                 .complete_nexus_task(completion)
                 .await
                 .map_err(|err| {
-                    CWorkerError::c_repr_of(WorkerError {
-                        code: WorkerErrorCode::CompletionFailure,
-                        message: format!("{}", err),
-                    })
-                    .unwrap()
+                    WorkerError::new(WorkerErrorCode::CompletionFailure, format!("{}", err))
                 })?;
             Ok(CUnit {})
         })
@@ -974,11 +1015,11 @@ impl WorkerRef {
     }
 
     fn request_workflow_eviction(&self, run_id: &str) {
-        enter_sync!(self.runtime);
-        self.worker
-            .as_ref()
-            .unwrap()
-            .request_workflow_eviction(run_id);
+        // There is nothing to evict once finalization has taken the worker.
+        if let Some(worker) = &self.worker {
+            enter_sync!(self.runtime);
+            worker.request_workflow_eviction(run_id);
+        }
     }
 
     fn initiate_shutdown(&self) {
@@ -990,17 +1031,14 @@ impl WorkerRef {
     }
 
     fn finalize_shutdown(&mut self, hs: HsCallback<CUnit, CWorkerError>) {
-        let Some(core_worker) = self.worker.take() else {
-            self.runtime.future_result_into_hs(hs, async {
-                Err(CWorkerError::c_repr_of(WorkerError {
-                    code: WorkerErrorCode::SDKError,
-                    message: "Worker finalization has already started".to_string(),
-                })
-                .unwrap())
-            });
-            return;
-        };
-        self.runtime.future_result_into_hs(hs, async move {
+        let core_worker = self.worker.take();
+        self.spawn_reporting(hs, async move {
+            let Some(core_worker) = core_worker else {
+                return Err(WorkerError::new(
+                    WorkerErrorCode::SDKError,
+                    "Worker finalization has already started",
+                ));
+            };
             // An interrupted Haskell wait does not cancel its Tokio task. Wait
             // for Core shutdown before unwrapping so any outstanding poll or
             // completion task can finish and release its worker reference.
@@ -1010,17 +1048,25 @@ impl WorkerRef {
                     worker.finalize_shutdown().await;
                     Ok(CUnit {})
                 }
-                Err(arc) => Err(CWorkerError::c_repr_of(WorkerError {
-                    code: WorkerErrorCode::SDKError,
-                    message: format!(
+                Err(arc) => Err(WorkerError::new(
+                    WorkerErrorCode::SDKError,
+                    format!(
                         "Cannot finalize, expected 1 reference, got {}",
                         Arc::strong_count(&arc)
                     ),
-                })
-                .unwrap()),
+                )),
             }
         })
     }
+}
+
+/// Schedule `fut` on `runtime` and report its result through `hs`.
+fn spawn_reporting<T, F>(runtime: &runtime::Runtime, hs: HsCallback<T, CWorkerError>, fut: F)
+where
+    F: Future<Output = Result<T, WorkerError>> + Send + 'static,
+    T: RawPointerConverter<T> + 'static,
+{
+    runtime.future_result_into_hs(hs, async move { fut.await.map_err(CWorkerError::from) })
 }
 
 // TODO: [publish-crate]
@@ -1043,15 +1089,12 @@ pub unsafe extern "C" fn hs_temporal_validate_worker(
         result_slot,
     };
 
-    let w = worker.worker.as_ref().unwrap().clone();
+    let w = worker.core_worker(WorkerErrorCode::SDKError);
     worker.runtime.future_result_into_hs(hs, async move {
-        let result = w.validate().await;
-        match result {
+        let w = w.map_err(|err| CWorkerValidationError::from(err.message))?;
+        match w.validate().await {
             Ok(()) => Ok(CUnit {}),
-            Err(err) => Err(CWorkerValidationError::c_repr_of(FormattedError {
-                message: format!("{}", err),
-            })
-            .unwrap()),
+            Err(err) => Err(CWorkerValidationError::from(format!("{}", err))),
         }
     })
 }
@@ -1114,8 +1157,7 @@ pub unsafe extern "C" fn hs_temporal_worker_complete_workflow_activation(
     result_slot: *mut *mut CUnit,
 ) {
     let worker = unsafe { &*worker };
-    let proto: &CArray<u8> = unsafe { CArray::raw_borrow(proto).unwrap() };
-    let proto: &[u8] = &proto.as_rust().unwrap().clone();
+    let proto = unsafe { read_bytes(proto, "completion", WorkerErrorCode::InvalidProto) };
     let hs = HsCallback {
         mvar,
         cap,
@@ -1139,8 +1181,7 @@ pub unsafe extern "C" fn hs_temporal_worker_complete_activity_task(
     result_slot: *mut *mut CUnit,
 ) {
     let worker = unsafe { &*worker };
-    let proto: &CArray<u8> = unsafe { CArray::raw_borrow(proto).unwrap() };
-    let proto: &[u8] = &proto.as_rust().unwrap().clone();
+    let proto = unsafe { read_bytes(proto, "completion", WorkerErrorCode::InvalidProto) };
     let hs = HsCallback {
         mvar,
         cap,
@@ -1186,8 +1227,7 @@ pub unsafe extern "C" fn hs_temporal_worker_complete_nexus_task(
     result_slot: *mut *mut CUnit,
 ) {
     let worker = unsafe { &*worker };
-    let proto: &CArray<u8> = unsafe { CArray::raw_borrow(proto).unwrap() };
-    let proto: &[u8] = &proto.as_rust().unwrap().clone();
+    let proto = unsafe { read_bytes(proto, "completion", WorkerErrorCode::InvalidProto) };
     let hs = HsCallback {
         mvar,
         cap,
@@ -1209,21 +1249,17 @@ pub unsafe extern "C" fn hs_temporal_worker_record_activity_heartbeat(
     result_slot: *mut *mut CUnit,
 ) {
     let worker = unsafe { &*worker };
-    let proto: &CArray<u8> = unsafe { CArray::raw_borrow(proto).unwrap() };
-    let proto: &[u8] = &proto.as_rust().unwrap().clone();
-    let result = worker.record_activity_heartbeat(proto);
+    let result = unsafe { read_bytes(proto, "heartbeat", WorkerErrorCode::InvalidProto) }
+        .and_then(|proto| worker.record_activity_heartbeat(&proto));
     match result {
         Ok(_) => unsafe {
             *error_slot = std::ptr::null_mut();
             *result_slot = std::ptr::null_mut();
         },
-        Err(err) => {
-            let err = CWorkerError::c_repr_of(err).unwrap();
-            unsafe {
-                *error_slot = err.into_raw_pointer_mut();
-                *result_slot = std::ptr::null_mut();
-            }
-        }
+        Err(err) => unsafe {
+            *error_slot = CWorkerError::from(err).into_raw_pointer_mut();
+            *result_slot = std::ptr::null_mut();
+        },
     }
 }
 
@@ -1237,10 +1273,14 @@ pub unsafe extern "C" fn hs_temporal_worker_request_workflow_eviction(
     run_id: *const CArray<u8>,
 ) {
     let worker = unsafe { &*worker };
-    let run_id: &CArray<u8> = unsafe { CArray::raw_borrow(run_id).unwrap() };
-    let run_id: &[u8] = &run_id.as_rust().unwrap().clone();
-    let run_id: &str = unsafe { str::from_utf8_unchecked(run_id) };
-    worker.request_workflow_eviction(run_id)
+    // This call has no error result. Run IDs are UTF-8 strings that Core
+    // issued, so a missing or invalid one cannot match a cached run.
+    let Ok(run_id) = (unsafe { copy_byte_array(run_id, "run ID") }) else {
+        return;
+    };
+    if let Ok(run_id) = str::from_utf8(&run_id) {
+        worker.request_workflow_eviction(run_id)
+    }
 }
 
 // TODO: [publish-crate]
@@ -1296,37 +1336,40 @@ impl HistoryPusher {
 impl HistoryPusher {
     fn push_history(
         &self,
-        workflow_id: &str,
-        history_proto: &[u8],
+        workflow_id: Result<String, WorkerError>,
+        history_proto: Result<Vec<u8>, WorkerError>,
         hs: HsCallback<CUnit, CWorkerError>,
     ) {
-        let history = History::decode(history_proto).map_err(|err| WorkerError {
-            code: WorkerErrorCode::InvalidProto,
-            message: format!("Invalid proto: {}", err),
+        let history = history_proto.and_then(|proto| {
+            History::decode(proto.as_slice()).map_err(|err| WorkerError {
+                code: WorkerErrorCode::InvalidProto,
+                message: format!("Invalid proto: {}", err),
+            })
         });
         self.send_history(workflow_id, history, hs)
     }
 
     fn push_history_json(
         &self,
-        workflow_id: &str,
-        history_json: &[u8],
+        workflow_id: Result<String, WorkerError>,
+        history_json: Result<Vec<u8>, WorkerError>,
         hs: HsCallback<CUnit, CWorkerError>,
     ) {
-        let history = serde_json::from_slice::<History>(history_json).map_err(|err| WorkerError {
-            code: WorkerErrorCode::InvalidProto,
-            message: format!("Invalid history JSON: {}", err),
+        let history = history_json.and_then(|json| {
+            serde_json::from_slice::<History>(&json).map_err(|err| WorkerError {
+                code: WorkerErrorCode::InvalidProto,
+                message: format!("Invalid history JSON: {}", err),
+            })
         });
         self.send_history(workflow_id, history, hs)
     }
 
     fn send_history(
         &self,
-        workflow_id: &str,
+        workflow_id: Result<String, WorkerError>,
         history: Result<History, WorkerError>,
         hs: HsCallback<CUnit, CWorkerError>,
     ) {
-        let wfid = workflow_id.to_string();
         let tx = if let Some(tx) = self.tx.as_ref() {
             Ok(tx.clone())
         } else {
@@ -1335,19 +1378,16 @@ impl HistoryPusher {
                 message: "Replay worker is no longer accepting new histories".to_string(),
             })
         };
-        self.runtime.future_result_into_hs(hs, async move {
-            let history = history.map_err(|err| CWorkerError::c_repr_of(err).unwrap())?;
-            let tx = tx.map_err(|err| CWorkerError::c_repr_of(err).unwrap())?;
-
-            tx.send(HistoryForReplay::new(history, wfid))
+        spawn_reporting(&self.runtime, hs, async move {
+            let wfid = workflow_id?;
+            let history = history?;
+            tx?.send(HistoryForReplay::new(history, wfid))
                 .await
                 .map_err(|_| {
-                    CWorkerError::c_repr_of(WorkerError {
-                        code: WorkerErrorCode::SDKError,
-                        message: "Channel for history replay was dropped, this is an SDK bug."
-                            .to_string(),
-                    })
-                    .unwrap()
+                    WorkerError::new(
+                        WorkerErrorCode::SDKError,
+                        "Channel for history replay was dropped, this is an SDK bug.",
+                    )
                 })?;
             Ok(CUnit {})
         })
@@ -1356,6 +1396,21 @@ impl HistoryPusher {
     fn close(&mut self) {
         self.tx.take();
     }
+}
+
+/// Read a workflow ID, which Haskell passes as arbitrary bytes.
+///
+/// # Safety
+///
+/// See [runtime::copy_byte_array].
+unsafe fn read_workflow_id(workflow_id: *const CArray<u8>) -> Result<String, WorkerError> {
+    let bytes = unsafe { read_bytes(workflow_id, "workflow ID", WorkerErrorCode::InvalidProto) }?;
+    String::from_utf8(bytes).map_err(|err| {
+        WorkerError::new(
+            WorkerErrorCode::InvalidProto,
+            format!("Workflow ID is not valid UTF-8: {err}"),
+        )
+    })
 }
 
 // TODO: [publish-crate]
@@ -1373,11 +1428,9 @@ pub unsafe extern "C" fn hs_temporal_history_pusher_push_history(
     result_slot: *mut *mut CUnit,
 ) {
     let history_pusher = unsafe { &mut *history_pusher };
-    let workflow_id: &CArray<u8> = unsafe { CArray::raw_borrow(workflow_id).unwrap() };
-    let workflow_id = workflow_id.as_rust().unwrap().clone();
-    let workflow_id: &str = unsafe { str::from_utf8_unchecked(&workflow_id) };
-    let history_proto: &CArray<u8> = unsafe { CArray::raw_borrow(history_proto).unwrap() };
-    let history_proto: &[u8] = &history_proto.as_rust().unwrap().clone();
+    let workflow_id = unsafe { read_workflow_id(workflow_id) };
+    let history_proto =
+        unsafe { read_bytes(history_proto, "history", WorkerErrorCode::InvalidProto) };
     history_pusher.push_history(
         workflow_id,
         history_proto,
@@ -1405,11 +1458,9 @@ pub unsafe extern "C" fn hs_temporal_history_pusher_push_history_json(
     result_slot: *mut *mut CUnit,
 ) {
     let history_pusher = unsafe { &mut *history_pusher };
-    let workflow_id: &CArray<u8> = unsafe { CArray::raw_borrow(workflow_id).unwrap() };
-    let workflow_id = workflow_id.as_rust().unwrap().clone();
-    let workflow_id: &str = unsafe { str::from_utf8_unchecked(&workflow_id) };
-    let history_json: &CArray<u8> = unsafe { CArray::raw_borrow(history_json).unwrap() };
-    let history_json: &[u8] = &history_json.as_rust().unwrap().clone();
+    let workflow_id = unsafe { read_workflow_id(workflow_id) };
+    let history_json =
+        unsafe { read_bytes(history_json, "history JSON", WorkerErrorCode::InvalidProto) };
     history_pusher.push_history_json(
         workflow_id,
         history_json,
@@ -1438,28 +1489,16 @@ pub unsafe extern "C" fn hs_temporal_history_proto_to_json(
     result_slot: *mut *mut CArray<u8>,
     error_slot: *mut *mut CArray<u8>,
 ) {
-    let history_proto: &CArray<u8> = unsafe { CArray::raw_borrow(history_proto).unwrap() };
-    let history_proto_bytes: Vec<u8> = history_proto.as_rust().unwrap().clone();
-
-    match History::decode(history_proto_bytes.as_slice()) {
-        Ok(history) => match serde_json::to_vec(&history) {
-            Ok(json_bytes) => unsafe {
-                *result_slot = CArray::c_repr_of(json_bytes)
-                    .unwrap()
-                    .into_raw_pointer_mut();
-            },
-            Err(err) => unsafe {
-                *error_slot =
-                    CArray::c_repr_of(format!("JSON serialization failed: {}", err).into_bytes())
-                        .unwrap()
-                        .into_raw_pointer_mut();
-            },
+    let json = unsafe { copy_byte_array(history_proto, "history") }.and_then(|bytes| {
+        let history = History::decode(bytes.as_slice())
+            .map_err(|err| format!("Proto decode failed: {}", err))?;
+        serde_json::to_vec(&history).map_err(|err| format!("JSON serialization failed: {}", err))
+    });
+    match json {
+        Ok(json_bytes) => unsafe {
+            *result_slot = byte_array(json_bytes).into_raw_pointer_mut();
         },
-        Err(err) => unsafe {
-            *error_slot = CArray::c_repr_of(format!("Proto decode failed: {}", err).into_bytes())
-                .unwrap()
-                .into_raw_pointer_mut();
-        },
+        Err(message) => unsafe { runtime::write_error_slot(error_slot, message) },
     }
 }
 
@@ -1492,7 +1531,36 @@ pub unsafe extern "C" fn hs_temporal_history_pusher_drop(history_pusher: *mut Hi
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::runtime::test_support::{TestWaiter, new_test_runtime, test_cap};
     use serde_json::json;
+
+    fn full_worker_config() -> serde_json::Value {
+        json!({
+            "namespace": "ns",
+            "task_queue": "tq",
+            "build_id": "build",
+            "client_identity_override": "identity",
+            "max_cached_workflows": 7,
+            "tuner": null,
+            "max_outstanding_workflow_tasks": 11,
+            "max_outstanding_activities": 12,
+            "max_outstanding_local_activities": 13,
+            "max_outstanding_nexus_tasks": 14,
+            "max_concurrent_workflow_task_polls": 3,
+            "max_concurrent_activity_task_polls": 4,
+            "max_concurrent_nexus_task_polls": 6,
+            "nonsticky_to_sticky_poll_ratio": 0.5,
+            "sticky_queue_schedule_to_start_timeout_millis": 1001,
+            "max_heartbeat_throttle_interval_millis": 1002,
+            "default_heartbeat_throttle_interval_millis": 1003,
+            "max_task_queue_activities_per_second": 2.5,
+            "max_worker_activities_per_second": 3.5,
+            "graceful_shutdown_period_millis": 1004,
+            "nondeterminism_as_workflow_fail": true,
+            "nondeterminism_as_workflow_fail_for_types": ["WfA", "WfB"],
+            "no_remote_activities": true
+        })
+    }
 
     fn full_tuner_config() -> serde_json::Value {
         json!({
@@ -1527,5 +1595,132 @@ mod tests {
         let resource = opts.resource_based_options.unwrap();
         assert_eq!(resource.target_mem_usage, 0.6);
         assert_eq!(resource.target_cpu_usage, 0.8);
+    }
+
+    #[test]
+    fn custom_slot_supplier_handle_must_not_be_null() {
+        let mut config = full_tuner_config();
+        config["nexus_slot_supplier"] = json!({"type": "custom", "handle": 0});
+        let err = TunerHolderOptions::try_from(&tuner_config(config))
+            .err()
+            .unwrap();
+        assert!(matches!(err.code, WorkerErrorCode::InvalidWorkerConfig));
+        assert_eq!(err.message, "custom slot supplier handle is null");
+    }
+
+    #[test]
+    fn new_worker_reports_bad_input_instead_of_panicking() {
+        let config = byte_array(full_worker_config().to_string().into_bytes());
+        let mut worker: *mut WorkerRef = std::ptr::null_mut();
+        let mut error: *mut CWorkerError = std::ptr::null_mut();
+        unsafe { hs_temporal_new_worker(std::ptr::null_mut(), &config, &mut worker, &mut error) };
+        assert!(worker.is_null());
+        let error: WorkerError = unsafe { CWorkerError::from_raw_pointer_mut(error) }
+            .unwrap()
+            .as_rust()
+            .unwrap();
+        assert!(matches!(error.code, WorkerErrorCode::SDKError));
+        assert_eq!(error.message, "client is null");
+    }
+
+    fn new_replay_worker_from(
+        runtime: &mut runtime::RuntimeRef,
+        config: *const CArray<u8>,
+    ) -> Result<(WorkerRef, HistoryPusher), WorkerError> {
+        let mut worker: *mut WorkerRef = std::ptr::null_mut();
+        let mut pusher: *mut HistoryPusher = std::ptr::null_mut();
+        let mut error: *mut CWorkerError = std::ptr::null_mut();
+        unsafe {
+            hs_temporal_new_replay_worker(runtime, config, &mut worker, &mut pusher, &mut error)
+        };
+        if error.is_null() {
+            Ok(unsafe { (*Box::from_raw(worker), *Box::from_raw(pusher)) })
+        } else {
+            Err(unsafe { CWorkerError::from_raw_pointer_mut(error) }
+                .unwrap()
+                .as_rust()
+                .unwrap())
+        }
+    }
+
+    #[test]
+    fn new_replay_worker_reports_invalid_config() {
+        let mut runtime = new_test_runtime();
+        let config = byte_array(b"{\"namespace\":1}".to_vec());
+        let err = new_replay_worker_from(&mut runtime, &config).err().unwrap();
+        assert!(matches!(err.code, WorkerErrorCode::InvalidWorkerConfig));
+        assert!(err.message.starts_with("Invalid worker config"));
+
+        let err = new_replay_worker_from(&mut runtime, std::ptr::null())
+            .err()
+            .unwrap();
+        assert!(matches!(err.code, WorkerErrorCode::InvalidWorkerConfig));
+        assert_eq!(err.message, "worker config pointer is null");
+    }
+
+    #[test]
+    fn calls_after_finalization_report_errors() {
+        let runtime = new_test_runtime();
+        let worker = WorkerRef {
+            worker: None,
+            runtime: runtime.runtime.clone(),
+        };
+
+        let mut waiter = TestWaiter::<CArray<u8>, CWorkerError>::new();
+        worker.poll_workflow_activation(HsCallback {
+            cap: test_cap(),
+            mvar: waiter.mvar(),
+            result_slot: &mut *waiter.result_slot,
+            error_slot: &mut *waiter.error_slot,
+        });
+        let err: WorkerError = waiter.wait().err().unwrap().as_rust().unwrap();
+        assert!(matches!(err.code, WorkerErrorCode::PollShutdownError));
+
+        let mut waiter = TestWaiter::<CUnit, CWorkerError>::new();
+        worker.complete_activity_task(
+            HsCallback {
+                cap: test_cap(),
+                mvar: waiter.mvar(),
+                result_slot: &mut *waiter.result_slot,
+                error_slot: &mut *waiter.error_slot,
+            },
+            Ok(vec![]),
+        );
+        let err: WorkerError = waiter.wait().err().unwrap().as_rust().unwrap();
+        assert!(matches!(err.code, WorkerErrorCode::CompletionFailure));
+
+        // Eviction has no error result; it must not panic.
+        worker.request_workflow_eviction("run");
+    }
+
+    #[test]
+    fn push_history_rejects_a_non_utf8_workflow_id() {
+        let mut runtime = new_test_runtime();
+        let config = byte_array(full_worker_config().to_string().into_bytes());
+        let (_worker, mut pusher) = new_replay_worker_from(&mut runtime, &config).unwrap();
+        let workflow_id = byte_array(vec![0xff, 0xfe]);
+        let history = byte_array(vec![]);
+        let mut waiter = TestWaiter::<CUnit, CWorkerError>::new();
+        unsafe {
+            hs_temporal_history_pusher_push_history(
+                &mut pusher,
+                &workflow_id,
+                &history,
+                waiter.mvar(),
+                test_cap(),
+                &mut *waiter.error_slot,
+                &mut *waiter.result_slot,
+            )
+        };
+        let err: WorkerError = waiter.wait().err().unwrap().as_rust().unwrap();
+        assert!(matches!(err.code, WorkerErrorCode::InvalidProto));
+        assert!(err.message.starts_with("Workflow ID is not valid UTF-8"));
+    }
+
+    #[test]
+    fn worker_error_conversion_tolerates_nul_bytes() {
+        let err = CWorkerError::from(WorkerError::new(WorkerErrorCode::SDKError, "a\0b"));
+        let err: WorkerError = err.as_rust().unwrap();
+        assert_eq!(err.message, "a\u{FFFD}b");
     }
 }
