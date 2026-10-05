@@ -247,6 +247,78 @@ pub unsafe extern "C" fn hs_temporal_start_test_server(
 mod tests {
     use super::*;
     use crate::runtime::test_support::{TestWaiter, error_text, new_test_runtime, test_cap};
+    use serde_json::json;
+
+    fn full_dev_server_config() -> serde_json::Value {
+        json!({
+            "exe": {
+                "type": "CachedDownload",
+                "contents": {
+                    "version": {
+                        "type": "SDKDefault",
+                        "contents": {"sdk_name": "sdk", "sdk_version": "1.0"}
+                    },
+                    "dest_dir": "/tmp/dest",
+                    "ttl": {"secs": 60, "nanos": 0}
+                }
+            },
+            "namespace": "ns",
+            "ip": "127.0.0.2",
+            "port": 1234,
+            "db_filename": "db.sqlite",
+            "ui": true,
+            "ui_port": 2345,
+            "log": ["json", "debug"],
+            "extra_args": ["--flag"]
+        })
+    }
+
+    #[test]
+    fn dev_server_config_receives_every_field() {
+        let config =
+            parse_dev_server_config(full_dev_server_config().to_string().as_bytes()).unwrap();
+        let EphemeralExe::CachedDownload {
+            version:
+                EphemeralExeVersion::SDKDefault {
+                    sdk_name,
+                    sdk_version,
+                },
+            dest_dir,
+            ttl,
+        } = config.exe
+        else {
+            panic!("expected a cached SDK default download");
+        };
+        assert_eq!(sdk_name, "sdk");
+        assert_eq!(sdk_version, "1.0");
+        assert_eq!(dest_dir.as_deref(), Some("/tmp/dest"));
+        assert_eq!(ttl, Some(Duration::from_secs(60)));
+        assert_eq!(config.namespace, "ns");
+        assert_eq!(config.ip, "127.0.0.2");
+        assert_eq!(config.port, Some(1234));
+        assert_eq!(config.db_filename.as_deref(), Some("db.sqlite"));
+        assert!(config.ui);
+        assert_eq!(config.ui_port, Some(2345));
+        assert_eq!(config.log, ("json".to_string(), "debug".to_string()));
+        assert_eq!(config.extra_args, vec!["--flag".to_string()]);
+    }
+
+    #[test]
+    fn test_server_config_receives_every_field() {
+        let config = parse_test_server_config(
+            json!({
+                "exe": {"type": "ExistingPath", "contents": "/bin/server"},
+                "port": 7,
+                "extra_args": ["a", "b"]
+            })
+            .to_string()
+            .as_bytes(),
+        )
+        .unwrap();
+        assert!(matches!(config.exe, EphemeralExe::ExistingPath(ref p) if p == "/bin/server"));
+        assert_eq!(config.port, Some(7));
+        assert_eq!(config.extra_args, vec!["a".to_string(), "b".to_string()]);
+    }
 
     type StartServer = unsafe extern "C" fn(
         *mut RuntimeRef,

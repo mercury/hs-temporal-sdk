@@ -1533,6 +1533,9 @@ mod tests {
     use super::*;
     use crate::runtime::test_support::{TestWaiter, new_test_runtime, test_cap};
     use serde_json::json;
+    use temporalio_common::worker::{
+        ActivitySlotKind, LocalActivitySlotKind, NexusSlotKind, WorkerTuner, WorkflowSlotKind,
+    };
 
     fn full_worker_config() -> serde_json::Value {
         json!({
@@ -1589,12 +1592,128 @@ mod tests {
         serde_json::from_value(json).unwrap()
     }
 
+    fn core_config(
+        json: serde_json::Value,
+    ) -> Result<temporalio_sdk_core::WorkerConfig, WorkerError> {
+        parse_worker_config(json.to_string().as_bytes())?.try_into()
+    }
+
+    fn debug<T: std::fmt::Debug>(value: T) -> String {
+        format!("{value:?}")
+    }
+
     #[test]
     fn resource_based_tuner_uses_both_targets() {
         let opts = TunerHolderOptions::try_from(&tuner_config(full_tuner_config())).unwrap();
         let resource = opts.resource_based_options.unwrap();
         assert_eq!(resource.target_mem_usage, 0.6);
         assert_eq!(resource.target_cpu_usage, 0.8);
+    }
+
+    #[test]
+    fn tuner_slot_options_match_the_config() {
+        let opts = TunerHolderOptions::try_from(&tuner_config(full_tuner_config())).unwrap();
+        assert_eq!(
+            debug(opts.workflow_slot_options),
+            debug(Some(SlotSupplierOptions::<WorkflowSlotKind>::FixedSize {
+                slots: 5
+            }))
+        );
+        assert_eq!(
+            debug(opts.activity_slot_options),
+            debug(Some(
+                SlotSupplierOptions::<ActivitySlotKind>::ResourceBased(ResourceSlotOptions::new(
+                    2,
+                    20,
+                    Duration::from_millis(30)
+                ))
+            ))
+        );
+        assert_eq!(
+            debug(opts.local_activity_slot_options),
+            debug(Some(
+                SlotSupplierOptions::<LocalActivitySlotKind>::ResourceBased(
+                    ResourceSlotOptions::new(1, 10_000, Duration::from_millis(50))
+                )
+            ))
+        );
+        assert!(opts.nexus_slot_options.is_none());
+    }
+
+    #[test]
+    fn resource_based_suppliers_require_tuner_options() {
+        for supplier in [
+            "workflow_slot_supplier",
+            "activity_slot_supplier",
+            "local_activity_slot_supplier",
+            "nexus_slot_supplier",
+        ] {
+            let mut config = json!({
+                "workflow_slot_supplier": null,
+                "activity_slot_supplier": null,
+                "local_activity_slot_supplier": null,
+                "nexus_slot_supplier": null,
+                "resource_based_tuner_options": null
+            });
+            config[supplier] = json!({
+                "type": "resource_based",
+                "minimum_slots": null,
+                "maximum_slots": null,
+                "ramp_throttle_ms": null
+            });
+            let err = TunerHolder::try_from(&tuner_config(config)).err().unwrap();
+            assert!(matches!(err.code, WorkerErrorCode::InvalidWorkerConfig));
+            assert!(
+                err.message.contains("resource_based_tuner_options"),
+                "{supplier}"
+            );
+        }
+    }
+
+    #[test]
+    fn fixed_size_tuner_builds() {
+        let config = json!({
+            "workflow_slot_supplier": {"type": "fixed_size", "slots": 2},
+            "activity_slot_supplier": {"type": "fixed_size", "slots": 3},
+            "local_activity_slot_supplier": {"type": "fixed_size", "slots": 4},
+            "nexus_slot_supplier": {"type": "fixed_size", "slots": 5},
+            "resource_based_tuner_options": null
+        });
+        let tuner = TunerHolder::try_from(&tuner_config(config)).unwrap();
+        assert_eq!(
+            tuner.workflow_task_slot_supplier().available_slots(),
+            Some(2)
+        );
+        assert_eq!(
+            tuner.activity_task_slot_supplier().available_slots(),
+            Some(3)
+        );
+        assert_eq!(
+            tuner.local_activity_slot_supplier().available_slots(),
+            Some(4)
+        );
+        assert_eq!(tuner.nexus_task_slot_supplier().available_slots(), Some(5));
+    }
+
+    unsafe extern "C" fn reserve(_: *const u8, _: usize, _: *mut SlotReserveCompletion) {}
+    unsafe extern "C" fn try_reserve(_: *const u8, _: usize) -> i32 {
+        0
+    }
+    unsafe extern "C" fn notify(_: *const u8, _: usize) {}
+
+    #[test]
+    fn custom_slot_supplier_uses_the_handle() {
+        let inner = HaskellSlotSupplierInner {
+            reserve_fn: reserve,
+            try_reserve_fn: try_reserve,
+            mark_used_fn: notify,
+            release_fn: notify,
+        };
+        let config = SlotSupplierConfig::Custom {
+            handle: &inner as *const HaskellSlotSupplierInner as u64,
+        };
+        let opts = SlotSupplierOptions::<NexusSlotKind>::from(&config);
+        assert!(matches!(opts, SlotSupplierOptions::Custom(_)));
     }
 
     #[test]
@@ -1606,6 +1725,131 @@ mod tests {
             .unwrap();
         assert!(matches!(err.code, WorkerErrorCode::InvalidWorkerConfig));
         assert_eq!(err.message, "custom slot supplier handle is null");
+    }
+
+    #[test]
+    fn worker_config_reaches_core_config() {
+        let config = core_config(full_worker_config()).unwrap();
+        assert_eq!(config.namespace, "ns");
+        assert_eq!(config.task_queue, "tq");
+        assert!(matches!(
+            config.versioning_strategy,
+            WorkerVersioningStrategy::None { ref build_id } if build_id == "build"
+        ));
+        assert_eq!(config.client_identity_override.as_deref(), Some("identity"));
+        assert_eq!(config.max_cached_workflows, 7);
+
+        let tuner = config.tuner.as_ref().unwrap();
+        assert_eq!(
+            tuner.workflow_task_slot_supplier().available_slots(),
+            Some(11)
+        );
+        assert_eq!(
+            tuner.activity_task_slot_supplier().available_slots(),
+            Some(12)
+        );
+        assert_eq!(
+            tuner.local_activity_slot_supplier().available_slots(),
+            Some(13)
+        );
+        assert_eq!(tuner.nexus_task_slot_supplier().available_slots(), Some(14));
+        // The bridge always supplies a tuner, so Core's own limits stay unset.
+        assert_eq!(config.max_outstanding_workflow_tasks, None);
+        assert_eq!(config.max_outstanding_activities, None);
+        assert_eq!(config.max_outstanding_local_activities, None);
+        assert_eq!(config.max_outstanding_nexus_tasks, None);
+
+        assert_eq!(
+            config.workflow_task_poller_behavior,
+            PollerBehavior::SimpleMaximum(3)
+        );
+        assert_eq!(
+            config.activity_task_poller_behavior,
+            PollerBehavior::SimpleMaximum(4)
+        );
+        assert_eq!(
+            config.nexus_task_poller_behavior,
+            PollerBehavior::SimpleMaximum(6)
+        );
+        assert_eq!(config.nonsticky_to_sticky_poll_ratio, 0.5);
+        assert_eq!(
+            config.sticky_queue_schedule_to_start_timeout,
+            Duration::from_millis(1001)
+        );
+        assert_eq!(
+            config.max_heartbeat_throttle_interval,
+            Duration::from_millis(1002)
+        );
+        assert_eq!(
+            config.default_heartbeat_throttle_interval,
+            Duration::from_millis(1003)
+        );
+        assert_eq!(config.max_task_queue_activities_per_second, Some(2.5));
+        assert_eq!(config.max_worker_activities_per_second, Some(3.5));
+        assert_eq!(
+            config.graceful_shutdown_period,
+            Some(Duration::from_millis(1004))
+        );
+        let nondeterminism = HashSet::from([WorkflowErrorType::Nondeterminism]);
+        assert_eq!(config.workflow_failure_errors, nondeterminism);
+        assert_eq!(
+            config.workflow_types_to_failure_errors,
+            HashMap::from([
+                ("WfA".to_string(), nondeterminism.clone()),
+                ("WfB".to_string(), nondeterminism.clone()),
+            ])
+        );
+        assert_eq!(
+            config.task_types,
+            temporalio_common::worker::WorkerTaskTypes {
+                enable_workflows: true,
+                enable_local_activities: true,
+                enable_remote_activities: false,
+                enable_nexus: true,
+            }
+        );
+    }
+
+    #[test]
+    fn worker_config_uses_defaults_for_absent_optional_values() {
+        let mut json = full_worker_config();
+        json["client_identity_override"] = json!(null);
+        json["max_outstanding_nexus_tasks"] = json!(null);
+        json["max_concurrent_nexus_task_polls"] = json!(null);
+        json["max_task_queue_activities_per_second"] = json!(null);
+        json["max_worker_activities_per_second"] = json!(null);
+        json["nondeterminism_as_workflow_fail"] = json!(false);
+        json["nondeterminism_as_workflow_fail_for_types"] = json!([]);
+        json["no_remote_activities"] = json!(false);
+        let config = core_config(json).unwrap();
+        assert_eq!(config.client_identity_override, None);
+        assert_eq!(
+            config.nexus_task_poller_behavior,
+            PollerBehavior::SimpleMaximum(5)
+        );
+        assert_eq!(config.max_task_queue_activities_per_second, None);
+        assert_eq!(config.max_worker_activities_per_second, None);
+        assert!(config.workflow_failure_errors.is_empty());
+        assert!(config.workflow_types_to_failure_errors.is_empty());
+        assert!(config.task_types.enable_remote_activities);
+    }
+
+    #[test]
+    fn worker_config_tuner_takes_priority_over_slot_limits() {
+        let mut json = full_worker_config();
+        json["tuner"] = json!({
+            "workflow_slot_supplier": {"type": "fixed_size", "slots": 21},
+            "activity_slot_supplier": null,
+            "local_activity_slot_supplier": null,
+            "nexus_slot_supplier": null,
+            "resource_based_tuner_options": null
+        });
+        let config = core_config(json).unwrap();
+        let tuner = config.tuner.as_ref().unwrap();
+        assert_eq!(
+            tuner.workflow_task_slot_supplier().available_slots(),
+            Some(21)
+        );
     }
 
     #[test]

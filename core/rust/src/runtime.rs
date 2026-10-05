@@ -461,6 +461,53 @@ mod tests {
     }
 
     #[test]
+    fn telemetry_options_parse_every_variant() {
+        let otel = parse_telemetry_options(
+            br#"{"tag":"OtelTelemetryOptions","url":"http://collector:4317",
+                 "headers":{"h":"v"},"metric_periodicity":{"secs":3,"nanos":4},
+                 "global_tags":{"t":"g"}}"#,
+        )
+        .unwrap();
+        let HsTelemetryOptions::OtelTelemetryOptions {
+            url,
+            headers,
+            metric_periodicity,
+            global_tags,
+        } = otel
+        else {
+            panic!("expected OtelTelemetryOptions");
+        };
+        assert_eq!(url, "http://collector:4317");
+        assert_eq!(headers, HashMap::from([("h".into(), "v".into())]));
+        assert_eq!(metric_periodicity, Some(Duration::new(3, 4)));
+        assert_eq!(global_tags, HashMap::from([("t".into(), "g".into())]));
+
+        let prometheus = parse_telemetry_options(
+            br#"{"tag":"PrometheusTelemetryOptions","socket_addr":"127.0.0.1:9464",
+                 "global_tags":{"t":"g"},"counters_total_suffix":true,"unit_suffix":true}"#,
+        )
+        .unwrap();
+        let HsTelemetryOptions::PrometheusTelemetryOptions {
+            socket_addr,
+            global_tags,
+            counters_total_suffix,
+            unit_suffix,
+        } = prometheus
+        else {
+            panic!("expected PrometheusTelemetryOptions");
+        };
+        assert_eq!(socket_addr, "127.0.0.1:9464".parse::<SocketAddr>().unwrap());
+        assert_eq!(global_tags, HashMap::from([("t".into(), "g".into())]));
+        assert!(counters_total_suffix);
+        assert!(unit_suffix);
+
+        assert!(matches!(
+            parse_telemetry_options(br#"{"tag":"NoTelemetry"}"#).unwrap(),
+            HsTelemetryOptions::NoTelemetry
+        ));
+    }
+
+    #[test]
     fn telemetry_options_reject_invalid_input() {
         for json in [
             &br#"{"tag":"Unknown"}"#[..],
