@@ -595,15 +595,6 @@ data WorkerConfig = WorkerConfig
   --
   -- When the timeout *is* set, throttling is set to 80% of that value.
   , maxTaskQueueActivitiesPerSecond :: Maybe Double
-  -- ^ Limits the number of activities per second that this worker will
-  -- process.
-  --
-  -- The worker will not poll for new activities if by doing so it might
-  -- receive and execute an activity which would cause it to exceed this
-  -- limit.
-  --
-  -- Negative, zero, or NaN values will cause building the options to fail.
-  , maxWorkerActivitiesPerSecond :: Maybe Double
   -- ^ Sets the maximum number of activities per second the task queue will
   -- dispatch, controlled server-side.
   --
@@ -614,6 +605,15 @@ data WorkerConfig = WorkerConfig
   --
   -- Setting this to a nonzero value will also disable eager activity
   -- execution.
+  , maxWorkerActivitiesPerSecond :: Maybe Double
+  -- ^ Limits the number of activities per second that this worker will
+  -- process.
+  --
+  -- The worker will not poll for new activities if by doing so it might
+  -- receive and execute an activity which would cause it to exceed this
+  -- limit.
+  --
+  -- Negative, zero, or NaN values will cause building the options to fail.
   , gracefulShutdownPeriodMillis :: Word64
   -- ^ The grace period, in milliseconds, that the core worker will afford
   -- any running workflows & activities after shutdown has been initiated.
