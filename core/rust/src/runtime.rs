@@ -77,32 +77,53 @@ fn init_runtime(
     telemetry_config: TelemetryOptions,
     late_telemetry_options: HsTelemetryOptions,
     try_put_mvar: extern "C" fn(capability: Capability, mvar: *mut MVar) -> (),
-) -> Box<RuntimeRef> {
+) -> Result<Box<RuntimeRef>, String> {
     let runtime_options = RuntimeOptions::builder()
         .telemetry_options(telemetry_config)
         .build()
-        .unwrap();
-    let mut runtime = CoreRuntime::new(runtime_options, TokioRuntimeBuilder::default()).unwrap();
+        .map_err(|err| format!("Invalid runtime options: {err}"))?;
+    let mut runtime = CoreRuntime::new(runtime_options, TokioRuntimeBuilder::default())
+        .map_err(|err| format!("Failed to start the Core runtime: {err:#}"))?;
 
-    let _guard = runtime.tokio_handle().enter();
-    let core_meter: Arc<dyn CoreMeter> = match late_telemetry_options {
-        HsTelemetryOptions::NoTelemetry => Arc::new(NoOpCoreMeter) as Arc<dyn CoreMeter>,
+    let core_meter = {
+        // Exporters spawn Tokio tasks, so they must start inside the runtime.
+        let _guard = runtime.tokio_handle().enter();
+        build_core_meter(late_telemetry_options)?
+    };
+    runtime.telemetry_mut().attach_late_init_metrics(core_meter);
+
+    Ok(Box::new(RuntimeRef {
+        runtime: Runtime {
+            core: Arc::new(runtime),
+            try_put_mvar,
+            core_runtime_dropper: spawn_core_runtime_dropper(),
+        },
+    }))
+}
+
+fn build_core_meter(options: HsTelemetryOptions) -> Result<Arc<dyn CoreMeter>, String> {
+    match options {
+        HsTelemetryOptions::NoTelemetry => Ok(Arc::new(NoOpCoreMeter)),
         HsTelemetryOptions::OtelTelemetryOptions {
             url,
             headers,
             metric_periodicity,
             global_tags,
-        } => Arc::new(
-            build_otlp_metric_exporter(
+        } => {
+            let url = url
+                .parse()
+                .map_err(|err| format!("Invalid OpenTelemetry collector URL {url:?}: {err}"))?;
+            let meter = build_otlp_metric_exporter(
                 OtelCollectorOptions::builder()
-                    .url(url.parse().expect("Invalid URL"))
+                    .url(url)
                     .metric_periodicity(metric_periodicity.unwrap_or_else(|| Duration::new(1, 0)))
                     .headers(headers)
                     .global_tags(global_tags)
                     .build(),
             )
-            .expect("Otel Metric exporter"),
-        ) as Arc<dyn CoreMeter>,
+            .map_err(|err| format!("Failed to build the OpenTelemetry metric exporter: {err:#}"))?;
+            Ok(Arc::new(meter))
+        }
         HsTelemetryOptions::PrometheusTelemetryOptions {
             socket_addr,
             global_tags,
@@ -117,20 +138,59 @@ fn init_runtime(
                     .counters_total_suffix(counters_total_suffix)
                     .build(),
             )
-            .expect("Failed to start prometheus exporter");
-            srv.meter as Arc<dyn CoreMeter>
+            .map_err(|err| {
+                format!("Failed to start the Prometheus exporter on {socket_addr}: {err:#}")
+            })?;
+            Ok(srv.meter)
         }
-    };
-    runtime.telemetry_mut().attach_late_init_metrics(core_meter);
+    }
+}
 
-    // TODO need to figure out how to handle errors here
-    Box::new(RuntimeRef {
-        runtime: Runtime {
-            core: Arc::new(runtime),
-            try_put_mvar,
-            core_runtime_dropper: spawn_core_runtime_dropper(),
-        },
-    })
+/// Parse the telemetry options sent by `Temporal.Runtime.initializeRuntime`.
+pub(crate) fn parse_telemetry_options(json: &[u8]) -> Result<HsTelemetryOptions, String> {
+    serde_json::from_slice(json).map_err(|err| format!("Invalid telemetry options: {err}"))
+}
+
+/// Copy a byte array owned by Haskell.
+///
+/// # Safety
+///
+/// `array` must be null or point to a live `CArray<u8>` whose `data_ptr` is valid
+/// for `size` bytes.
+pub(crate) unsafe fn copy_byte_array(
+    array: *const CArray<u8>,
+    description: &str,
+) -> Result<Vec<u8>, String> {
+    let array = unsafe { CArray::raw_borrow(array) }
+        .map_err(|_| format!("{description} pointer is null"))?;
+    if array.size > 0 && array.data_ptr.is_null() {
+        return Err(format!("{description} data pointer is null"));
+    }
+    array
+        .as_rust()
+        .map_err(|err| format!("Failed to read {description}: {err}"))
+}
+
+/// Move `bytes` into a byte array that Haskell frees with `hs_temporal_drop_byte_array`.
+pub(crate) fn byte_array(bytes: Vec<u8>) -> CArray<u8> {
+    // Converting a `Vec<u8>` only boxes it, so this cannot fail.
+    CArray::c_repr_of(bytes).expect("byte arrays have a C representation")
+}
+
+/// Build the byte-array error value used by bridge calls that report a message.
+pub(crate) fn error_bytes(message: impl Into<String>) -> CArray<u8> {
+    byte_array(message.into().into_bytes())
+}
+
+/// Store `message` in a nullable error out-parameter.
+///
+/// # Safety
+///
+/// `slot` must be null or valid for writes.
+pub(crate) unsafe fn write_error_slot(slot: *mut *mut CArray<u8>, message: impl Into<String>) {
+    if !slot.is_null() {
+        unsafe { *slot = error_bytes(message).into_raw_pointer_mut() };
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -155,30 +215,37 @@ pub enum HsTelemetryOptions {
 /// # Safety
 ///
 /// Haskell FFI bridge invariants.
+///
+/// Returns null on failure and stores a UTF-8 message in `*error_slot`, which
+/// the caller frees with `hs_temporal_drop_byte_array`. On success,
+/// `*error_slot` is set to null.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn hs_temporal_init_runtime(
     telemetry_opts: *const CArray<u8>,
     try_put_mvar: extern "C" fn(Capability, *mut MVar) -> (),
+    error_slot: *mut *mut CArray<u8>,
 ) -> *mut RuntimeRef {
-    let telemetry_opts = unsafe {
-        CArray::raw_borrow(telemetry_opts)
-            .unwrap()
-            .as_rust()
-            .unwrap()
-            .clone()
-    };
-    let telemetry_opts: HsTelemetryOptions =
-        serde_json::from_slice(telemetry_opts.as_slice()).expect("Failed to parse");
-
-    let early_options = TelemetryOptions::builder()
-        .logging(Logger::Forward {
-            filter: construct_filter_string(Level::INFO, Level::ERROR),
-        })
-        .attach_service_name(true)
-        // .metrics(core_meter)
-        .build();
-    let rt = init_runtime(early_options, telemetry_opts, try_put_mvar);
-    Box::into_raw(rt)
+    if !error_slot.is_null() {
+        unsafe { *error_slot = std::ptr::null_mut() };
+    }
+    let result = unsafe { copy_byte_array(telemetry_opts, "telemetry options") }
+        .and_then(|json| parse_telemetry_options(&json))
+        .and_then(|telemetry_opts| {
+            let early_options = TelemetryOptions::builder()
+                .logging(Logger::Forward {
+                    filter: construct_filter_string(Level::INFO, Level::ERROR),
+                })
+                .attach_service_name(true)
+                .build();
+            init_runtime(early_options, telemetry_opts, try_put_mvar)
+        });
+    match result {
+        Ok(rt) => Box::into_raw(rt),
+        Err(message) => {
+            unsafe { write_error_slot(error_slot, message) };
+            std::ptr::null_mut()
+        }
+    }
 }
 
 fn safe_drop_runtime(runtime: Box<RuntimeRef>) {
@@ -379,6 +446,121 @@ mod tests {
         assert!(returned_before_release);
         assert!(error_slot.is_null());
         assert_eq!(core_weak.strong_count(), 0);
+    }
+
+    #[test]
+    fn telemetry_options_reject_invalid_input() {
+        for json in [
+            &br#"{"tag":"Unknown"}"#[..],
+            br#"{"tag":"PrometheusTelemetryOptions","socket_addr":"not an address",
+                 "global_tags":{},"counters_total_suffix":false,"unit_suffix":false}"#,
+            b"not json",
+        ] {
+            let err = parse_telemetry_options(json).err().unwrap_or_else(|| {
+                panic!("accepted {}", String::from_utf8_lossy(json));
+            });
+            assert!(err.starts_with("Invalid telemetry options"), "{err}");
+        }
+    }
+
+    #[test]
+    fn otel_meter_rejects_an_invalid_url() {
+        let err = build_core_meter(HsTelemetryOptions::OtelTelemetryOptions {
+            url: "not a url".into(),
+            headers: HashMap::new(),
+            metric_periodicity: None,
+            global_tags: HashMap::new(),
+        })
+        .err()
+        .unwrap();
+        assert!(err.contains("Invalid OpenTelemetry collector URL"), "{err}");
+    }
+
+    #[test]
+    fn prometheus_meter_reports_a_bind_failure() {
+        let taken = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let socket_addr = taken.local_addr().unwrap();
+        let tokio = tokio::runtime::Runtime::new().unwrap();
+        let _guard = tokio.enter();
+        let err = build_core_meter(HsTelemetryOptions::PrometheusTelemetryOptions {
+            socket_addr,
+            global_tags: HashMap::new(),
+            counters_total_suffix: false,
+            unit_suffix: false,
+        })
+        .err()
+        .unwrap();
+        assert!(
+            err.contains("Failed to start the Prometheus exporter"),
+            "{err}"
+        );
+    }
+
+    fn init_runtime_from_json(json: &[u8]) -> (*mut RuntimeRef, Option<String>) {
+        let input = CArray::c_repr_of(json.to_vec()).unwrap();
+        let mut error_slot: *mut CArray<u8> = std::ptr::null_mut();
+        let runtime = unsafe { hs_temporal_init_runtime(&input, notify_haskell, &mut error_slot) };
+        let error = (!error_slot.is_null()).then(|| {
+            let error = unsafe { CArray::from_raw_pointer_mut(error_slot) }.unwrap();
+            String::from_utf8(error.as_rust().unwrap()).unwrap()
+        });
+        (runtime, error)
+    }
+
+    #[test]
+    fn init_runtime_returns_an_error_for_invalid_options() {
+        let (runtime, error) = init_runtime_from_json(br#"{"tag":"Unknown"}"#);
+        assert!(runtime.is_null());
+        assert!(error.unwrap().starts_with("Invalid telemetry options"));
+
+        let (runtime, error) = init_runtime_from_json(
+            br#"{"tag":"OtelTelemetryOptions","url":"not a url","headers":{},
+                 "metric_periodicity":null,"global_tags":{}}"#,
+        );
+        assert!(runtime.is_null());
+        assert!(
+            error
+                .unwrap()
+                .contains("Invalid OpenTelemetry collector URL")
+        );
+
+        let mut error_slot: *mut CArray<u8> = std::ptr::null_mut();
+        let runtime =
+            unsafe { hs_temporal_init_runtime(std::ptr::null(), notify_haskell, &mut error_slot) };
+        assert!(runtime.is_null());
+        let error = unsafe { CArray::from_raw_pointer_mut(error_slot) }.unwrap();
+        assert_eq!(
+            String::from_utf8(error.as_rust().unwrap()).unwrap(),
+            "telemetry options pointer is null"
+        );
+    }
+
+    #[test]
+    fn init_runtime_succeeds_without_telemetry() {
+        let (runtime, error) = init_runtime_from_json(br#"{"tag":"NoTelemetry"}"#);
+        assert_eq!(error, None);
+        assert!(!runtime.is_null());
+        unsafe { hs_temporal_free_runtime(runtime) };
+    }
+
+    #[test]
+    fn copy_byte_array_rejects_null_pointers() {
+        let err = unsafe { copy_byte_array(std::ptr::null(), "input") }.unwrap_err();
+        assert_eq!(err, "input pointer is null");
+        let dangling = CArray::<u8> {
+            data_ptr: std::ptr::null(),
+            size: 3,
+        };
+        let err = unsafe { copy_byte_array(&dangling, "input") }.unwrap_err();
+        assert_eq!(err, "input data pointer is null");
+        let empty = CArray::<u8> {
+            data_ptr: std::ptr::null(),
+            size: 0,
+        };
+        assert_eq!(
+            unsafe { copy_byte_array(&empty, "input") }.unwrap(),
+            Vec::<u8>::new()
+        );
     }
 }
 
