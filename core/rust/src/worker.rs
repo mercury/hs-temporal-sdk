@@ -36,7 +36,7 @@ pub struct WorkerRef {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(tag = "type")]
+#[serde(tag = "type", deny_unknown_fields)]
 pub enum SlotSupplierConfig {
     #[serde(rename = "fixed_size")]
     FixedSize { slots: usize },
@@ -51,12 +51,14 @@ pub enum SlotSupplierConfig {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct ResourceBasedTunerConfig {
     pub target_memory_usage: f64,
     pub target_cpu_usage: f64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct TunerConfig {
     pub workflow_slot_supplier: Option<SlotSupplierConfig>,
     pub activity_slot_supplier: Option<SlotSupplierConfig>,
@@ -385,6 +387,7 @@ pub unsafe extern "C" fn hs_temporal_slot_reserve_complete(completion: *mut Slot
 /// Where possible, we'll try to adhere to the naming conventions used in the Rust SDK, and most of the field comments
 /// have been copied verbatim from the upstream [temporal::sdk_core::worker::WorkerConfig] fields.
 #[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct WorkerConfig {
     /// The Temporal service namespace this worker is bound to.
     namespace: String,
@@ -1850,6 +1853,35 @@ mod tests {
             tuner.workflow_task_slot_supplier().available_slots(),
             Some(21)
         );
+    }
+
+    #[test]
+    fn worker_config_rejects_unknown_fields() {
+        let mut with_tuner = full_worker_config();
+        with_tuner["tuner"] = full_tuner_config();
+        for pointer in [
+            "",
+            "/tuner",
+            "/tuner/workflow_slot_supplier",
+            "/tuner/activity_slot_supplier",
+            "/tuner/resource_based_tuner_options",
+        ] {
+            let mut json = with_tuner.clone();
+            json.pointer_mut(pointer)
+                .unwrap()
+                .as_object_mut()
+                .unwrap()
+                .insert("unexpected".into(), json!(1));
+            let err = parse_worker_config(json.to_string().as_bytes())
+                .err()
+                .unwrap();
+            assert!(matches!(err.code, WorkerErrorCode::InvalidWorkerConfig));
+            assert!(
+                err.message.contains("unknown field `unexpected`"),
+                "{pointer}: {}",
+                err.message
+            );
+        }
     }
 
     #[test]
