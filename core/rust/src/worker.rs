@@ -98,13 +98,13 @@ impl<SK: SlotKind + Send + Sync + 'static> From<&SlotSupplierConfig>
     }
 }
 
-impl TryFrom<&TunerConfig> for TunerHolder {
+impl TryFrom<&TunerConfig> for TunerHolderOptions {
     type Error = WorkerError;
     fn try_from(cfg: &TunerConfig) -> Result<Self, WorkerError> {
         let maybe_resource_opts = cfg.resource_based_tuner_options.as_ref().map(|rbt| {
             ResourceBasedSlotsOptions::builder()
                 .target_mem_usage(rbt.target_memory_usage)
-                .target_cpu_usage(rbt.target_memory_usage)
+                .target_cpu_usage(rbt.target_cpu_usage)
                 .build()
         });
 
@@ -141,6 +141,18 @@ impl TryFrom<&TunerConfig> for TunerHolder {
             .maybe_local_activity_slot_options(maybe_local_activity_slot_opts)
             .maybe_nexus_slot_options(maybe_nexus_slot_opts)
             .maybe_resource_based_options(maybe_resource_opts)
+            .build()
+            .map_err(|err| WorkerError {
+                code: WorkerErrorCode::InvalidWorkerConfig,
+                message: format!("Invalid tuner config: {}", err),
+            })
+    }
+}
+
+impl TryFrom<&TunerConfig> for TunerHolder {
+    type Error = WorkerError;
+    fn try_from(cfg: &TunerConfig) -> Result<Self, WorkerError> {
+        TunerHolderOptions::try_from(cfg)?
             .build_tuner_holder()
             .map_err(|err| WorkerError {
                 code: WorkerErrorCode::InvalidWorkerConfig,
@@ -1475,4 +1487,45 @@ pub unsafe extern "C" fn hs_temporal_history_pusher_close(history_pusher: *mut H
 pub unsafe extern "C" fn hs_temporal_history_pusher_drop(history_pusher: *mut HistoryPusher) {
     let history_pusher = unsafe { Box::from_raw(history_pusher) };
     drop(history_pusher)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn full_tuner_config() -> serde_json::Value {
+        json!({
+            "workflow_slot_supplier": {"type": "fixed_size", "slots": 5},
+            "activity_slot_supplier": {
+                "type": "resource_based",
+                "minimum_slots": 2,
+                "maximum_slots": 20,
+                "ramp_throttle_ms": 30
+            },
+            "local_activity_slot_supplier": {
+                "type": "resource_based",
+                "minimum_slots": null,
+                "maximum_slots": null,
+                "ramp_throttle_ms": null
+            },
+            "nexus_slot_supplier": null,
+            "resource_based_tuner_options": {
+                "target_memory_usage": 0.6,
+                "target_cpu_usage": 0.8
+            }
+        })
+    }
+
+    fn tuner_config(json: serde_json::Value) -> TunerConfig {
+        serde_json::from_value(json).unwrap()
+    }
+
+    #[test]
+    fn resource_based_tuner_uses_both_targets() {
+        let opts = TunerHolderOptions::try_from(&tuner_config(full_tuner_config())).unwrap();
+        let resource = opts.resource_based_options.unwrap();
+        assert_eq!(resource.target_mem_usage, 0.6);
+        assert_eq!(resource.target_cpu_usage, 0.8);
+    }
 }
