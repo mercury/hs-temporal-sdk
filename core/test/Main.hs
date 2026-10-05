@@ -1,5 +1,8 @@
 module Main (main) where
 
+import qualified BridgeErrorSpec
+import Test.Hspec
+
 
 main :: IO ()
-main = putStrLn "Test suite not yet implemented."
+main = hspec BridgeErrorSpec.spec
