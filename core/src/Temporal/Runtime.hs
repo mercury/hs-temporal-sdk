@@ -10,6 +10,7 @@ module Temporal.Runtime (
   fetchLogs,
   CoreLog (..),
   LogLevel (..),
+
   -- * Resource-safe wrappers
   bracketRuntime,
 ) where
@@ -24,10 +25,11 @@ import Temporal.Core.CTypes
 import Temporal.Internal.FFI
 
 
--- | Initialize the Rust runtime and thread-pool.
---
--- IMPORTANT: You must call 'destroyRuntime' when done, or use 'withRuntime'/'bracketRuntime'
--- for automatic cleanup.
+{- | Initialize the Rust runtime and thread-pool.
+
+IMPORTANT: You must call 'destroyRuntime' when done, or use 'withRuntime'/'bracketRuntime'
+for automatic cleanup.
+-}
 initializeRuntime :: TelemetryOptions -> IO Runtime
 initializeRuntime opts = withCArrayBS (BL.toStrict $ encode opts) $ \optsP ->
   mask_ $ do
@@ -35,9 +37,10 @@ initializeRuntime opts = withCArrayBS (BL.toStrict $ encode opts) $ \optsP ->
     return (Runtime rtP)
 
 
--- | Explicitly destroy a Runtime, freeing its resources immediately.
---
--- This should only be called once, and the Runtime should not be used afterwards.
+{- | Explicitly destroy a Runtime, freeing its resources immediately.
+
+This should only be called once, and the Runtime should not be used afterwards.
+-}
 destroyRuntime :: Runtime -> IO ()
 destroyRuntime (Runtime ptr) = freeRuntime ptr
 
@@ -47,14 +50,15 @@ withRuntime :: Runtime -> (Ptr Runtime -> IO a) -> IO a
 withRuntime (Runtime ptr) f = f ptr
 
 
--- | Bracket-style wrapper for Runtime that ensures proper cleanup.
---
--- Example:
---
--- @
--- bracketRuntime telemetryOpts $ \\rt -> do
---   ...
--- @
+{- | Bracket-style wrapper for Runtime that ensures proper cleanup.
+
+Example:
+
+@
+bracketRuntime telemetryOpts $ \\rt -> do
+  ...
+@
+-}
 bracketRuntime :: TelemetryOptions -> (Runtime -> IO a) -> IO a
 bracketRuntime opts = bracket (initializeRuntime opts) destroyRuntime
 
