@@ -72,9 +72,14 @@ tests:
     other-modules:
       - Assertions
       - BridgeErrorSpec
+      - ConfigContractSpec
     dependencies:
       - base
+      - aeson
+      - bytestring
+      - containers
       - hspec
       - monad-logger
       - temporal-sdk-core
       - text
+      - unordered-containers

@@ -1125,6 +1125,51 @@ void hs_temporal_drop_test_resource(struct CTestResource *resource);
 uint64_t hs_temporal_test_resource_drop_count(void);
 
 /**
+ * # Safety
+ *
+ * See [echo_config].
+ */
+void hs_temporal_test_echo_worker_config(const struct CArray_u8 *json,
+                                         struct CArray_u8 **result_slot,
+                                         struct CArray_u8 **error_slot);
+
+/**
+ * # Safety
+ *
+ * See [echo_config].
+ */
+void hs_temporal_test_echo_client_config(const struct CArray_u8 *json,
+                                         struct CArray_u8 **result_slot,
+                                         struct CArray_u8 **error_slot);
+
+/**
+ * # Safety
+ *
+ * See [echo_config].
+ */
+void hs_temporal_test_echo_telemetry_options(const struct CArray_u8 *json,
+                                             struct CArray_u8 **result_slot,
+                                             struct CArray_u8 **error_slot);
+
+/**
+ * # Safety
+ *
+ * See [echo_config].
+ */
+void hs_temporal_test_echo_dev_server_config(const struct CArray_u8 *json,
+                                             struct CArray_u8 **result_slot,
+                                             struct CArray_u8 **error_slot);
+
+/**
+ * # Safety
+ *
+ * See [echo_config].
+ */
+void hs_temporal_test_echo_test_server_config(const struct CArray_u8 *json,
+                                              struct CArray_u8 **result_slot,
+                                              struct CArray_u8 **error_slot);
+
+/**
  * Create a custom slot supplier handle from Haskell-supplied callback function pointers.
  * Returns a raw pointer that must be freed with `hs_temporal_drop_custom_slot_supplier`.
  *
