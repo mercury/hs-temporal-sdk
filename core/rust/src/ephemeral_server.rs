@@ -1,5 +1,5 @@
-use crate::runtime::{Capability, HsCallback, MVar, Runtime, RuntimeRef};
-use crate::worker::{CUnit, Unit};
+use crate::runtime::{Capability, HsCallback, MVar, Runtime, RuntimeRef, error_bytes};
+use crate::worker::CUnit;
 use ffi_convert::*;
 use serde::Deserialize;
 use std::ffi::{CStr, c_char};
@@ -89,6 +89,58 @@ pub struct TemporalDevServerConfigDef {
     pub extra_args: Vec<String>,
 }
 
+pub(crate) fn parse_dev_server_config(json: &[u8]) -> Result<TemporalDevServerConfig, String> {
+    let mut de = serde_json::Deserializer::from_slice(json);
+    TemporalDevServerConfigDef::deserialize(&mut de)
+        .and_then(|config| de.end().map(|()| config))
+        .map_err(|err| format!("Invalid dev server config: {err}"))
+}
+
+pub(crate) fn parse_test_server_config(json: &[u8]) -> Result<TestServerConfig, String> {
+    let mut de = serde_json::Deserializer::from_slice(json);
+    TestServerConfigDef::deserialize(&mut de)
+        .and_then(|config| de.end().map(|()| config))
+        .map_err(|err| format!("Invalid test server config: {err}"))
+}
+
+/// # Safety
+///
+/// `json` must be null or point to a NUL-terminated string.
+unsafe fn json_bytes<'a>(json: *const c_char) -> Result<&'a [u8], String> {
+    if json.is_null() {
+        Err("server config pointer is null".to_string())
+    } else {
+        Ok(unsafe { CStr::from_ptr(json) }.to_bytes())
+    }
+}
+
+/// An invalid `config` is reported through `hs`, so the Haskell waiter is
+/// always woken.
+fn start_server<C, F>(
+    runtime_ref: &RuntimeRef,
+    config: Result<C, String>,
+    hs: HsCallback<EphemeralServerRef, CArray<u8>>,
+    start: impl FnOnce(C) -> F + Send + 'static,
+) where
+    C: Send + 'static,
+    F: Future<Output = anyhow::Result<EphemeralServer>> + Send + 'static,
+{
+    // The spawned future can outlive this C call and its borrowed `RuntimeRef`.
+    // Capture an owned runtime before constructing the future so creating the
+    // returned server never dereferences the raw FFI pointer after an await.
+    let server_runtime = runtime_ref.runtime.clone();
+    runtime_ref.runtime.future_result_into_hs(hs, async move {
+        let config = config.map_err(error_bytes)?;
+        match start(config).await {
+            Ok(server) => Ok(EphemeralServerRef {
+                server,
+                runtime: server_runtime,
+            }),
+            Err(e) => Err(error_bytes(format!("Failed to start server: {e}"))),
+        }
+    })
+}
+
 // TODO: [publish-crate]
 /// # Safety
 ///
@@ -102,34 +154,16 @@ pub unsafe extern "C" fn hs_temporal_start_dev_server(
     error_slot: *mut *mut CArray<u8>,
     result_slot: *mut *mut EphemeralServerRef,
 ) {
-    let runtime_ref = unsafe { runtime.as_ref().unwrap() };
-    // The spawned future can outlive this C call and its borrowed `RuntimeRef`.
-    // Capture an owned runtime before constructing the future so creating the
-    // returned server never dereferences the raw FFI pointer after an await.
-    let server_runtime = runtime_ref.runtime.clone();
-    let mut de = serde_json::Deserializer::from_str(unsafe {
-        std::str::from_utf8_unchecked(CStr::from_ptr(json_string).to_bytes())
-    });
-    let conf =
-        TemporalDevServerConfigDef::deserialize(&mut de).expect("Failed to deserialize config");
+    let runtime_ref = unsafe { runtime.as_ref() }.expect("runtime is null");
+    let config = unsafe { json_bytes(json_string) }.and_then(parse_dev_server_config);
     let hs: HsCallback<EphemeralServerRef, CArray<u8>> = HsCallback {
         cap,
         mvar,
         error_slot,
         result_slot,
     };
-    runtime_ref.runtime.future_result_into_hs(hs, async move {
-        let result = conf.start_server().await;
-        match result {
-            Ok(server) => Ok(EphemeralServerRef {
-                server,
-                runtime: server_runtime,
-            }),
-            Err(e) => Err(
-                CArray::c_repr_of(format!("Failed to start server: {}", e).into_bytes())
-                    .expect("Failed to convert error to CArray"),
-            ),
-        }
+    start_server(runtime_ref, config, hs, |config| async move {
+        config.start_server().await
     })
 }
 
@@ -156,11 +190,8 @@ pub unsafe extern "C" fn hs_temporal_shutdown_ephemeral_server(
     server_ref.runtime.future_result_into_hs(hs, async move {
         let result = server.shutdown().await;
         match result {
-            Ok(()) => Ok(CUnit::c_repr_of(Unit {}).unwrap()),
-            Err(e) => Err(CArray::c_repr_of(
-                format!("Failed to shutdown server: {}", e).into_bytes(),
-            )
-            .expect("Failed to convert error to CArray")),
+            Ok(()) => Ok(CUnit {}),
+            Err(e) => Err(error_bytes(format!("Failed to shutdown server: {e}"))),
         }
     })
 }
@@ -191,31 +222,49 @@ pub unsafe extern "C" fn hs_temporal_start_test_server(
     error_slot: *mut *mut CArray<u8>,
     result_slot: *mut *mut EphemeralServerRef,
 ) {
-    let runtime_ref = unsafe { runtime.as_ref().unwrap() };
-    // See `hs_temporal_start_dev_server`: the future must not retain a borrow
-    // derived from the raw runtime pointer after this C call returns.
-    let server_runtime = runtime_ref.runtime.clone();
-    let mut de = serde_json::Deserializer::from_str(unsafe {
-        std::str::from_utf8_unchecked(CStr::from_ptr(json_string).to_bytes())
-    });
-    let conf = TestServerConfigDef::deserialize(&mut de).expect("Failed to deserialize config");
+    let runtime_ref = unsafe { runtime.as_ref() }.expect("runtime is null");
+    let config = unsafe { json_bytes(json_string) }.and_then(parse_test_server_config);
     let hs: HsCallback<EphemeralServerRef, CArray<u8>> = HsCallback {
         cap,
         mvar,
         error_slot,
         result_slot,
     };
-    runtime_ref.runtime.future_result_into_hs(hs, async move {
-        let result = conf.start_server().await;
-        match result {
-            Ok(server) => Ok(EphemeralServerRef {
-                server,
-                runtime: server_runtime,
-            }),
-            Err(e) => Err(
-                CArray::c_repr_of(format!("Failed to start server: {}", e).into_bytes())
-                    .expect("Failed to convert error to CArray"),
-            ),
-        }
+    start_server(runtime_ref, config, hs, |config| async move {
+        config.start_server().await
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::runtime::test_support::{call_bridge, error_text, new_test_runtime};
+
+    type StartServer = unsafe extern "C" fn(
+        *mut RuntimeRef,
+        *const c_char,
+        *mut MVar,
+        Capability,
+        *mut *mut CArray<u8>,
+        *mut *mut EphemeralServerRef,
+    );
+
+    fn start_with_raw_config(start: StartServer, json: *const c_char) -> String {
+        let mut runtime = new_test_runtime();
+        let result: Result<EphemeralServerRef, CArray<u8>> =
+            call_bridge(|mvar, cap, error_slot, result_slot| unsafe {
+                start(&mut runtime, json, mvar, cap, error_slot, result_slot)
+            });
+        error_text(result.err().expect("the server must not start"))
+    }
+
+    #[test]
+    fn start_server_reports_invalid_config_to_the_waiter() {
+        let err = start_with_raw_config(hs_temporal_start_dev_server, c"{\"exe\":1}".as_ptr());
+        assert!(err.starts_with("Invalid dev server config"), "{err}");
+        let err = start_with_raw_config(hs_temporal_start_test_server, c"[]".as_ptr());
+        assert!(err.starts_with("Invalid test server config"), "{err}");
+        let err = start_with_raw_config(hs_temporal_start_dev_server, std::ptr::null());
+        assert_eq!(err, "server config pointer is null");
+    }
 }
