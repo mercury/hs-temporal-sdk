@@ -2,8 +2,11 @@
 
 module BridgeErrorSpec (spec) where
 
+import Control.Exception (evaluate)
+import Control.Monad.Logger (runNoLoggingT)
 import Data.Text (Text)
 import qualified Data.Text as T
+import Temporal.Core.Client
 import Temporal.Runtime
 import Test.Hspec
 
@@ -22,6 +25,13 @@ spec = describe "Bridge errors" $ do
     it "starts a runtime without telemetry" $
       startRuntime NoTelemetry
 
+  describe "connectClient" $
+    it "reports an invalid target URL as ClientConnectionError" $
+      bracketRuntime NoTelemetry $ \rt -> do
+        client <- runNoLoggingT . connectClient rt $ defaultClientConfig {targetUrl = "not a url"}
+        withClient client evaluate
+          `shouldThrow` connectionErrorContaining "Invalid client config"
+
 
 startRuntime :: TelemetryOptions -> IO ()
 startRuntime options = bracketRuntime options (const $ pure ())
@@ -30,6 +40,12 @@ startRuntime options = bracketRuntime options (const $ pure ())
 initializationErrorContaining :: Text -> Selector RuntimeInitializationError
 initializationErrorContaining expected (RuntimeInitializationError message) =
   expected `T.isInfixOf` message
+
+
+connectionErrorContaining :: Text -> Selector ClientError
+connectionErrorContaining expected = \case
+  ClientConnectionError message -> expected `T.isInfixOf` message
+  ClientClosedError -> False
 
 
 otelOptions :: Text -> TelemetryOptions
