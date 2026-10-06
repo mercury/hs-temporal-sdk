@@ -35,7 +35,12 @@ impl RawPointerConverter<EphemeralServerRef> for EphemeralServerRef {
 
 /// Where to find an executable. Can be a path or download.
 #[derive(Deserialize)]
-#[serde(tag = "type", content = "contents", remote = "EphemeralExe")]
+#[serde(
+    tag = "type",
+    content = "contents",
+    remote = "EphemeralExe",
+    deny_unknown_fields
+)]
 pub enum EphemeralExeDef {
     /// Existing path on the filesystem for the executable.
     ExistingPath(String),
@@ -52,7 +57,12 @@ pub enum EphemeralExeDef {
 
 /// Which version of the exe to download.
 #[derive(Deserialize)]
-#[serde(tag = "type", content = "contents", remote = "EphemeralExeVersion")]
+#[serde(
+    tag = "type",
+    content = "contents",
+    remote = "EphemeralExeVersion",
+    deny_unknown_fields
+)]
 pub enum EphemeralExeVersionDef {
     /// Use a default version for the given SDK name and version.
     SDKDefault {
@@ -66,7 +76,7 @@ pub enum EphemeralExeVersionDef {
 }
 
 #[derive(Deserialize)]
-#[serde(remote = "TemporalDevServerConfig")]
+#[serde(remote = "TemporalDevServerConfig", deny_unknown_fields)]
 pub struct TemporalDevServerConfigDef {
     /// Required path to executable or download info.
     #[serde(with = "EphemeralExeDef")]
@@ -206,7 +216,7 @@ pub unsafe extern "C" fn hs_temporal_shutdown_ephemeral_server(
 
 /// Configuration for the test server.
 #[derive(Deserialize)]
-#[serde(remote = "TestServerConfig")]
+#[serde(remote = "TestServerConfig", deny_unknown_fields)]
 pub struct TestServerConfigDef {
     /// Required path to executable or download info.
     #[serde(with = "EphemeralExeDef")]
@@ -318,6 +328,42 @@ mod tests {
         assert!(matches!(config.exe, EphemeralExe::ExistingPath(ref p) if p == "/bin/server"));
         assert_eq!(config.port, Some(7));
         assert_eq!(config.extra_args, vec!["a".to_string(), "b".to_string()]);
+    }
+
+    #[test]
+    fn server_configs_reject_unknown_fields() {
+        // Before this check existed, Haskell sent `ttl` next to `contents`
+        // and the bridge silently ignored it.
+        let mut misplaced_ttl = full_dev_server_config();
+        misplaced_ttl["exe"]["ttl"] = json!(60);
+        let mut extra_in_download = full_dev_server_config();
+        extra_in_download["exe"]["contents"]["extra"] = json!(1);
+        let mut extra_in_version = full_dev_server_config();
+        extra_in_version["exe"]["contents"]["version"]["contents"]["extra"] = json!(1);
+        let mut extra_top_level = full_dev_server_config();
+        extra_top_level["extra"] = json!(1);
+        for config in [
+            misplaced_ttl,
+            extra_in_download,
+            extra_in_version,
+            extra_top_level,
+        ] {
+            let err = parse_dev_server_config(config.to_string().as_bytes())
+                .err()
+                .unwrap();
+            // Adjacently tagged enums report an unknown key as an invalid tag.
+            assert!(
+                err.contains("unknown field") || err.contains(r#"expected "type" or "contents""#),
+                "{err}"
+            );
+        }
+
+        let err = parse_test_server_config(
+            br#"{"exe":{"type":"ExistingPath","contents":"x"},"port":null,"extra_args":[],"x":1}"#,
+        )
+        .err()
+        .unwrap();
+        assert!(err.contains("unknown field"), "{err}");
     }
 
     type StartServer = unsafe extern "C" fn(

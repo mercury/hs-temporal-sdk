@@ -103,7 +103,7 @@ fn init_runtime(
 
 fn build_core_meter(options: HsTelemetryOptions) -> Result<Arc<dyn CoreMeter>, String> {
     match options {
-        HsTelemetryOptions::NoTelemetry => Ok(Arc::new(NoOpCoreMeter)),
+        HsTelemetryOptions::NoTelemetry {} => Ok(Arc::new(NoOpCoreMeter)),
         HsTelemetryOptions::OtelTelemetryOptions {
             url,
             headers,
@@ -206,7 +206,7 @@ pub(crate) unsafe fn write_error_slot(slot: *mut *mut CArray<u8>, message: impl 
 }
 
 #[derive(Serialize, Deserialize)]
-#[serde(tag = "tag")]
+#[serde(tag = "tag", deny_unknown_fields)]
 pub enum HsTelemetryOptions {
     OtelTelemetryOptions {
         url: String,
@@ -220,7 +220,9 @@ pub enum HsTelemetryOptions {
         counters_total_suffix: bool,
         unit_suffix: bool,
     },
-    NoTelemetry,
+    // A struct variant, because serde does not apply `deny_unknown_fields` to
+    // unit variants of internally tagged enums.
+    NoTelemetry {},
 }
 
 // TODO: [publish-crate]
@@ -503,16 +505,19 @@ mod tests {
 
         assert!(matches!(
             parse_telemetry_options(br#"{"tag":"NoTelemetry"}"#).unwrap(),
-            HsTelemetryOptions::NoTelemetry
+            HsTelemetryOptions::NoTelemetry {}
         ));
     }
 
     #[test]
     fn telemetry_options_reject_invalid_input() {
         for json in [
-            &br#"{"tag":"Unknown"}"#[..],
+            &br#"{"tag":"NoTelemetry","extra":1}"#[..],
+            br#"{"tag":"Unknown"}"#,
             br#"{"tag":"PrometheusTelemetryOptions","socket_addr":"not an address",
                  "global_tags":{},"counters_total_suffix":false,"unit_suffix":false}"#,
+            br#"{"tag":"OtelTelemetryOptions","url":"http://c","headers":{},
+                 "global_tags":{},"metric_periodicity":null,"extra":1}"#,
             b"not json",
         ] {
             let err = parse_telemetry_options(json).err().unwrap_or_else(|| {
@@ -568,9 +573,9 @@ mod tests {
 
     #[test]
     fn init_runtime_returns_an_error_for_invalid_options() {
-        let (runtime, error) = init_runtime_from_json(br#"{"tag":"Unknown"}"#);
+        let (runtime, error) = init_runtime_from_json(br#"{"tag":"NoTelemetry","x":1}"#);
         assert!(runtime.is_null());
-        assert!(error.unwrap().starts_with("Invalid telemetry options"));
+        assert!(error.unwrap().contains("unknown field"));
 
         let (runtime, error) = init_runtime_from_json(
             br#"{"tag":"OtelTelemetryOptions","url":"not a url","headers":{},
