@@ -182,6 +182,18 @@ pub(crate) fn error_bytes(message: impl Into<String>) -> CArray<u8> {
     byte_array(message.into().into_bytes())
 }
 
+/// Make `message` safe to convert into a NUL-terminated C string.
+///
+/// Error messages can quote caller or server data. An interior NUL byte would
+/// make the C string conversion fail, so replace it.
+pub(crate) fn c_string_safe(message: String) -> String {
+    if message.contains('\0') {
+        message.replace('\0', "\u{FFFD}")
+    } else {
+        message
+    }
+}
+
 /// Store `message` in a nullable error out-parameter.
 ///
 /// # Safety
@@ -541,6 +553,12 @@ mod tests {
         assert_eq!(error, None);
         assert!(!runtime.is_null());
         unsafe { hs_temporal_free_runtime(runtime) };
+    }
+
+    #[test]
+    fn c_string_safe_replaces_interior_nul() {
+        assert_eq!(c_string_safe("a\0b".into()), "a\u{FFFD}b");
+        assert_eq!(c_string_safe("plain".into()), "plain");
     }
 
     #[test]
