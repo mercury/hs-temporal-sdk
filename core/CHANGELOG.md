@@ -33,6 +33,8 @@
 ### New API
 
 * `Temporal.Runtime.RuntimeInitializationError`.
+* `Temporal.Core.Internal.TestFixture.echoBridgeConfig` and
+  `BridgeConfigType`, for tests only.
 
 ### Internal
 
@@ -40,7 +42,8 @@
   null on failure. This changes the C ABI of `temporal_bridge`.
 * The bridge no longer loops forever when an RPC call carries two or more
   metadata entries. No Haskell caller sent RPC metadata yet.
-* New `temporal-sdk-core-tests` test suite. It checks that invalid input
+* New `temporal-sdk-core-tests` test suite. It checks that the Haskell and
+  Rust configuration types agree on every field, and that invalid input
   reaches Haskell as an ordinary error.
 * New Rust tests connect to an in-process gRPC server that records request
   headers. They check that client metadata, the API key and per-call RPC

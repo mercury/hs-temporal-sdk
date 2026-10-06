@@ -1,7 +1,7 @@
 use crate::runtime::{Capability, HsCallback, MVar, Runtime, RuntimeRef, error_bytes};
 use crate::worker::CUnit;
 use ffi_convert::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::ffi::{CStr, c_char};
 use std::time::Duration;
 use temporalio_sdk_core::ephemeral_server::*;
@@ -34,7 +34,7 @@ impl RawPointerConverter<EphemeralServerRef> for EphemeralServerRef {
 }
 
 /// Where to find an executable. Can be a path or download.
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(
     tag = "type",
     content = "contents",
@@ -51,12 +51,13 @@ pub enum EphemeralExeDef {
         version: EphemeralExeVersion,
         /// Destination directory or the user temp directory if none set.
         dest_dir: Option<String>,
+        /// How long to cache the download for. None means forever.
         ttl: Option<Duration>,
     },
 }
 
 /// Which version of the exe to download.
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(
     tag = "type",
     content = "contents",
@@ -75,7 +76,7 @@ pub enum EphemeralExeVersionDef {
     Fixed(String),
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "TemporalDevServerConfig", deny_unknown_fields)]
 pub struct TemporalDevServerConfigDef {
     /// Required path to executable or download info.
@@ -215,7 +216,7 @@ pub unsafe extern "C" fn hs_temporal_shutdown_ephemeral_server(
 }
 
 /// Configuration for the test server.
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "TestServerConfig", deny_unknown_fields)]
 pub struct TestServerConfigDef {
     /// Required path to executable or download info.

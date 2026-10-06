@@ -12,13 +12,18 @@ but nothing outside of tests should call them.
 module Temporal.Core.Internal.TestFixture (
   acquireDelayedTestResource,
   testResourceDropCount,
+  BridgeConfigType (..),
+  echoBridgeConfig,
 ) where
 
+import Control.Exception (bracket, mask_)
 import Control.Monad ((>=>))
 import Data.ByteString (ByteString)
+import Data.Text (Text)
 import Data.Word
+import Foreign.Marshal.Alloc (alloca)
 import Foreign.Ptr
-import Foreign.Storable (peek)
+import Foreign.Storable (peek, poke)
 import Temporal.Core.CTypes
 import Temporal.Internal.FFI
 import Temporal.Runtime
@@ -50,3 +55,70 @@ acquireDelayedTestResource r delayMillis = withRuntime r $ \rp ->
     raw_dropTestResource
     (peek >=> cArrayToByteString)
     (\_ -> pure ())
+
+
+-- | A configuration type that the bridge decodes from JSON.
+data BridgeConfigType
+  = -- | @Temporal.Core.Worker.WorkerConfig@
+    WorkerConfigType
+  | -- | @Temporal.Core.Client.ClientConfig@
+    ClientConfigType
+  | -- | @Temporal.Runtime.TelemetryOptions@
+    TelemetryOptionsType
+  | -- | @Temporal.Core.EphemeralServer.TemporalDevServerConfig@
+    DevServerConfigType
+  | -- | @Temporal.Core.EphemeralServer.TemporalTestServerConfig@
+    TestServerConfigType
+  deriving stock (Show, Eq, Enum, Bounded)
+
+
+type EchoConfig = Ptr (CArray Word8) -> Ptr (Ptr (CArray Word8)) -> Ptr (Ptr (CArray Word8)) -> IO ()
+
+
+foreign import ccall "hs_temporal_test_echo_worker_config" raw_echoWorkerConfig :: EchoConfig
+
+
+foreign import ccall "hs_temporal_test_echo_client_config" raw_echoClientConfig :: EchoConfig
+
+
+foreign import ccall "hs_temporal_test_echo_telemetry_options" raw_echoTelemetryOptions :: EchoConfig
+
+
+foreign import ccall "hs_temporal_test_echo_dev_server_config" raw_echoDevServerConfig :: EchoConfig
+
+
+foreign import ccall "hs_temporal_test_echo_test_server_config" raw_echoTestServerConfig :: EchoConfig
+
+
+{- | Decode JSON with the bridge's decoder for a configuration type, then
+encode the decoded value back to JSON.
+
+Returns the bridge's error message if it rejects the input. Tests compare the
+result with the input to check that the Haskell encoder and the Rust type
+agree on every field.
+-}
+echoBridgeConfig :: BridgeConfigType -> ByteString -> IO (Either Text ByteString)
+echoBridgeConfig configType json = withCArrayBS json $ \jsonPtr ->
+  alloca $ \resultSlot -> alloca $ \errorSlot -> mask_ $ do
+    poke resultSlot nullPtr
+    poke errorSlot nullPtr
+    echo jsonPtr resultSlot errorSlot
+    errPtr <- peek errorSlot
+    resPtr <- peek resultSlot
+    if errPtr /= nullPtr
+      then Left <$> takeByteArray cArrayToText errPtr
+      else
+        if resPtr /= nullPtr
+          then Right <$> takeByteArray cArrayToByteString resPtr
+          else pure $ Left "the bridge returned no result and no error"
+  where
+    echo :: EchoConfig
+    echo = case configType of
+      WorkerConfigType -> raw_echoWorkerConfig
+      ClientConfigType -> raw_echoClientConfig
+      TelemetryOptionsType -> raw_echoTelemetryOptions
+      DevServerConfigType -> raw_echoDevServerConfig
+      TestServerConfigType -> raw_echoTestServerConfig
+
+    takeByteArray :: (CArray Word8 -> IO a) -> Ptr (CArray Word8) -> IO a
+    takeByteArray decode ptr = bracket (pure ptr) rust_dropByteArray (peek >=> decode)

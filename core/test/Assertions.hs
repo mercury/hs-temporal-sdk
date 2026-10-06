@@ -1,5 +1,8 @@
 -- | Assertions that name the property being checked in their failure message.
 module Assertions (
+  assertEq,
+  assertRight,
+  assertLeft,
   assertContains,
   assertThrows,
 ) where
@@ -9,6 +12,30 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import GHC.Stack (HasCallStack)
 import Test.Hspec
+
+
+assertEq :: (HasCallStack, Eq a, Show a) => String -> a -> a -> Expectation
+assertEq description expected actual
+  | expected == actual = pure ()
+  | otherwise =
+      expectationFailure $
+        description <> "\n  expected: " <> show expected <> "\n  actual:   " <> show actual
+
+
+assertRight :: (HasCallStack, Show e) => String -> Either e a -> IO a
+assertRight description = either failure pure
+  where
+    failure err = do
+      expectationFailure $ description <> ": expected Right, got Left " <> show err
+      error "unreachable"
+
+
+assertLeft :: (HasCallStack, Show a) => String -> Either e a -> IO e
+assertLeft description = either pure failure
+  where
+    failure value = do
+      expectationFailure $ description <> ": expected Left, got Right " <> show value
+      error "unreachable"
 
 
 assertContains :: HasCallStack => String -> Text -> Text -> Expectation

@@ -120,6 +120,7 @@ test-suite temporal-sdk-core-tests
   other-modules:
       Assertions
       BridgeErrorSpec
+      ConfigContractSpec
   hs-source-dirs:
       test
   default-extensions:
@@ -149,9 +150,13 @@ test-suite temporal-sdk-core-tests
       ViewPatterns
   ghc-options: -g -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base
+      aeson
+    , base
+    , bytestring
+    , containers
     , hspec
     , monad-logger
     , temporal-sdk-core
     , text
+    , unordered-containers
   default-language: Haskell2010
