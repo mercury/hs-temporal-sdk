@@ -380,7 +380,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runtime::test_support::{TestWaiter, error_text, new_test_runtime, test_cap};
+    use crate::runtime::test_support::{call_bridge, new_test_runtime};
     use serde_json::json;
     use std::ffi::CString;
     use std::net::SocketAddr;
@@ -467,18 +467,16 @@ mod tests {
 
     fn connect_with_raw_config(config: &std::ffi::CStr) -> Result<ClientRef, CArray<u8>> {
         let runtime = new_test_runtime();
-        let mut waiter = TestWaiter::<ClientRef, CArray<u8>>::new();
-        unsafe {
+        call_bridge(|mvar, cap, error_slot, result_slot| unsafe {
             hs_temporal_connect_client(
                 &runtime,
                 config.as_ptr(),
-                waiter.mvar(),
-                test_cap(),
-                &mut *waiter.error_slot,
-                &mut *waiter.result_slot,
+                mvar,
+                cap,
+                error_slot,
+                result_slot,
             )
-        };
-        waiter.wait()
+        })
     }
 
     /// A local WorkflowService that records the headers of each request and
@@ -548,7 +546,7 @@ mod tests {
         config["retry_config"] = json!(null);
         let config = CString::new(config.to_string()).unwrap();
         connect_with_raw_config(&config)
-            .map_err(error_text)
+            .map_err(|error| String::from_utf8(error.as_rust().unwrap()).unwrap())
             .expect("the client connects to the local server")
     }
 
@@ -579,19 +577,18 @@ mod tests {
             metadata: metadata.head(),
             timeout_millis: std::ptr::null(),
         };
-        let mut waiter = TestWaiter::<CArray<u8>, CRPCError>::new();
-        unsafe {
-            crate::rpc::hs_get_system_info(
-                &mut client,
-                &call,
-                waiter.mvar(),
-                test_cap(),
-                &mut *waiter.error_slot,
-                &mut *waiter.result_slot,
-            )
-        };
-        let err: RPCError = waiter
-            .wait()
+        let result: Result<CArray<u8>, CRPCError> =
+            call_bridge(|mvar, cap, error_slot, result_slot| unsafe {
+                crate::rpc::hs_get_system_info(
+                    &mut client,
+                    &call,
+                    mvar,
+                    cap,
+                    error_slot,
+                    result_slot,
+                )
+            });
+        let err: RPCError = result
             .expect_err("the local server answers Unimplemented")
             .as_rust()
             .unwrap();

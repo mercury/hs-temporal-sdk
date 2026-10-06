@@ -388,8 +388,11 @@ pub(crate) mod test_support {
     use super::*;
     use std::sync::mpsc;
 
+    /// The test runtime's `try_put_mvar`. It consumes the sender that
+    /// `call_bridge` passes as the `MVar`, as `hs_try_putmvar` consumes its
+    /// `StablePtr`.
     extern "C" fn notify_test_waiter(_: Capability, mvar: *mut MVar) {
-        let sender = unsafe { &*mvar.cast::<mpsc::Sender<()>>() };
+        let sender = unsafe { Box::from_raw(mvar.cast::<mpsc::Sender<()>>()) };
         let _ = sender.send(());
     }
 
@@ -408,55 +411,38 @@ pub(crate) mod test_support {
         }
     }
 
-    /// The result and error slots and the wake-up channel of one async call.
-    pub(crate) struct TestWaiter<A, E> {
-        sender: *mut mpsc::Sender<()>,
-        receiver: mpsc::Receiver<()>,
-        pub(crate) result_slot: Box<*mut A>,
-        pub(crate) error_slot: Box<*mut E>,
-    }
-
-    impl<A: RawPointerConverter<A>, E: RawPointerConverter<E>> TestWaiter<A, E> {
-        pub(crate) fn new() -> Self {
-            let (sender, receiver) = mpsc::channel();
-            Self {
-                sender: Box::into_raw(Box::new(sender)),
-                receiver,
-                result_slot: Box::new(std::ptr::null_mut()),
-                error_slot: Box::new(std::ptr::null_mut()),
+    /// Stands in for the Haskell side of an async bridge call
+    /// (`withTokioAsyncCall` in `Temporal.Internal.FFI`).
+    ///
+    /// `start` receives the `MVar`, capability, and error and result slots that
+    /// Haskell would pass to a bridge entry point. The call blocks until the
+    /// spawned task calls the runtime's `try_put_mvar`, then returns the value
+    /// that the task wrote. The runtime must come from `new_test_runtime`.
+    pub(crate) fn call_bridge<A, E>(
+        start: impl FnOnce(*mut MVar, Capability, *mut *mut E, *mut *mut A),
+    ) -> Result<A, E>
+    where
+        A: RawPointerConverter<A>,
+        E: RawPointerConverter<E>,
+    {
+        let (sender, receiver) = mpsc::channel::<()>();
+        // `notify_test_waiter` takes ownership of the sender.
+        let mvar = Box::into_raw(Box::new(sender)).cast::<MVar>();
+        let mut result: *mut A = std::ptr::null_mut();
+        let mut error: *mut E = std::ptr::null_mut();
+        // GHC's "any capability" value. `notify_test_waiter` ignores it.
+        let cap = Capability { cap_num: -1 };
+        start(mvar, cap, &raw mut error, &raw mut result);
+        receiver
+            .recv_timeout(Duration::from_secs(10))
+            .expect("the bridge call never woke its waiter");
+        unsafe {
+            if error.is_null() {
+                Ok(A::from_raw_pointer_mut(result).unwrap())
+            } else {
+                Err(E::from_raw_pointer_mut(error).unwrap())
             }
         }
-
-        pub(crate) fn mvar(&self) -> *mut MVar {
-            self.sender.cast()
-        }
-
-        pub(crate) fn wait(self) -> Result<A, E> {
-            self.receiver
-                .recv_timeout(Duration::from_secs(10))
-                .expect("the bridge call never woke its waiter");
-            unsafe {
-                if self.error_slot.is_null() {
-                    Ok(A::from_raw_pointer_mut(*self.result_slot).unwrap())
-                } else {
-                    Err(E::from_raw_pointer_mut(*self.error_slot).unwrap())
-                }
-            }
-        }
-    }
-
-    impl<A, E> Drop for TestWaiter<A, E> {
-        fn drop(&mut self) {
-            unsafe { drop(Box::from_raw(self.sender)) };
-        }
-    }
-
-    pub(crate) fn test_cap() -> Capability {
-        Capability { cap_num: -1 }
-    }
-
-    pub(crate) fn error_text(error: CArray<u8>) -> String {
-        String::from_utf8(error.as_rust().unwrap()).unwrap()
     }
 }
 
