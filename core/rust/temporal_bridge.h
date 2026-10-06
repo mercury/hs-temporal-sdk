@@ -1064,9 +1064,14 @@ void hs_list_nexus_endpoints(struct ClientRef *client,
  * # Safety
  *
  * Haskell FFI bridge invariants.
+ *
+ * Returns null on failure and stores a UTF-8 message in `*error_slot`, which
+ * the caller frees with `hs_temporal_drop_byte_array`. On success,
+ * `*error_slot` is set to null.
  */
 struct RuntimeRef *hs_temporal_init_runtime(const struct CArray_u8 *telemetry_opts,
-                                            void (*try_put_mvar)(struct Capability, struct MVar*));
+                                            void (*try_put_mvar)(struct Capability, struct MVar*),
+                                            struct CArray_u8 **error_slot);
 
 /**
  * # Safety
