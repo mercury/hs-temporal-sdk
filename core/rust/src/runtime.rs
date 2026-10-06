@@ -146,13 +146,10 @@ fn build_core_meter(options: HsTelemetryOptions) -> Result<Arc<dyn CoreMeter>, S
     }
 }
 
-/// Parse the telemetry options sent by `Temporal.Runtime.initializeRuntime`.
 pub(crate) fn parse_telemetry_options(json: &[u8]) -> Result<HsTelemetryOptions, String> {
     serde_json::from_slice(json).map_err(|err| format!("Invalid telemetry options: {err}"))
 }
 
-/// Copy a byte array owned by Haskell.
-///
 /// # Safety
 ///
 /// `array` must be null or point to a live `CArray<u8>` whose `data_ptr` is valid
@@ -171,19 +168,14 @@ pub(crate) unsafe fn copy_byte_array(
         .map_err(|err| format!("Failed to read {description}: {err}"))
 }
 
-/// Move `bytes` into a byte array that Haskell frees with `hs_temporal_drop_byte_array`.
 pub(crate) fn byte_array(bytes: Vec<u8>) -> CArray<u8> {
-    // Converting a `Vec<u8>` only boxes it, so this cannot fail.
     CArray::c_repr_of(bytes).expect("byte arrays have a C representation")
 }
 
-/// Build the byte-array error value used by bridge calls that report a message.
 pub(crate) fn error_bytes(message: impl Into<String>) -> CArray<u8> {
     byte_array(message.into().into_bytes())
 }
 
-/// Store `message` in a nullable error out-parameter.
-///
 /// # Safety
 ///
 /// `slot` must be null or valid for writes.
@@ -216,9 +208,8 @@ pub enum HsTelemetryOptions {
 ///
 /// Haskell FFI bridge invariants.
 ///
-/// Returns null on failure and stores a UTF-8 message in `*error_slot`, which
-/// the caller frees with `hs_temporal_drop_byte_array`. On success,
-/// `*error_slot` is set to null.
+/// Returns null on failure and stores an error message in `*error_slot`, which
+/// the caller frees with `hs_temporal_drop_byte_array`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn hs_temporal_init_runtime(
     telemetry_opts: *const CArray<u8>,

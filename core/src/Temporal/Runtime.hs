@@ -29,11 +29,6 @@ import Temporal.Core.CTypes
 import Temporal.Internal.FFI
 
 
-{- | Thrown by 'initializeRuntime' when the Rust bridge cannot start a runtime.
-
-For example, the telemetry options are invalid, the OpenTelemetry collector URL
-does not parse, or the Prometheus exporter cannot bind its socket.
--}
 newtype RuntimeInitializationError = RuntimeInitializationError Text
   deriving stock (Show, Eq)
 

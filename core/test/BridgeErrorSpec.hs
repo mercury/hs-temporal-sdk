@@ -1,9 +1,5 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 
-{- | Invalid caller input must reach Haskell as an ordinary failure. Before
-these checks, the Rust bridge panicked across the C ABI and aborted the
-process.
--}
 module BridgeErrorSpec (spec) where
 
 import Assertions

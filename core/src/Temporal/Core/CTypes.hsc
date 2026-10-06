@@ -99,8 +99,6 @@ data TelemetryOptions
 
 deriveToJSON (defaultOptions {fieldLabelModifier = camelTo2 '_'}) ''TelemetryOptions
 
--- | Returns 'nullPtr' on failure and stores an error message in the last
--- argument, which the caller frees with 'rust_dropByteArray'.
 foreign import ccall "hs_temporal_init_runtime" initRuntime :: Ptr (CArray Word8) -> TryPutMVarFFI -> Ptr (Ptr (CArray Word8)) -> IO (Ptr Runtime)
 foreign import ccall "hs_temporal_free_runtime" freeRuntime :: Ptr Runtime -> IO ()
 

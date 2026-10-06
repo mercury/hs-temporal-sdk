@@ -1,4 +1,3 @@
--- | Assertions that name the property being checked in their failure message.
 module Assertions (
   assertContains,
   assertThrows,
