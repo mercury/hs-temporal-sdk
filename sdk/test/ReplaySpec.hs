@@ -351,6 +351,29 @@ tests = describe "Workflow Replay" $ do
     replayResult <- runReplayHistory globalRuntime conf history
     replayResult `shouldSatisfy` isRight
 
+  specify "patched after the first yield follows a recorded marker" $ \TestEnv {..} -> do
+    -- The marker arrives on the activation that fires the timer.
+    -- Dropping NotifyHasPatch on every activation skips that job.
+    let workflow :: W.ProvidedWorkflow (W.Workflow ())
+        workflow = W.provideWorkflow JSON "replay-post-yield-marker" $ provideCallStack $ do
+          W.sleep $ milliseconds 10
+          _ <- W.patched "after-yield"
+          _ <- W.executeActivity replayActivityDef.reference (W.defaultStartActivityOptions $ W.StartToClose $ seconds 3)
+          pure ()
+        defs = (replayActivityDef, workflow)
+        conf = provideCallStack $ configure () defs baseConf
+
+    history <- withWorker conf $ do
+      uuid <- uuidText
+      let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
+      useClient $ do
+        wfHandle <- C.start workflow (W.WorkflowId uuid) opts
+        C.waitWorkflowResult wfHandle
+        C.fetchHistory wfHandle
+
+    replayResult <- runReplayHistory globalRuntime conf history
+    replayResult `shouldSatisfy` isRight
+
   specify "incompatible replay fails" $ \TestEnv {..} -> do
     let originalWorkflow :: W.ProvidedWorkflow (W.Workflow ())
         originalWorkflow = W.provideWorkflow JSON "replay-incompat-wf" $ provideCallStack $ do
