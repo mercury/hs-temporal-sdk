@@ -2,8 +2,8 @@
 
 module BridgeErrorSpec (spec) where
 
-import Assertions
 import Data.Text (Text)
+import qualified Data.Text as T
 import Temporal.Runtime
 import Test.Hspec
 
@@ -11,23 +11,25 @@ import Test.Hspec
 spec :: Spec
 spec = describe "Bridge errors" $ do
   describe "initializeRuntime" $ do
-    it "throws RuntimeInitializationError for an invalid OpenTelemetry URL" $ do
-      message <- runtimeInitializationError $ otelOptions "not a url"
-      assertContains "names the bad setting" "Invalid OpenTelemetry collector URL" message
+    it "throws RuntimeInitializationError for an invalid OpenTelemetry URL" $
+      startRuntime (otelOptions "not a url")
+        `shouldThrow` initializationErrorContaining "Invalid OpenTelemetry collector URL"
 
-    it "throws RuntimeInitializationError for an invalid Prometheus address" $ do
-      message <- runtimeInitializationError $ prometheusOptions "not an address"
-      assertContains "names the bad setting" "Invalid telemetry options" message
+    it "throws RuntimeInitializationError for an invalid Prometheus address" $
+      startRuntime (prometheusOptions "not an address")
+        `shouldThrow` initializationErrorContaining "Invalid telemetry options"
 
     it "starts a runtime without telemetry" $
-      bracketRuntime NoTelemetry (const $ pure ())
+      startRuntime NoTelemetry
 
 
-runtimeInitializationError :: TelemetryOptions -> IO Text
-runtimeInitializationError options = do
-  RuntimeInitializationError message <-
-    assertThrows "runtime initialization fails" $ bracketRuntime options (const $ pure ())
-  pure message
+startRuntime :: TelemetryOptions -> IO ()
+startRuntime options = bracketRuntime options (const $ pure ())
+
+
+initializationErrorContaining :: Text -> Selector RuntimeInitializationError
+initializationErrorContaining expected (RuntimeInitializationError message) =
+  expected `T.isInfixOf` message
 
 
 otelOptions :: Text -> TelemetryOptions
