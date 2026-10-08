@@ -74,5 +74,6 @@ tests:
     dependencies:
       - base
       - hspec
+      - monad-logger
       - temporal-sdk-core
       - text
