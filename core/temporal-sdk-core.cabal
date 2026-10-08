@@ -113,3 +113,43 @@ library
         Security
         CoreFoundation
         SystemConfiguration
+
+test-suite temporal-sdk-core-tests
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      BridgeErrorSpec
+  hs-source-dirs:
+      test
+  default-extensions:
+      BangPatterns
+      BlockArguments
+      DataKinds
+      DerivingStrategies
+      FlexibleContexts
+      FlexibleInstances
+      GADTs
+      GeneralizedNewtypeDeriving
+      InstanceSigs
+      LambdaCase
+      MultiParamTypeClasses
+      NamedFieldPuns
+      NumericUnderscores
+      RankNTypes
+      OverloadedRecordDot
+      OverloadedStrings
+      RecordWildCards
+      ScopedTypeVariables
+      StandaloneDeriving
+      TypeApplications
+      TypeFamilies
+      TypeOperators
+      UndecidableInstances
+      ViewPatterns
+  ghc-options: -g -Wall -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base
+    , hspec
+    , temporal-sdk-core
+    , text
+  default-language: Haskell2010

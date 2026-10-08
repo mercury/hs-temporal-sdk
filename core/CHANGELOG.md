@@ -9,11 +9,24 @@
   value now makes `connectClient` fail with `ClientConnectionError`.
 * The resource-based tuner now uses `targetCpuUsage` as its CPU target.
   Before, it used `targetMemoryUsage` for both the memory and the CPU target.
+* Invalid input from the caller now returns an error instead of aborting the
+  process:
+  * `initializeRuntime` throws `RuntimeInitializationError` for invalid
+    telemetry options, an invalid OpenTelemetry collector URL, a failed
+    OpenTelemetry exporter, or a Prometheus exporter that cannot bind.
+
+### New API
+
+* `Temporal.Runtime.RuntimeInitializationError`.
 
 ### Internal
 
+* `hs_temporal_init_runtime` takes an extra error out-parameter and returns
+  null on failure. This changes the C ABI of `temporal_bridge`.
 * The bridge no longer loops forever when an RPC call carries two or more
   metadata entries. No Haskell caller sent RPC metadata yet.
+* New `temporal-sdk-core-tests` test suite. It checks that invalid input
+  reaches Haskell as an ordinary error.
 * New Rust tests connect to an in-process gRPC server that records request
   headers. They check that client metadata, the API key and per-call RPC
   metadata reach the server.
