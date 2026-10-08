@@ -249,22 +249,29 @@ mod tests {
         *mut *mut EphemeralServerRef,
     );
 
-    fn start_with_raw_config(start: StartServer, json: *const c_char) -> String {
+    fn start_with_raw_config(start: StartServer, json: Option<&CStr>) -> String {
         let mut runtime = new_test_runtime();
         let result: Result<EphemeralServerRef, CArray<u8>> =
             call_bridge(|mvar, cap, error_slot, result_slot| unsafe {
-                start(&mut runtime, json, mvar, cap, error_slot, result_slot)
+                start(
+                    &mut runtime,
+                    json.map_or(std::ptr::null(), CStr::as_ptr),
+                    mvar,
+                    cap,
+                    error_slot,
+                    result_slot,
+                )
             });
         error_text(result.err().expect("the server must not start"))
     }
 
     #[test]
     fn start_server_reports_invalid_config_to_the_waiter() {
-        let err = start_with_raw_config(hs_temporal_start_dev_server, c"{\"exe\":1}".as_ptr());
+        let err = start_with_raw_config(hs_temporal_start_dev_server, Some(c"{\"exe\":1}"));
         assert!(err.starts_with("Invalid dev server config"), "{err}");
-        let err = start_with_raw_config(hs_temporal_start_test_server, c"[]".as_ptr());
+        let err = start_with_raw_config(hs_temporal_start_test_server, Some(c"[]"));
         assert!(err.starts_with("Invalid test server config"), "{err}");
-        let err = start_with_raw_config(hs_temporal_start_dev_server, std::ptr::null());
+        let err = start_with_raw_config(hs_temporal_start_dev_server, None);
         assert_eq!(err, "server config pointer is null");
     }
 }

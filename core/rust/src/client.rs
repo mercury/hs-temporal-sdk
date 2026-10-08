@@ -536,14 +536,21 @@ mod tests {
         })
     }
 
-    fn connect_with_raw_config(config: *const libc::c_char) -> Result<ClientRef, CArray<u8>> {
+    fn connect_with_raw_config(config: Option<&CStr>) -> Result<ClientRef, CArray<u8>> {
         let runtime = new_test_runtime();
         call_bridge(|mvar, cap, error_slot, result_slot| unsafe {
-            hs_temporal_connect_client(&runtime, config, mvar, cap, error_slot, result_slot)
+            hs_temporal_connect_client(
+                &runtime,
+                config.map_or(std::ptr::null(), CStr::as_ptr),
+                mvar,
+                cap,
+                error_slot,
+                result_slot,
+            )
         })
     }
 
-    fn connect_error(config: *const libc::c_char) -> String {
+    fn connect_error(config: Option<&CStr>) -> String {
         error_text(
             connect_with_raw_config(config)
                 .err()
@@ -553,15 +560,15 @@ mod tests {
 
     fn connect_error_for(config: serde_json::Value) -> String {
         let config = CString::new(config.to_string()).unwrap();
-        connect_error(config.as_ptr())
+        connect_error(Some(&config))
     }
 
     #[test]
     fn connect_client_reports_invalid_config_to_the_waiter() {
-        let err = connect_error(c"{not json".as_ptr());
+        let err = connect_error(Some(c"{not json"));
         assert!(err.starts_with("Invalid client config"), "{err}");
 
-        let err = connect_error(std::ptr::null());
+        let err = connect_error(None);
         assert_eq!(err, "client config pointer is null");
 
         let mut config = full_client_config();
@@ -655,7 +662,7 @@ mod tests {
         config["tls_config"] = json!(null);
         config["retry_config"] = json!(null);
         let config = CString::new(config.to_string()).unwrap();
-        connect_with_raw_config(config.as_ptr())
+        connect_with_raw_config(Some(&config))
             .map_err(error_text)
             .expect("the client connects to the local server")
     }
