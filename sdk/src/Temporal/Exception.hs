@@ -8,6 +8,7 @@ module Temporal.Exception (
 
   -- * Runtime errors
   RuntimeError (..),
+  ShutdownBlockedByActivities (..),
   WorkflowNotFound (..),
   ActivityNotFound (..),
   QueryNotFound (..),
@@ -242,6 +243,32 @@ data RuntimeError = RuntimeError String
 
 
 instance Exception RuntimeError where
+  toException = workerExceptionToException
+  fromException = workerExceptionFromException
+
+
+{- | A worker's graceful shutdown period elapsed while activities were still running.
+
+Unlike 'RuntimeError', this does not indicate a fault in the SDK: it means
+'gracefulShutdownPeriodMillis' was too short for the activities this worker had in
+flight, so they were not given long enough to tear themselves down.
+
+Callers that can afford to wait may retry the shutdown; callers that cannot
+should expect the server to time the surviving activities out on their
+start-to-close deadlines.
+
+The count is the worker's own view, taken when shutdown gave up, and excludes
+activities whose handler has finished but whose completion is still in flight.
+-}
+data ShutdownBlockedByActivities = ShutdownBlockedByActivities
+  { outstandingActivities :: Int
+  , namespace :: Text
+  , taskQueue :: Text
+  }
+  deriving stock (Show)
+
+
+instance Exception ShutdownBlockedByActivities where
   toException = workerExceptionToException
   fromException = workerExceptionFromException
 
