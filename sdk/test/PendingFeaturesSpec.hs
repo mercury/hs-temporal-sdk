@@ -17,20 +17,6 @@ spec = do
     it "lazy client initialization" $ const pending
     it "cloud client authentication" $ const pending
 
-  describe "Async Activity Completion (Py/TS)" $ do
-    it "complete async activity by token" $ const pending
-    it "fail async activity by token" $ const pending
-    it "heartbeat async activity by token" $ const pending
-    it "cancel async activity by token" $ const pending
-    it "complete async activity by ID" $ const pending
-    it "fail async activity by ID" $ const pending
-    it "non-existing activity errors (complete)" $ const pending
-    it "non-existing activity errors (fail)" $ const pending
-    it "non-existing activity errors (heartbeat)" $ const pending
-    it "non-existing activity errors (cancel)" $ const pending
-    it "async completion with activity env access" $ const pending
-    it "async completion cancellation flow" $ const pending
-    it "async completion failure flow" $ const pending
 
   describe "Worker Tuner (Py/TS)" $ do
     it "configure slot supplier" $ const pending

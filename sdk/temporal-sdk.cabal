@@ -22,6 +22,7 @@ library
       Temporal.Bundle
       Temporal.Bundle.TH
       Temporal.Client
+      Temporal.Client.AsyncActivity
       Temporal.Client.Namespace
       Temporal.Client.Schedule
       Temporal.Client.TestService
@@ -49,7 +50,6 @@ library
       Temporal.Activity.Definition
       Temporal.Activity.Worker
       Temporal.Client.Types
-      Temporal.Client.AsyncActivity
       Temporal.Client.Workflow
       Temporal.Common
       Temporal.Common.Async
