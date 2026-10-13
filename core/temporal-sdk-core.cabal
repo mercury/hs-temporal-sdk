@@ -31,7 +31,7 @@ custom-setup
     , base >=4.7 && <5
     , directory >=1.3.6.0
     , filepath >=1.3.0.2
-    , unix
+    , process >=1.6.0.0
 
 flag external_lib
   description: Use external library (don't compile automatically)

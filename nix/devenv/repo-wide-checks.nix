@@ -30,6 +30,7 @@ let
         "^sdk/src/Temporal/Client/Workflow\\.hs"
         "^sdk/src/Temporal/Workflow/Internal/Monad\\.hs" # CPP not supported by fourmolu
         "^sdk/test/Spec\\.hs"
+        "Setup\\.hs$" # CPP not supported by fourmolu
       ] ++ attrs.excludes or [ ];
     };
 in
