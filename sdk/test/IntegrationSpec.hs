@@ -14,6 +14,8 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Redundant bracket" #-}
+{-# HLINT ignore "Redundant $" #-}
+{-# HLINT ignore "Avoid lambda" #-}
 
 module IntegrationSpec where
 
@@ -182,7 +184,7 @@ mkWithWorker :: PortNumber -> WorkerConfig actEnv -> IO a -> IO a
 mkWithWorker pn conf m = do
   let clientConfig_ = configWithRetry pn
   c <- runStdoutLoggingT $ connectClient globalRuntime clientConfig_
-  bracket (startWorker c (conf {payloadProcessor = sillyEncryptionPayloadProcessor})) shutdown (const m)
+  bracket (startWorker c (conf {payloadProcessor = conf.payloadProcessor <> sillyEncryptionPayloadProcessor})) shutdown (const m)
 
 
 -- Increment the bytestring words by 1 on encode, and decrement by 1 on decode
@@ -818,6 +820,43 @@ needsClient = do
         timeout 5_000_000 (takeMVar firstEvaluationEntered) `shouldReturn` Just ()
         timeout 5_000_000 (useClient $ C.waitWorkflowResult workflowHandle) `shouldReturn` Just ()
         readIORef evaluationAttempts `shouldReturn` 2
+
+    specify "does not count payload processor IO against the deadlock timeout" $ \TestEnv {..} -> do
+      let slowProcessor =
+            PayloadProcessor
+              { payloadProcessorEncode = \p -> do
+                  threadDelay 250_000
+                  pure p
+              , payloadProcessorDecode = \p -> do
+                  threadDelay 250_000
+                  pure (Right p)
+              }
+          act :: Int -> Activity () Int
+          act n = pure (n + 1)
+          actDef = provideActivity defaultCodec "slow-processor-activity" act
+          workflow :: Int -> MyWorkflow Int
+          workflow =
+            W.executeActivity
+              actDef.reference
+              (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
+          wf = W.provideWorkflow defaultCodec "slow-processor-workflow" workflow
+          conf =
+            (configure () (wf, actDef) baseConf)
+              { deadlockTimeout = Just 100_000
+              , payloadProcessor = slowProcessor
+              }
+          startOptions =
+            (C.startWorkflowOptions taskQueue)
+              { C.timeouts =
+                  C.TimeoutOptions
+                    { C.runTimeout = Just $ seconds 10
+                    , C.executionTimeout = Nothing
+                    , C.taskTimeout = Nothing
+                    }
+              }
+      withWorker conf do
+        workflowHandle <- useClient $ C.start wf.reference "slow-processor-workflow" startOptions 41
+        timeout 5_000_000 (useClient $ C.waitWorkflowResult workflowHandle) `shouldReturn` Just 42
 
     describe "Workflow existence assertions" $ do
       specify "checkWorkflowExecutionExists returns correct values" $ \TestEnv {..} -> do
