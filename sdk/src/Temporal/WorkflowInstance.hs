@@ -54,11 +54,18 @@ import GHC.Stack (HasCallStack, emptyCallStack, getCallStack)
 import qualified GHC.Stack
 import Lens.Family2
 import Paths_temporal_sdk (version)
+import qualified Proto.Temporal.Api.Common.V1.Message as ProtoPayload
 import qualified Proto.Temporal.Api.Failure.V1.Message_Fields as F
 import qualified Proto.Temporal.Api.Failure.V1.Message_Fields as Failure
+import qualified Proto.Temporal.Sdk.Core.ActivityResult.ActivityResult as ActivityResult
+import qualified Proto.Temporal.Sdk.Core.ActivityResult.ActivityResult_Fields as ActivityResult
 import Proto.Temporal.Sdk.Core.ChildWorkflow.ChildWorkflow (
   StartChildWorkflowExecutionFailedCause (..),
  )
+import qualified Proto.Temporal.Sdk.Core.ChildWorkflow.ChildWorkflow as ChildWorkflow
+import qualified Proto.Temporal.Sdk.Core.ChildWorkflow.ChildWorkflow_Fields as ChildWorkflow
+import qualified Proto.Temporal.Sdk.Core.Nexus.Nexus as NexusProto
+import qualified Proto.Temporal.Sdk.Core.Nexus.Nexus_Fields as NexusFields
 import Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation (
   CancelWorkflow,
   DoUpdate,
@@ -273,7 +280,7 @@ runWorkflowToCompletion wf = do
 
       completeStep suspension = do
         Logging.logDebug "Awaiting activation results from workflow"
-        activation <- join $ atomically $ do
+        rawActivation <- join $ atomically $ do
           mActivation <- tryReadTQueue inst.activationChannel
           case mActivation of
             Nothing -> do
@@ -281,7 +288,9 @@ runWorkflowToCompletion wf = do
                 flushCommands
                 atomically $ readTQueue inst.activationChannel
             Just act -> pure $ pure act
-        runWithWorkflowExecutionContext inst $ fmap runIdentity $ activate activation $ Identity suspension
+        runWithWorkflowExecutionContext inst $ do
+          activation <- decodeActivationPayloads rawActivation
+          fmap runIdentity $ activate activation $ Identity suspension
 
       runSteps current = do
         step <- resumeWithDeadline current
@@ -300,8 +309,11 @@ may still interrupt a query that is in progress during eviction.
 handleQueriesAfterCompletion :: InstanceM ()
 handleQueriesAfterCompletion = forever $ do
   inst <- ask
-  activation <- atomically $ readTQueue inst.activationChannel
-  completion <- runWithWorkflowExecutionContext inst $ UnliftIO.try $ activate activation Proxy
+  rawActivation <- atomically $ readTQueue inst.activationChannel
+  completion <- runWithWorkflowExecutionContext inst $ UnliftIO.try $ do
+    activation <- decodeActivationPayloads rawActivation
+    Proxy <- activate activation Proxy
+    flushCommands
   case completion of
     Left err -> do
       Logging.logDebug ("Workflow failure: " <> Text.pack (show err))
@@ -313,10 +325,110 @@ handleQueriesAfterCompletion = forever $ do
 
           completionMessage =
             defMessage
-              & Completion.runId .~ (activation ^. Activation.runId)
+              & Completion.runId .~ (rawActivation ^. Activation.runId)
               & Completion.failed .~ failureProto
       liftIO (inst.workflowCompleteActivation completionMessage >>= either throwIO pure)
-    Right Proxy -> flushCommands
+    Right () -> pure ()
+
+
+decodeProtoPayload :: PayloadProcessor -> ProtoPayload.Payload -> InstanceM ProtoPayload.Payload
+decodeProtoPayload processor p = do
+  decoded <- liftIO $ payloadProcessorDecode processor (convertFromProtoPayload p)
+  case decoded of
+    Left err -> throwIO (ValueError err)
+    Right ok -> pure (convertToProtoPayload ok)
+
+
+decodeProtoPayloads :: Traversable f => PayloadProcessor -> f ProtoPayload.Payload -> InstanceM (f ProtoPayload.Payload)
+decodeProtoPayloads processor = traverse (decodeProtoPayload processor)
+
+
+tryDecodeProtoPayloads :: Traversable f => PayloadProcessor -> f ProtoPayload.Payload -> InstanceM (f ProtoPayload.Payload)
+tryDecodeProtoPayloads processor = liftIO . traverse tryDecode
+  where
+    tryDecode p = do
+      decoded <- payloadProcessorDecode processor (convertFromProtoPayload p)
+      pure $ either (const p) convertToProtoPayload decoded
+
+
+decodeSignalWorkflow :: PayloadProcessor -> SignalWorkflow -> InstanceM SignalWorkflow
+decodeSignalWorkflow processor sig = do
+  inp <- decodeProtoPayloads processor (sig ^. Command.vec'input)
+  pure (sig & Command.vec'input .~ inp)
+
+
+decodeActivationPayloads :: WorkflowActivation -> InstanceM WorkflowActivation
+decodeActivationPayloads activation = do
+  inst <- ask
+  jobs <- traverse (decodeActivationJob inst.payloadProcessor) (activation ^. Activation.vec'jobs)
+  pure (activation & Activation.vec'jobs .~ jobs)
+
+
+decodeActivationJob :: PayloadProcessor -> WorkflowActivationJob -> InstanceM WorkflowActivationJob
+decodeActivationJob processor job = do
+  variant' <- traverse (decodeActivationJobVariant processor) (job ^. Activation.maybe'variant)
+  pure (job & Activation.maybe'variant .~ variant')
+
+
+decodeActivationJobVariant :: PayloadProcessor -> WorkflowActivationJob'Variant -> InstanceM WorkflowActivationJob'Variant
+decodeActivationJobVariant processor = \case
+  WorkflowActivationJob'ResolveActivity msg -> do
+    status' <- case msg ^. Activation.result . ActivityResult.maybe'status of
+      Just (ActivityResult.ActivityResolution'Completed success) -> do
+        res <- decodeProtoPayload processor (success ^. ActivityResult.result)
+        pure $ Just $ ActivityResult.ActivityResolution'Completed (success & ActivityResult.result .~ res)
+      status -> pure status
+    pure $
+      WorkflowActivationJob'ResolveActivity
+        (msg & (Activation.result . ActivityResult.maybe'status) .~ status')
+  WorkflowActivationJob'ResolveChildWorkflowExecution msg -> do
+    status' <- case msg ^. Activation.result . ChildWorkflow.maybe'status of
+      Just (ChildWorkflow.ChildWorkflowResult'Completed success) -> do
+        res <- decodeProtoPayload processor (success ^. ChildWorkflow.result)
+        pure $ Just $ ChildWorkflow.ChildWorkflowResult'Completed (success & ChildWorkflow.result .~ res)
+      status -> pure status
+    pure $
+      WorkflowActivationJob'ResolveChildWorkflowExecution
+        (msg & (Activation.result . ChildWorkflow.maybe'status) .~ status')
+  WorkflowActivationJob'ResolveNexusOperation msg -> do
+    status' <- case msg ^. Activation.result . NexusFields.maybe'status of
+      Just (NexusProto.NexusOperationResult'Completed payload) -> do
+        res <- decodeProtoPayload processor payload
+        pure $ Just $ NexusProto.NexusOperationResult'Completed res
+      status -> pure status
+    pure $
+      WorkflowActivationJob'ResolveNexusOperation
+        (msg & (Activation.result . NexusFields.maybe'status) .~ status')
+  WorkflowActivationJob'SignalWorkflow sig ->
+    WorkflowActivationJob'SignalWorkflow <$> decodeSignalWorkflow processor sig
+  WorkflowActivationJob'DoUpdate upd -> do
+    inp <- decodeProtoPayloads processor (upd ^. Activation.vec'input)
+    hdrs <- tryDecodeProtoPayloads processor (upd ^. Activation.headers)
+    pure $
+      WorkflowActivationJob'DoUpdate
+        ( upd
+            & Activation.vec'input .~ inp
+            & Activation.headers .~ hdrs
+        )
+  WorkflowActivationJob'QueryWorkflow qry -> do
+    args <- decodeProtoPayloads processor (qry ^. Command.vec'arguments)
+    hdrs <- tryDecodeProtoPayloads processor (qry ^. Activation.headers)
+    pure $
+      WorkflowActivationJob'QueryWorkflow
+        ( qry
+            & Command.vec'arguments .~ args
+            & Activation.headers .~ hdrs
+        )
+  v@(WorkflowActivationJob'InitializeWorkflow _) -> pure v
+  v@(WorkflowActivationJob'FireTimer _) -> pure v
+  v@(WorkflowActivationJob'UpdateRandomSeed _) -> pure v
+  v@(WorkflowActivationJob'CancelWorkflow _) -> pure v
+  v@(WorkflowActivationJob'NotifyHasPatch _) -> pure v
+  v@(WorkflowActivationJob'ResolveChildWorkflowExecutionStart _) -> pure v
+  v@(WorkflowActivationJob'ResolveSignalExternalWorkflow _) -> pure v
+  v@(WorkflowActivationJob'ResolveRequestCancelExternalWorkflow _) -> pure v
+  v@(WorkflowActivationJob'ResolveNexusOperationStart _) -> pure v
+  v@(WorkflowActivationJob'RemoveFromCache _) -> pure v
 
 
 isBuiltinQuery :: Text.Text -> Bool
@@ -481,6 +593,7 @@ applyStartWorkflow initialSignals execInput workflowFn = do
             Logging.logError $ Text.pack ("Failed to decode workflow arguments: " <> msg)
             throwIO (ValueError msg)
           Right act -> do
+            decodedSignals <- traverse (decodeSignalWorkflow inst.payloadProcessor) initialSignals
             Logging.logDebug "Calling runWorkflow"
             -- Apply any signals that arrived with the start job before running the
             -- workflow body.
@@ -490,7 +603,7 @@ applyStartWorkflow initialSignals execInput workflowFn = do
             --
             -- Safe on replay: the first activation carries the same signals,
             -- and buffering emits no commands.
-            pure . runWorkflow $ traverse_ applySignalWorkflow initialSignals *> act
+            pure . runWorkflow $ traverse_ applySignalWorkflow decodedSignals *> act
   liftIO $ executeWorkflowBase execInput
 
 
@@ -507,10 +620,9 @@ applyQueryWorkflow queryWorkflow = do
   instInfo <- readIORef inst.workflowInstanceInfo
   handles <- readIORef inst.workflowQueryHandlers
   Logging.logDebug $ Text.pack ("Applying query: " <> show (queryWorkflow ^. Activation.queryType))
-  let processor = inst.payloadProcessor
-  args <- processorDecodePayloads processor (fmap convertFromProtoPayload (queryWorkflow ^. Command.vec'arguments))
-  hdrs <- processorTryDecodePayloads processor (fmap convertFromProtoPayload (queryWorkflow ^. Activation.headers))
-  let baseInput =
+  let args = fmap convertFromProtoPayload (queryWorkflow ^. Command.vec'arguments)
+      hdrs = fmap convertFromProtoPayload (queryWorkflow ^. Activation.headers)
+      baseInput =
         HandleQueryInput
           { handleQueryId = QueryId (queryWorkflow ^. Activation.queryId)
           , handleQueryInputType = queryWorkflow ^. Activation.queryType
@@ -535,25 +647,22 @@ applyQueryWorkflow queryWorkflow = do
     if isBuiltinQuery (queryWorkflow ^. Activation.queryType)
       then liftIO $ lookupHandler baseInput
       else liftIO $ inst.inboundInterceptor.handleQuery baseInput lookupHandler
-  cmd <- case res of
-    Left err ->
-      -- TODO, more useful error message
-      pure $
-        defMessage
-          & Command.queryId .~ rawQueryId baseInput.handleQueryId
-          & Command.failed
-            .~ ( defMessage
-                  & F.message .~ Text.pack (show err)
-               )
-    Right ok -> do
-      res' <- liftIO $ payloadProcessorEncode processor ok
-      pure $
-        defMessage
-          & Command.queryId .~ rawQueryId baseInput.handleQueryId
-          & Command.succeeded
-            .~ ( defMessage
-                  & Command.response .~ convertToProtoPayload res'
-               )
+  let cmd = case res of
+        Left err ->
+          -- TODO, more useful error message
+          defMessage
+            & Command.queryId .~ rawQueryId baseInput.handleQueryId
+            & Command.failed
+              .~ ( defMessage
+                    & F.message .~ Text.pack (show err)
+                 )
+        Right ok ->
+          defMessage
+            & Command.queryId .~ rawQueryId baseInput.handleQueryId
+            & Command.succeeded
+              .~ ( defMessage
+                    & Command.response .~ convertToProtoPayload ok
+                 )
   addCommand $ defMessage & Command.respondToQuery .~ cmd
 
 
@@ -566,23 +675,20 @@ applySignalWorkflow signalWorkflow = join $ do
         handlerOrDefault =
           HashMap.lookup (Just signalName) handlers
             <|> HashMap.lookup Nothing handlers
-    -- Decode inputs first - we need them whether we have a handler or are buffering
-    eInputs <- UnliftIO.try $ processorDecodePayloads inst.payloadProcessor (fmap convertFromProtoPayload (signalWorkflow ^. Command.vec'input))
-    case eInputs of
-      Left err -> pure $ Throw err
-      Right args -> case handlerOrDefault of
-        Nothing -> do
-          -- Buffer the signal until a handler is registered (matching TypeScript SDK behavior)
-          -- Uses Endo for O(1) append (diff-list style), maintaining FIFO order
-          -- flip (<>) ensures old signals come before new: old <> new
-          Logging.logDebug $ Text.pack ("Buffering signal (no handler registered yet): " <> show signalName)
-          liftIO $
-            modifyIORef' inst.workflowBufferedSignals $
-              HashMap.insertWith (flip (<>)) signalName (Endo (args :))
-          pure $ Done $ pure ()
-        Just handler -> pure $ Done $ do
-          Logging.logDebug $ Text.pack ("Applying signal handler for signal: " <> show signalName)
-          handler args
+        args = fmap convertFromProtoPayload (signalWorkflow ^. Command.vec'input)
+    case handlerOrDefault of
+      Nothing -> do
+        -- Buffer the signal until a handler is registered (matching TypeScript SDK behavior)
+        -- Uses Endo for O(1) append (diff-list style), maintaining FIFO order
+        -- flip (<>) ensures old signals come before new: old <> new
+        Logging.logDebug $ Text.pack ("Buffering signal (no handler registered yet): " <> show signalName)
+        liftIO $
+          modifyIORef' inst.workflowBufferedSignals $
+            HashMap.insertWith (flip (<>)) signalName (Endo (args :))
+        pure $ Done $ pure ()
+      Just handler -> pure $ Done $ do
+        Logging.logDebug $ Text.pack ("Applying signal handler for signal: " <> show signalName)
+        handler args
 
 
 applyDoUpdateWorkflow :: DoUpdate -> Workflow ()
@@ -609,70 +715,43 @@ applyDoUpdateWorkflow doUpdate = provideCallStack do
         addCommand cmd
         pure (pure False, error "This should never happen")
       Just WorkflowUpdateImplementation {..} -> do
-        updateArgs <- UnliftIO.try $ processorDecodePayloads inst.payloadProcessor (fmap convertFromProtoPayload (doUpdate ^. Activation.vec'input))
-        updateHeaders <- processorTryDecodePayloads inst.payloadProcessor (fmap convertFromProtoPayload (doUpdate ^. Activation.headers))
-        let runValidator = doUpdate ^. Activation.runValidator
+        let args = fmap convertFromProtoPayload (doUpdate ^. Activation.vec'input)
+            updateHeaders = fmap convertFromProtoPayload (doUpdate ^. Activation.headers)
+            runValidator = doUpdate ^. Activation.runValidator
             updateId = UpdateId $ doUpdate ^. Activation.id
-        case updateArgs of
-          Left err ->
-            pure
+            baseInput =
+              HandleUpdateInput
+                { handleUpdateId = updateId
+                , handleUpdateInputType = doUpdate ^. Activation.name
+                , handleUpdateInputArgs = args
+                , handleUpdateInputHeaders = updateHeaders
+                , handleUpdateWorkflowInfo = instInfo
+                }
+            runUpdate = inst.inboundInterceptor.handleUpdate baseInput $ \input ->
+              updateImplementation input.handleUpdateId input.handleUpdateInputArgs input.handleUpdateInputHeaders
+        pure $
+          if runValidator
+            then
               ( do
-                  addCommand $
-                    defMessage
-                      & Command.updateResponse
-                        .~ ( defMessage
-                              & Command.protocolInstanceId .~ (doUpdate ^. Activation.protocolInstanceId)
-                              & Command.rejected .~ applicationFailureToFailureProto (mkApplicationFailure err inst.errorConverters)
-                           )
-                  pure False
-              , error "Error processing update args"
-              )
-          Right args -> do
-            let baseInput =
-                  HandleUpdateInput
-                    { handleUpdateId = updateId
-                    , handleUpdateInputType = doUpdate ^. Activation.name
-                    , handleUpdateInputArgs = args
-                    , handleUpdateInputHeaders = updateHeaders
-                    , handleUpdateWorkflowInfo = instInfo
-                    }
-            let runUpdate = inst.inboundInterceptor.handleUpdate baseInput $ \input ->
-                  updateImplementation input.handleUpdateId input.handleUpdateInputArgs input.handleUpdateInputHeaders
-            pure $
-              if runValidator
-                then
-                  ( do
-                      eValidatorResult <- case updateValidationImplementation of
-                        Nothing -> pure $ Right ()
-                        Just f -> do
-                          eResult <- UnliftIO.try $
-                            liftIO $
-                              inst.inboundInterceptor.validateUpdate baseInput $ \input ->
-                                unValidation $ f input.handleUpdateId input.handleUpdateInputArgs input.handleUpdateInputHeaders
-                          pure $ join eResult
-                      case eValidatorResult of
-                        Left err -> do
-                          addCommand $
-                            defMessage
-                              & Command.updateResponse
-                                .~ ( defMessage
-                                      & Command.protocolInstanceId .~ (doUpdate ^. Activation.protocolInstanceId)
-                                      & Command.rejected .~ applicationFailureToFailureProto (mkApplicationFailure err inst.errorConverters)
-                                   )
-                          pure False
-                        Right () -> do
-                          addCommand $
-                            defMessage
-                              & Command.updateResponse
-                                .~ ( defMessage
-                                      & Command.protocolInstanceId .~ (doUpdate ^. Activation.protocolInstanceId)
-                                      & Command.accepted .~ defMessage
-                                   )
-                          pure True
-                  , runUpdate
-                  )
-                else
-                  ( do
+                  eValidatorResult <- case updateValidationImplementation of
+                    Nothing -> pure $ Right ()
+                    Just f -> do
+                      eResult <- UnliftIO.try $
+                        liftIO $
+                          inst.inboundInterceptor.validateUpdate baseInput $ \input ->
+                            unValidation $ f input.handleUpdateId input.handleUpdateInputArgs input.handleUpdateInputHeaders
+                      pure $ join eResult
+                  case eValidatorResult of
+                    Left err -> do
+                      addCommand $
+                        defMessage
+                          & Command.updateResponse
+                            .~ ( defMessage
+                                  & Command.protocolInstanceId .~ (doUpdate ^. Activation.protocolInstanceId)
+                                  & Command.rejected .~ applicationFailureToFailureProto (mkApplicationFailure err inst.errorConverters)
+                               )
+                      pure False
+                    Right () -> do
                       addCommand $
                         defMessage
                           & Command.updateResponse
@@ -681,8 +760,20 @@ applyDoUpdateWorkflow doUpdate = provideCallStack do
                                   & Command.accepted .~ defMessage
                                )
                       pure True
-                  , runUpdate
-                  )
+              , runUpdate
+              )
+            else
+              ( do
+                  addCommand $
+                    defMessage
+                      & Command.updateResponse
+                        .~ ( defMessage
+                              & Command.protocolInstanceId .~ (doUpdate ^. Activation.protocolInstanceId)
+                              & Command.accepted .~ defMessage
+                           )
+                  pure True
+              , runUpdate
+              )
   runAction <- ilift validator
   when runAction $ do
     ePayload <- Temporal.Workflow.Internal.Monad.try updateAction
@@ -702,13 +793,12 @@ applyDoUpdateWorkflow doUpdate = provideCallStack do
           pure $ Throw err
         Right payload -> do
           Logging.logDebug "gonna send an update completed message!"
-          payload' <- liftIO $ payloadProcessorEncode inst.payloadProcessor payload
           addCommand $
             defMessage
               & Command.updateResponse
                 .~ ( defMessage
                       & Command.protocolInstanceId .~ (doUpdate ^. Activation.protocolInstanceId)
-                      & Command.completed .~ convertToProtoPayload payload'
+                      & Command.completed .~ convertToProtoPayload payload
                    )
           pure $ Done ()
 
@@ -967,13 +1057,11 @@ applyResolutions rs = do
 convertExitVariantToCommand :: WorkflowExitVariant Payload -> InstanceM Command.WorkflowCommand
 convertExitVariantToCommand variant = do
   inst <- ask
-  let processor = inst.payloadProcessor
   case variant of
     WorkflowExitSuccess result -> do
-      result' <- liftIO $ payloadProcessorEncode processor result
       pure $
         defMessage
-          & Command.completeWorkflowExecution .~ (defMessage & Command.result .~ convertToProtoPayload result')
+          & Command.completeWorkflowExecution .~ (defMessage & Command.result .~ convertToProtoPayload result)
     WorkflowExitContinuedAsNew (ContinueAsNewException {..}) -> do
       i <- readIORef inst.workflowInstanceInfo
       searchAttrs <-
@@ -983,19 +1071,17 @@ convertExitVariantToCommand variant = do
                 then i.searchAttributes
                 else continueAsNewOptions.searchAttributes
             )
-      args <- processorEncodePayloads processor continueAsNewArguments
-      memo <- processorEncodePayloads processor continueAsNewOptions.memo
       pure $
         defMessage
           & Command.continueAsNewWorkflowExecution
             .~ ( defMessage
                   & Command.workflowType .~ rawWorkflowType continueAsNewWorkflowType
                   & Command.taskQueue .~ maybe "" rawTaskQueue continueAsNewOptions.taskQueue
-                  & Command.vec'arguments .~ fmap convertToProtoPayload args
+                  & Command.vec'arguments .~ fmap convertToProtoPayload continueAsNewArguments
                   & Command.maybe'retryPolicy .~ (retryPolicyToProto <$> continueAsNewOptions.retryPolicy)
                   & Command.searchAttributes .~ searchAttrs
                   & Command.headers .~ fmap convertToProtoPayload continueAsNewOptions.headers
-                  & Command.memo .~ fmap convertToProtoPayload memo
+                  & Command.memo .~ fmap convertToProtoPayload continueAsNewOptions.memo
                   & Command.maybe'workflowTaskTimeout .~ (durationToProto <$> continueAsNewOptions.taskTimeout)
                   & Command.maybe'workflowRunTimeout .~ (durationToProto <$> continueAsNewOptions.runTimeout)
                )
