@@ -36,7 +36,7 @@ import Data.Foldable (for_, traverse_)
 #endif
 import Data.Functor.Identity
 import qualified Data.HashMap.Strict as HashMap
-import Data.Maybe (mapMaybe)
+import Data.Maybe (isJust, mapMaybe)
 import Data.Monoid (Endo (..))
 import Data.ProtoLens
 import Data.Proxy
@@ -54,6 +54,7 @@ import GHC.Stack (HasCallStack, emptyCallStack, getCallStack)
 import qualified GHC.Stack
 import Lens.Family2
 import Paths_temporal_sdk (version)
+import qualified Proto.Temporal.Api.Common.V1.Message_Fields as Message
 import qualified Proto.Temporal.Api.Failure.V1.Message_Fields as F
 import qualified Proto.Temporal.Api.Failure.V1.Message_Fields as Failure
 import Proto.Temporal.Sdk.Core.ChildWorkflow.ChildWorkflow (
@@ -101,6 +102,7 @@ import Temporal.SearchAttributes.Internal
 import Temporal.Workflow.Eval (ActivationResult (..), SuspendableWorkflowExecution, injectWorkflowSignalOrUpdate, rethrowAsyncExceptions, runWorkflow)
 import Temporal.Workflow.Internal.Instance
 import Temporal.Workflow.Internal.Monad
+import Temporal.Workflow.Internal.Payload
 import Temporal.Workflow.Types
 import UnliftIO
 
@@ -125,7 +127,7 @@ create
   => (Core.WorkflowActivationCompletion -> IO (Either Core.WorkerError ()))
   -> (Vector Payload -> IO (Either String (Workflow Payload)))
   -> Maybe Int
-  -- ^ Deadlock timeout in seconds.
+  -- ^ Deadlock timeout, in microseconds.
   -> [ApplicationFailureHandler]
   -> WorkflowInboundInterceptor
   -> WorkflowOutboundInterceptor
@@ -194,13 +196,15 @@ create
               result <-
                 E.try @SomeException $
                   runInstanceM inst $ do
-                    exec <- setUpWorkflowExecution start
+                    decodedStart <- liftIO $ decodeInitialization inst.payloadProcessor start
+                    decodedSignals <- liftIO $ traverse (decodeSignal inst.payloadProcessor) initialSignals
+                    exec <- setUpWorkflowExecution decodedStart
                     res <-
                       liftIO $
                         interceptWorkflow inboundInterceptor exec $ \exec' ->
                           runInstanceM inst $ runTopLevel $ do
                             Logging.logDebug "Executing workflow"
-                            wf <- applyStartWorkflow initialSignals exec' workflowFn
+                            wf <- applyStartWorkflow decodedSignals exec' workflowFn
                             runWorkflowToCompletion wf
                     finishWorkflow res
               case result of
@@ -239,13 +243,13 @@ failWorkflowActivation err = do
 finishWorkflow :: WorkflowExitVariant Payload -> InstanceM ()
 finishWorkflow res = do
   inst <- ask
-  let finalize = liftIO $ finalizeWorkflowExecution inst.inboundInterceptor inst (Just res)
-  -- Finalize before publishing the terminal command. The executor remains alive
-  -- after publication to answer queries, so executor exit is not workflow exit.
-  (`Catch.finally` finalize) do
-    Logging.logDebug "Workflow execution completed"
-    addCommand =<< convertExitVariantToCommand res
-  flushCommands
+  Logging.logDebug "Workflow execution completed"
+  addCommand =<< convertExitVariantToCommand res
+  -- Encoding must succeed before finalizers observe success, and finalizers
+  -- must finish before publication makes the result observable.
+  completion <- prepareCompletion
+  liftIO $ finalizeWorkflowExecution inst.inboundInterceptor inst (Just res)
+  publishCompletion completion
   Logging.logDebug "Handling leftover queries"
   handleQueriesAfterCompletion
 
@@ -259,18 +263,20 @@ runWithWorkflowExecutionContext inst action = do
       liftIO $ runWorkflowExecutionContext $ runInstanceM inst action
 
 
+-- Processor IO runs outside these timed execution sections.
+withWatchdog :: WorkflowInstance -> InstanceM a -> InstanceM a
+withWatchdog inst action = case inst.workflowDeadlockTimeout of
+  Nothing -> action
+  Just budget -> do
+    UnliftIO.timeout budget action >>= \case
+      Nothing -> throwIO $ LogicBug WorkflowActivationDeadlock
+      Just result -> pure result
+
+
 runWorkflowToCompletion :: HasCallStack => SuspendableWorkflowExecution Payload -> InstanceM Payload
 runWorkflowToCompletion wf = do
   inst <- ask
-  let resumeWithDeadline current =
-        case inst.workflowDeadlockTimeout of
-          Nothing -> resume current
-          Just timeoutDuration -> do
-            result <- UnliftIO.timeout timeoutDuration (resume current)
-            case result of
-              Nothing -> throwIO $ LogicBug WorkflowActivationDeadlock
-              Just step -> pure step
-
+  let resumeWithDeadline current = withWatchdog inst $ resume current
       completeStep suspension = do
         Logging.logDebug "Awaiting activation results from workflow"
         activation <- join $ atomically $ do
@@ -281,7 +287,9 @@ runWorkflowToCompletion wf = do
                 flushCommands
                 atomically $ readTQueue inst.activationChannel
             Just act -> pure $ pure act
-        runWithWorkflowExecutionContext inst $ fmap runIdentity $ activate activation $ Identity suspension
+        runWithWorkflowExecutionContext inst $ do
+          decoded <- liftIO $ decodeActivation inst.payloadProcessor activation
+          runIdentity <$> activate decoded (Identity suspension)
 
       runSteps current = do
         step <- resumeWithDeadline current
@@ -301,7 +309,10 @@ handleQueriesAfterCompletion :: InstanceM ()
 handleQueriesAfterCompletion = forever $ do
   inst <- ask
   activation <- atomically $ readTQueue inst.activationChannel
-  completion <- runWithWorkflowExecutionContext inst $ UnliftIO.try $ activate activation Proxy
+  completion <- runWithWorkflowExecutionContext inst $ UnliftIO.try $ do
+    decoded <- liftIO $ decodeActivation inst.payloadProcessor activation
+    void $ activate decoded Proxy
+    prepareCompletion
   case completion of
     Left err -> do
       Logging.logDebug ("Workflow failure: " <> Text.pack (show err))
@@ -316,7 +327,8 @@ handleQueriesAfterCompletion = forever $ do
               & Completion.runId .~ (activation ^. Activation.runId)
               & Completion.failed .~ failureProto
       liftIO (inst.workflowCompleteActivation completionMessage >>= either throwIO pure)
-    Right Proxy -> flushCommands
+    -- Let the executor handle publication failures.
+    Right prepared -> publishCompletion prepared
 
 
 isBuiltinQuery :: Text.Text -> Bool
@@ -408,8 +420,12 @@ addBuiltinQueryHandlers inst = do
     sdkVersion = Text.pack (showVersion version)
 
 
--- Exceptions escape to the instance executor, which owns the sole failed
--- activation completion path.
+{- | Apply an activation.
+
+__NOTE__: Payloads must have already been decoded by 'decodeActivation', and
+any associated payload processor IO must have run before this function is
+called so that it won't count towards workflow execution timeout.
+-}
 activate
   :: Functor f
   => WorkflowActivation
@@ -426,17 +442,11 @@ activate act suspension = do
     in (info', info')
   writeIORef inst.workflowTime (act ^. Activation.timestamp . to timespecFromTimestamp)
   writeIORef inst.workflowIsReplaying (act ^. Activation.isReplaying)
-  eResult <- case inst.workflowDeadlockTimeout of
-    Nothing -> applyJobs (act ^. Activation.vec'jobs) suspension
-    Just timeoutDuration -> do
-      res <- UnliftIO.timeout timeoutDuration $ applyJobs (act ^. Activation.vec'jobs) suspension
-      case res of
-        Nothing -> pure $ Left $ toException $ LogicBug WorkflowActivationDeadlock
-        Just res' -> pure res'
+  eResult <- withWatchdog inst $ applyJobs (act ^. Activation.vec'jobs) suspension
   either throwIO pure eResult
 
 
--- | This gives us the basic state for a workflow instance prior to initial evaluation.
+-- | Initialize workflow state from inputs that have already been decoded.
 setUpWorkflowExecution :: InitializeWorkflow -> InstanceM ExecuteWorkflowInput
 setUpWorkflowExecution initializeWorkflow = do
   inst <- ask
@@ -445,13 +455,15 @@ setUpWorkflowExecution initializeWorkflow = do
   writeIORef inst.workflowTime (initializeWorkflow ^. Activation.startTime . to timespecFromTimestamp)
   info <- readIORef inst.workflowInstanceInfo
 
-  hdrs <- processorTryDecodePayloads inst.payloadProcessor (fmap convertFromProtoPayload (initializeWorkflow ^. Activation.headers))
+  let hdrs = fmap convertFromProtoPayload (initializeWorkflow ^. Activation.headers)
+      decodedInfo = info {headers = hdrs, rawMemo = fmap convertFromProtoPayload (initializeWorkflow ^. Activation.memo . Message.fields)}
+  writeIORef inst.workflowInstanceInfo decodedInfo
   pure $
     ExecuteWorkflowInput
       { executeWorkflowInputType = WorkflowType (initializeWorkflow ^. Activation.workflowType)
       , executeWorkflowInputArgs = fmap convertFromProtoPayload (initializeWorkflow ^. Command.vec'arguments)
       , executeWorkflowInputHeaders = hdrs
-      , executeWorkflowInputInfo = info
+      , executeWorkflowInputInfo = decodedInfo
       , executeWorkflowInputVault = inst.workflowVault
       }
 
@@ -475,7 +487,7 @@ applyStartWorkflow initialSignals execInput workflowFn = do
             , "workflowId="
             , rawWorkflowId input.executeWorkflowInputInfo.workflowId
             ]
-        eAct <- liftIO (workflowFn =<< processorDecodePayloads inst.payloadProcessor input.executeWorkflowInputArgs)
+        eAct <- liftIO (workflowFn input.executeWorkflowInputArgs)
         case eAct of
           Left msg -> do
             Logging.logError $ Text.pack ("Failed to decode workflow arguments: " <> msg)
@@ -507,9 +519,8 @@ applyQueryWorkflow queryWorkflow = do
   instInfo <- readIORef inst.workflowInstanceInfo
   handles <- readIORef inst.workflowQueryHandlers
   Logging.logDebug $ Text.pack ("Applying query: " <> show (queryWorkflow ^. Activation.queryType))
-  let processor = inst.payloadProcessor
-  args <- processorDecodePayloads processor (fmap convertFromProtoPayload (queryWorkflow ^. Command.vec'arguments))
-  hdrs <- processorTryDecodePayloads processor (fmap convertFromProtoPayload (queryWorkflow ^. Activation.headers))
+  let args = convertFromProtoPayload <$> queryWorkflow ^. Command.vec'arguments
+      hdrs = convertFromProtoPayload <$> queryWorkflow ^. Activation.headers
   let baseInput =
         HandleQueryInput
           { handleQueryId = QueryId (queryWorkflow ^. Activation.queryId)
@@ -535,25 +546,16 @@ applyQueryWorkflow queryWorkflow = do
     if isBuiltinQuery (queryWorkflow ^. Activation.queryType)
       then liftIO $ lookupHandler baseInput
       else liftIO $ inst.inboundInterceptor.handleQuery baseInput lookupHandler
-  cmd <- case res of
-    Left err ->
-      -- TODO, more useful error message
-      pure $
-        defMessage
-          & Command.queryId .~ rawQueryId baseInput.handleQueryId
-          & Command.failed
-            .~ ( defMessage
-                  & F.message .~ Text.pack (show err)
-               )
-    Right ok -> do
-      res' <- liftIO $ payloadProcessorEncode processor ok
-      pure $
-        defMessage
-          & Command.queryId .~ rawQueryId baseInput.handleQueryId
-          & Command.succeeded
-            .~ ( defMessage
-                  & Command.response .~ convertToProtoPayload res'
-               )
+  let cmd = case res of
+        -- TODO, more useful error message
+        Left err ->
+          defMessage
+            & Command.queryId .~ rawQueryId baseInput.handleQueryId
+            & Command.failed .~ (defMessage & F.message .~ Text.pack (show err))
+        Right ok ->
+          defMessage
+            & Command.queryId .~ rawQueryId baseInput.handleQueryId
+            & Command.succeeded .~ (defMessage & Command.response .~ convertToProtoPayload ok)
   addCommand $ defMessage & Command.respondToQuery .~ cmd
 
 
@@ -566,23 +568,17 @@ applySignalWorkflow signalWorkflow = join $ do
         handlerOrDefault =
           HashMap.lookup (Just signalName) handlers
             <|> HashMap.lookup Nothing handlers
-    -- Decode inputs first - we need them whether we have a handler or are buffering
-    eInputs <- UnliftIO.try $ processorDecodePayloads inst.payloadProcessor (fmap convertFromProtoPayload (signalWorkflow ^. Command.vec'input))
-    case eInputs of
-      Left err -> pure $ Throw err
-      Right args -> case handlerOrDefault of
-        Nothing -> do
-          -- Buffer the signal until a handler is registered (matching TypeScript SDK behavior)
-          -- Uses Endo for O(1) append (diff-list style), maintaining FIFO order
-          -- flip (<>) ensures old signals come before new: old <> new
-          Logging.logDebug $ Text.pack ("Buffering signal (no handler registered yet): " <> show signalName)
-          liftIO $
-            modifyIORef' inst.workflowBufferedSignals $
-              HashMap.insertWith (flip (<>)) signalName (Endo (args :))
-          pure $ Done $ pure ()
-        Just handler -> pure $ Done $ do
-          Logging.logDebug $ Text.pack ("Applying signal handler for signal: " <> show signalName)
-          handler args
+    let args = convertFromProtoPayload <$> signalWorkflow ^. Command.vec'input
+    case handlerOrDefault of
+      Nothing -> do
+        -- Buffer the signal until a handler is registered.
+        Logging.logDebug . Text.pack $ "Buffering signal (no handler registered yet): " <> show signalName
+        liftIO . modifyIORef' inst.workflowBufferedSignals $
+          HashMap.insertWith (flip (<>)) signalName (Endo (args :))
+        pure . Done $ pure ()
+      Just handler -> pure . Done $ do
+        Logging.logDebug . Text.pack $ "Applying signal handler for signal: " <> show signalName
+        handler args
 
 
 applyDoUpdateWorkflow :: DoUpdate -> Workflow ()
@@ -612,37 +608,30 @@ prepareUpdate update = do
       rejectUpdate update . toException $ UpdateNotFound message
       pure Nothing
     Just handler -> do
-      decoded <- mkHandleUpdateInput info
-      case decoded of
+      let input = mkHandleUpdateInput info
+          action = inst.inboundInterceptor.handleUpdate input $ \intercepted ->
+            handler.updateImplementation
+              intercepted.handleUpdateId
+              intercepted.handleUpdateInputArgs
+              intercepted.handleUpdateInputHeaders
+      runUpdateValidator inst input handler >>= \case
         Left err -> Nothing <$ rejectUpdate update err
-        Right input -> do
-          let action = inst.inboundInterceptor.handleUpdate input $ \intercepted ->
-                handler.updateImplementation
-                  intercepted.handleUpdateId
-                  intercepted.handleUpdateInputArgs
-                  intercepted.handleUpdateInputHeaders
-          runUpdateValidator inst input handler >>= \case
-            Left err -> Nothing <$ rejectUpdate update err
-            Right () -> Just action <$ acceptUpdate update
+        Right () -> Just action <$ acceptUpdate update
   where
-    mkHandleUpdateInput :: Info -> InstanceM (Either SomeException HandleUpdateInput)
-    mkHandleUpdateInput info = do
-      inst <- ask
-      args <- UnliftIO.try $ processorDecodePayloads inst.payloadProcessor (convertFromProtoPayload <$> update ^. Activation.vec'input)
-      headers <- processorTryDecodePayloads inst.payloadProcessor (convertFromProtoPayload <$> update ^. Activation.headers)
-      pure $ flip fmap args $ \decodedArgs ->
-        HandleUpdateInput
-          { handleUpdateId = UpdateId $ update ^. Activation.id
-          , handleUpdateInputType = update ^. Activation.name
-          , handleUpdateInputArgs = decodedArgs
-          , handleUpdateInputHeaders = headers
-          , handleUpdateWorkflowInfo = info
-          }
+    mkHandleUpdateInput :: Info -> HandleUpdateInput
+    mkHandleUpdateInput info =
+      HandleUpdateInput
+        { handleUpdateId = UpdateId $ update ^. Activation.id
+        , handleUpdateInputType = update ^. Activation.name
+        , handleUpdateInputArgs = convertFromProtoPayload <$> update ^. Activation.vec'input
+        , handleUpdateInputHeaders = convertFromProtoPayload <$> update ^. Activation.headers
+        , handleUpdateWorkflowInfo = info
+        }
 
     runUpdateValidator :: WorkflowInstance -> HandleUpdateInput -> WorkflowUpdateImplementation -> InstanceM (Either SomeException ())
-    runUpdateValidator inst input handler
-      | update ^. Activation.runValidator
-      , Just validator <- handler.updateValidationImplementation = do
+    runUpdateValidator inst input handler =
+      case (update ^. Activation.runValidator, handler.updateValidationImplementation) of
+        (True, Just validator) -> do
           result <- UnliftIO.try . liftIO . inst.inboundInterceptor.validateUpdate input $ \intercepted ->
             unValidation $
               validator
@@ -650,7 +639,7 @@ prepareUpdate update = do
                 intercepted.handleUpdateInputArgs
                 intercepted.handleUpdateInputHeaders
           pure $ join result
-      | otherwise = pure $ Right ()
+        _ -> pure $ Right ()
 
 
 acceptUpdate :: DoUpdate -> InstanceM ()
@@ -671,13 +660,11 @@ rejectUpdate update err = do
 
 
 completeUpdate :: DoUpdate -> Payload -> InstanceM ()
-completeUpdate update payload = do
-  inst <- ask
-  encoded <- liftIO $ payloadProcessorEncode inst.payloadProcessor payload
+completeUpdate update payload =
   addCommand $
     defMessage
       & Command.updateResponse . Command.protocolInstanceId .~ (update ^. Activation.protocolInstanceId)
-      & Command.updateResponse . Command.completed .~ convertToProtoPayload encoded
+      & Command.updateResponse . Command.completed .~ convertToProtoPayload payload
 
 
 applyNotifyHasPatch :: NotifyHasPatch -> InstanceM ()
@@ -934,13 +921,11 @@ applyResolutions rs = do
 convertExitVariantToCommand :: WorkflowExitVariant Payload -> InstanceM Command.WorkflowCommand
 convertExitVariantToCommand variant = do
   inst <- ask
-  let processor = inst.payloadProcessor
   case variant of
-    WorkflowExitSuccess result -> do
-      result' <- liftIO $ payloadProcessorEncode processor result
+    WorkflowExitSuccess result ->
       pure $
         defMessage
-          & Command.completeWorkflowExecution .~ (defMessage & Command.result .~ convertToProtoPayload result')
+          & Command.completeWorkflowExecution .~ (defMessage & Command.result .~ convertToProtoPayload result)
     WorkflowExitContinuedAsNew (ContinueAsNewException {..}) -> do
       i <- readIORef inst.workflowInstanceInfo
       searchAttrs <-
@@ -950,8 +935,8 @@ convertExitVariantToCommand variant = do
                 then i.searchAttributes
                 else continueAsNewOptions.searchAttributes
             )
-      args <- processorEncodePayloads processor continueAsNewArguments
-      memo <- processorEncodePayloads processor continueAsNewOptions.memo
+      let args = continueAsNewArguments
+          memo = continueAsNewOptions.memo
       pure $
         defMessage
           & Command.continueAsNewWorkflowExecution
@@ -1018,11 +1003,13 @@ workflowExitFromException err
 handleTopLevelException :: SomeException -> InstanceM (WorkflowExitVariant Payload)
 handleTopLevelException err = do
   rethrowAsyncExceptions err
-  case E.fromException err :: Maybe LogicBug of
-    -- SDK watchdog and invariant failures belong to the workflow task. Let the
-    -- executor publish a failed activation instead of terminating the workflow.
-    Just _ -> throwIO err
-    Nothing -> pure $ workflowExitFromException err
+  when (isJust (E.fromException @PayloadProcessingFailure err)) $
+    throwIO err
+  -- SDK watchdog and invariant failures belong to the workflow task. Let the
+  -- executor publish a failed activation instead of terminating the workflow.
+  when (isJust (E.fromException @LogicBug err)) $
+    throwIO err
+  pure $ workflowExitFromException err
 
 
 runTopLevel :: InstanceM Payload -> InstanceM (WorkflowExitVariant Payload)
