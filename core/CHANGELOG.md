@@ -19,6 +19,11 @@
     `clientPrivateKey`) as `ClientConnectionError`.
   * `startDevServer` and `startTestServer` return `Left` for a configuration
     that the bridge cannot decode.
+  * `pushHistory` and `pushHistoryJson` return `Left` (`InvalidProto`) for a
+    workflow ID that is not valid UTF-8.
+  * A worker call that races with `finalizeShutdown` returns an error
+    (`PollShutdown` for polls, `CompletionFailure` for completions) instead of
+    aborting. `requestWorkflowEviction` does nothing in that case.
   * Error messages that contain a NUL byte no longer abort the process.
 
 ### New API
