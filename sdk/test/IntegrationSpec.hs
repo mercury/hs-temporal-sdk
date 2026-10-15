@@ -28,7 +28,6 @@ import Control.Monad.Logger
 import Control.Monad.Reader
 import Data.Aeson (FromJSON, ToJSON, Value (..), toJSON)
 import qualified Data.Aeson as Aeson
-import qualified Data.ByteString as BS
 import Data.Either (isLeft, isRight)
 import Data.Foldable (traverse_)
 import Data.Functor
@@ -41,8 +40,6 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Time (Day (ModifiedJulianDay), diffUTCTime, getCurrentTime)
 import Data.Time.Clock (UTCTime)
-import qualified Data.UUID as UUID
-import qualified Data.UUID.V4 as UUID
 import Data.Vector (Vector)
 import qualified Data.Vector as V
 import DiscoverInstances (discoverInstances)
@@ -62,9 +59,6 @@ import OpenTelemetry.Trace.Id.Generator.Default (defaultIdGenerator)
 import qualified Proto.Temporal.Api.Failure.V1.Message_Fields as Failure
 import qualified Proto.Temporal.Api.History.V1.Message_Fields as History
 import RequireCallStack
-import System.Directory
-import System.Environment (lookupEnv)
-import System.IO
 import System.Timeout (timeout)
 import Temporal.Activity hiding (activityId, retryPolicy, workflowId)
 import Temporal.Bundle
@@ -72,14 +66,9 @@ import Temporal.Bundle.TH
 import qualified Temporal.Client as C
 import qualified Temporal.Client.TestService
 import Temporal.Contrib.OpenTelemetry
-import Temporal.Core.Client hiding (RpcError)
 import Temporal.Duration
-import Temporal.EphemeralServer
-import qualified Temporal.EphemeralServer as TemporalDevServerConfig (TemporalDevServerConfig (..))
-import qualified Temporal.EphemeralServer as TemporalTestServerConfig (TemporalTestServerConfig (..))
 import Temporal.Exception hiding (activityId)
 import Temporal.Interceptor
-import Temporal.Operator (IndexedValueType (..), SearchAttributes (..), addSearchAttributes, listSearchAttributes)
 import Temporal.Payload hiding (around)
 import Temporal.SearchAttributes
 import Temporal.TH (ActivityFn, WorkflowFn, discoverDefinitions)
@@ -92,7 +81,20 @@ import Temporal.Workflow (
 import qualified Temporal.Workflow as W
 import Temporal.Workflow.Unsafe (performUnsafeNonDeterministicIO)
 import Test.Hspec
-import TestHelpers (waitForWorkflowStart)
+import TestHelpers (
+  MyWorkflow,
+  PortNumber,
+  TestEnv (..),
+  defaultCodec,
+  setup,
+  setupTimeSkipping,
+  sillyEncryptionPayloadProcessor,
+  uuidText,
+  waitForWorkflowStart,
+  withInterceptors,
+  withServer,
+  withTimeSkippingServer,
+ )
 
 
 temporalBundle
@@ -160,78 +162,6 @@ instance ToApplicationFailure AnApplicationFailure where
       (Just $ seconds 1)
 
 
-configWithRetry :: PortNumber -> ClientConfig
-configWithRetry pn =
-  defaultClientConfig
-    { targetUrl = "http://localhost:" <> Text.pack (show pn)
-    , retryConfig =
-        Just $
-          ClientRetryConfig
-            { initialIntervalMillis = 500
-            , randomizationFactor = 0.2
-            , multiplier = 1.5
-            , maxIntervalMillis = 10_000
-            , maxRetries = 15
-            , maxElapsedTimeMillis = Just 60_000
-            }
-            -- , targetUrl = pack ("http://localhost:" <> show pn)
-    }
-
-
-mkWithWorker :: PortNumber -> WorkerConfig actEnv -> IO a -> IO a
-mkWithWorker pn conf m = do
-  let clientConfig_ = configWithRetry pn
-  c <- runStdoutLoggingT $ connectClient globalRuntime clientConfig_
-  bracket (startWorker c (conf {payloadProcessor = sillyEncryptionPayloadProcessor})) shutdown (const m)
-
-
--- Increment the bytestring words by 1 on encode, and decrement by 1 on decode
---
--- This is used to test that the payload processor is working correctly
-sillyEncryptionPayloadProcessor :: PayloadProcessor
-sillyEncryptionPayloadProcessor = PayloadProcessor incr decr
-  where
-    incr (Payload data_ meta) = pure $ Payload (BS.map (+ 1) data_) meta
-    decr (Payload data_ meta) = pure $ Right $ Payload (BS.map (\x -> x - 1) data_) meta
-
-
-makeClient :: PortNumber -> Interceptors env -> IO (C.WorkflowClient, Client)
-makeClient pn interceptors = makeClient' pn interceptors False
-
-
-makeTimeSkippingClient :: PortNumber -> Interceptors env -> IO (C.WorkflowClient, Client)
-makeTimeSkippingClient pn interceptors = makeClient' pn interceptors True
-
-
-makeClient' :: PortNumber -> Interceptors env -> Bool -> IO (C.WorkflowClient, Client)
-makeClient' pn Interceptors {..} enableTimeSkipping = do
-  let conf = configWithRetry pn
-  c <- runStdoutLoggingT $ connectClient globalRuntime conf
-  (,)
-    <$> C.workflowClient
-      c
-      ( C.WorkflowClientConfig
-          { namespace = "default"
-          , interceptors = clientInterceptors
-          , payloadProcessor = sillyEncryptionPayloadProcessor
-          , enableTimeSkipping
-          }
-      )
-    <*> pure c
-
-
-uuidText :: IO Text
-uuidText = UUID.toText <$> UUID.nextRandom
-
-
-data TestEnv = TestEnv
-  { useClient :: forall a. ReaderT C.WorkflowClient IO a -> IO a
-  , baseConf :: ConfigM () ()
-  , taskQueue :: W.TaskQueue
-  , withWorker :: forall a. WorkerConfig () -> IO a -> IO a
-  }
-
-
 data TemporalWorkflowJobPayload = TemporalWorkflowJobPayload
   { workflowId :: W.WorkflowId
   , workflowType :: W.WorkflowType
@@ -249,85 +179,6 @@ instance ToJSON TemporalWorkflowJobPayload
 
 
 instance FromJSON TemporalWorkflowJobPayload
-
-
-withServer :: (PortNumber -> IO a) -> IO a
-withServer f = do
-  lookupEnv "HS_TEMPORAL_SDK_LOCAL_TEST_SERVER" >>= \case
-    Just _ -> f 7233
-    _ -> do
-      fp <- getFreePort
-      mTemporalPath <- findExecutable "temporal"
-      conf <- case mTemporalPath of
-        Nothing -> error "Could not find the 'temporal' executable in PATH"
-        Just temporalPath -> do
-          let serverConfig =
-                defaultTemporalDevServerConfig
-                  { TemporalDevServerConfig.port = Just $ fromIntegral fp
-                  , TemporalDevServerConfig.exe = ExistingPath temporalPath
-                  }
-          pure serverConfig
-      withDevServer globalRuntime conf $ \_ -> do
-        f fp
-
-
-withTimeSkippingServer :: (PortNumber -> IO a) -> IO a
-withTimeSkippingServer f = do
-  lookupEnv "HS_TEMPORAL_SDK_LOCAL_TIME_SKIPPING_TEST_SERVER" >>= \case
-    Just _ -> f 7234
-    _ -> do
-      fp <- getFreePort
-      mTemporalPath <- findExecutable "temporal-test-server"
-      conf <- case mTemporalPath of
-        Nothing -> error "Could not find the 'temporal-test-server' (time-skipping) executable in PATH"
-        Just temporalPath -> do
-          pure
-            TemporalTestServerConfig
-              { TemporalTestServerConfig.exe = ExistingPath temporalPath
-              , TemporalTestServerConfig.port = Just $ fromIntegral fp
-              , TemporalTestServerConfig.extraArgs = []
-              }
-      withTestServer globalRuntime conf $ \_ -> do
-        f fp
-
-
-setup :: Interceptors () -> PortNumber -> (TestEnv -> IO ()) -> IO ()
-setup additionalInterceptors fp go = do
-  otelInterceptors <- makeOpenTelemetryInterceptor
-  let interceptors = otelInterceptors <> additionalInterceptors
-  (client, coreClient) <- makeClient fp interceptors
-
-  SearchAttributes {customAttributes} <- either throwIO pure =<< listSearchAttributes coreClient (W.Namespace "default")
-  let allTestAttributes =
-        Map.fromList
-          [ ("attr1", Temporal.Operator.Bool)
-          , ("attr2", Temporal.Operator.Int)
-          ]
-  _ <- addSearchAttributes coreClient (W.Namespace "default") (allTestAttributes `Map.difference` customAttributes)
-
-  (conf, taskQueue) <- mkBaseConf interceptors
-  go
-    TestEnv
-      { useClient = flip runReaderT client
-      , withWorker = mkWithWorker fp
-      , baseConf = conf
-      , taskQueue
-      }
-
-
-setupTimeSkipping :: Interceptors () -> PortNumber -> (TestEnv -> IO ()) -> IO ()
-setupTimeSkipping additionalInterceptors fp go = do
-  otelInterceptors <- makeOpenTelemetryInterceptor
-  let interceptors = otelInterceptors <> additionalInterceptors
-  (client, _) <- makeTimeSkippingClient fp interceptors
-  (conf, taskQueue) <- mkBaseConf interceptors
-  go
-    TestEnv
-      { useClient = flip runReaderT client
-      , withWorker = mkWithWorker fp
-      , baseConf = conf
-      , taskQueue
-      }
 
 
 spec :: Spec
@@ -437,13 +288,6 @@ spec = do
   -- distinct server for each test
   around withTimeSkippingServer $ do
     aroundWith (flip $ setupTimeSkipping mempty) needsTimeSkipping
-
-
-type MyWorkflow a = W.RequireCallStack => W.Workflow a
-
-
-defaultCodec :: JSON
-defaultCodec = JSON
 
 
 data RegressionTask = Foo | Bar
@@ -594,19 +438,6 @@ testDefs = defs defaultCodec testImpls
 
 testConf :: Definitions ()
 testConf = collectTemporalDefinitions testDefs
-
-
-mkBaseConf :: Interceptors () -> IO (ConfigM () (), W.TaskQueue)
-mkBaseConf interceptors = do
-  taskQueue <- W.TaskQueue <$> uuidText
-  pure
-    ( do
-        setNamespace $ W.Namespace "default"
-        setTaskQueue taskQueue
-        addInterceptors interceptors
-        setLogger $ defaultOutput stdout
-    , taskQueue
-    )
 
 
 workflowFinalizationWithEscapedInterceptor :: SpecWith PortNumber
@@ -3235,10 +3066,6 @@ updatesWithInterceptors = do
             pure (updateResult, workflowResult)
           updateResult `shouldBe` 24
           workflowResult `shouldBe` 24
-
-
-withInterceptors :: Interceptors () -> SpecWith TestEnv -> SpecWith PortNumber
-withInterceptors interceptors = aroundAllWith $ flip $ setup interceptors
 
 
 terminateTests :: SpecWith TestEnv
