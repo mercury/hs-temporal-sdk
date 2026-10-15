@@ -1,9 +1,9 @@
-use crate::runtime::{self, Capability, HsCallback, MVar};
+use crate::runtime::{self, Capability, HsCallback, MVar, c_string_safe, error_bytes};
 use ffi_convert::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ffi::CStr;
-use std::str::{FromStr, from_utf8_unchecked};
+use std::str::{FromStr, Utf8Error};
 use std::time::Duration;
 use temporalio_client::{
     ClientOptions, ConfiguredClient, RetryClient, RetryOptions, TemporalServiceClient, TlsOptions,
@@ -147,36 +147,39 @@ pub struct HaskellHashMapEntries {
     next: *const HaskellHashMapEntries,
 }
 
+pub(crate) fn parse_client_config(json: &[u8]) -> Result<ClientConfig, String> {
+    serde_json::from_slice(json).map_err(|err| format!("Invalid client config: {err}"))
+}
+
 // TODO: [publish-crate]
 /// # Safety
 ///
-/// Haskell FFI bridge invariants.
-pub unsafe fn convert_hashmap(hashmap: *const HaskellHashMapEntries) -> HashMap<String, String> {
+/// `hashmap` must be null or point to a live, null-terminated list whose keys
+/// and values are valid for their stated lengths.
+pub unsafe fn convert_hashmap(
+    hashmap: *const HaskellHashMapEntries,
+) -> Result<HashMap<String, String>, Utf8Error> {
     let mut map = HashMap::new();
-    if hashmap.is_null() {
-        return map;
-    }
-
     let mut hashmap_ptr = hashmap;
     while !hashmap_ptr.is_null() {
         let hashmap_val = unsafe { &*hashmap_ptr };
-        let key = unsafe {
-            from_utf8_unchecked(std::slice::from_raw_parts(
-                hashmap_val.key,
-                hashmap_val.key_len,
-            ))
-        };
-        let value = unsafe {
-            from_utf8_unchecked(std::slice::from_raw_parts(
-                hashmap_val.value,
-                hashmap_val.value_len,
-            ))
-        };
+        let key = unsafe { haskell_str(hashmap_val.key, hashmap_val.key_len) }?;
+        let value = unsafe { haskell_str(hashmap_val.value, hashmap_val.value_len) }?;
         map.insert(key.to_string(), value.to_string());
         hashmap_ptr = hashmap_val.next;
     }
 
-    map
+    Ok(map)
+}
+
+/// # Safety
+///
+/// `ptr` must be valid for `len` bytes, or `len` must be zero.
+unsafe fn haskell_str<'a>(ptr: *const u8, len: usize) -> Result<&'a str, Utf8Error> {
+    if len == 0 {
+        return Ok("");
+    }
+    std::str::from_utf8(unsafe { std::slice::from_raw_parts(ptr, len) })
 }
 #[repr(C)]
 pub struct RpcCall {
@@ -190,7 +193,7 @@ pub struct RpcCall {
 pub(crate) struct TemporalCall {
     pub(crate) req: Vec<u8>,
     pub(crate) retry: bool,
-    pub(crate) metadata: HashMap<String, String>,
+    pub(crate) metadata: Result<HashMap<String, String>, String>,
     pub(crate) timeout_millis: Option<u64>,
 }
 
@@ -203,7 +206,8 @@ impl From<&RpcCall> for TemporalCall {
                 rust_vec.unwrap().clone()
             },
             retry: rpc_call.retry,
-            metadata: unsafe { convert_hashmap(rpc_call.metadata) },
+            metadata: unsafe { convert_hashmap(rpc_call.metadata) }
+                .map_err(|err| format!("RPC metadata is not valid UTF-8: {err}")),
             timeout_millis: if rpc_call.timeout_millis.is_null() {
                 None
             } else {
@@ -238,16 +242,23 @@ impl RawPointerConverter<ClientRef> for ClientRef {
     }
 }
 
+/// An invalid `config` is reported through `hs_callback` like a connection
+/// failure, so the Haskell waiter is always woken.
 pub fn connect_client(
     runtime_ref: &runtime::RuntimeRef,
-    config: ClientConfig,
+    config: Result<ClientConfig, String>,
     hs_callback: HsCallback<ClientRef, CArray<u8>>,
 ) {
-    let opts: ClientOptions = config.try_into().unwrap();
+    let opts: Result<ClientOptions, String> = config.and_then(|config| {
+        config
+            .try_into()
+            .map_err(|err| format!("Invalid client config: {err:#}"))
+    });
     let runtime = runtime_ref.runtime.clone();
     runtime_ref
         .runtime
         .future_result_into_hs(hs_callback, async move {
+            let opts = opts.map_err(error_bytes)?;
             let retry_client_result = opts
                 .connect_no_namespace(runtime.core.as_ref().telemetry().get_metric_meter())
                 .await;
@@ -257,10 +268,7 @@ pub fn connect_client(
                     retry_client,
                     runtime,
                 }),
-                Err(e) => {
-                    let err_message = e.to_string().into_bytes();
-                    Err(CArray::c_repr_of(err_message).unwrap())
-                }
+                Err(e) => Err(error_bytes(e.to_string())),
             }
         })
 }
@@ -279,8 +287,11 @@ pub unsafe extern "C" fn hs_temporal_connect_client(
     result_slot: *mut *mut ClientRef,
 ) {
     let runtime_ref = unsafe { &*runtime_ref };
-    let config_json = unsafe { CStr::from_ptr(config_json) };
-    let config: ClientConfig = serde_json::from_slice(config_json.to_bytes()).unwrap();
+    let config = if config_json.is_null() {
+        Err("client config pointer is null".to_string())
+    } else {
+        parse_client_config(unsafe { CStr::from_ptr(config_json) }.to_bytes())
+    };
     let hs_callback = runtime::HsCallback {
         cap,
         mvar,
@@ -307,8 +318,8 @@ pub(crate) fn rpc_req<P: prost::Message + Default>(
     let buf = call.req.as_slice();
     let proto = P::decode(buf).map_err(|err| err.to_string())?;
     let mut req = tonic::Request::new(proto);
-    let metadata = &call.metadata;
-    for (k, v) in metadata {
+    let metadata = call.metadata?;
+    for (k, v) in &metadata {
         req.metadata_mut().insert(
             MetadataKey::from_str(k.as_str()).map_err(|err| err.to_string())?,
             v.parse()
@@ -337,14 +348,24 @@ pub struct CRPCError {
     details: *const CArray<u8>,
 }
 
+impl From<RPCError> for CRPCError {
+    fn from(err: RPCError) -> Self {
+        CRPCError::c_repr_of(RPCError {
+            message: c_string_safe(err.message),
+            ..err
+        })
+        .expect("a message without NUL bytes has a C representation")
+    }
+}
+
 impl From<String> for CRPCError {
     fn from(err: String) -> Self {
-        CRPCError::c_repr_of(RPCError {
+        RPCError {
             code: 0,
             message: err,
             details: vec![],
-        })
-        .unwrap()
+        }
+        .into()
     }
 }
 
@@ -368,19 +389,19 @@ where
 {
     match res {
         Ok(resp) => Ok(resp.get_ref().encode_to_vec()),
-        Err(err) => Err(CRPCError::c_repr_of(RPCError {
+        Err(err) => Err(RPCError {
             code: err.code() as u32,
             message: err.message().to_owned(),
             details: err.details().into(),
-        })
-        .unwrap()),
+        }
+        .into()),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runtime::test_support::{call_bridge, new_test_runtime};
+    use crate::runtime::test_support::{call_bridge, error_text, new_test_runtime};
     use serde_json::json;
     use std::ffi::CString;
     use std::net::SocketAddr;
@@ -429,15 +450,65 @@ mod tests {
 
     #[test]
     fn convert_hashmap_reads_every_entry() {
-        assert_eq!(unsafe { convert_hashmap(std::ptr::null()) }, HashMap::new());
+        assert_eq!(
+            unsafe { convert_hashmap(std::ptr::null()) }.unwrap(),
+            HashMap::new()
+        );
 
         let one = [("authorization", "Bearer token")];
         let entries = HashMapEntries::new(&one);
-        assert_eq!(unsafe { convert_hashmap(entries.head()) }, to_map(&one));
+        assert_eq!(
+            unsafe { convert_hashmap(entries.head()) }.unwrap(),
+            to_map(&one)
+        );
 
         let three = [("a", "1"), ("b", ""), ("c", "3")];
         let entries = HashMapEntries::new(&three);
-        assert_eq!(unsafe { convert_hashmap(entries.head()) }, to_map(&three));
+        assert_eq!(
+            unsafe { convert_hashmap(entries.head()) }.unwrap(),
+            to_map(&three)
+        );
+    }
+
+    #[test]
+    fn convert_hashmap_rejects_invalid_utf8() {
+        let invalid = [0xff_u8, 0xfe];
+        let entry = HaskellHashMapEntries {
+            key: invalid.as_ptr(),
+            key_len: invalid.len(),
+            value: std::ptr::null(),
+            value_len: 0,
+            next: std::ptr::null(),
+        };
+        assert!(unsafe { convert_hashmap(&entry) }.is_err());
+    }
+
+    #[test]
+    fn convert_hashmap_reads_a_null_pointer_with_zero_length_as_empty() {
+        let key = "x-empty";
+        let entry = HaskellHashMapEntries {
+            key: key.as_ptr(),
+            key_len: key.len(),
+            value: std::ptr::null(),
+            value_len: 0,
+            next: std::ptr::null(),
+        };
+        assert_eq!(
+            unsafe { convert_hashmap(&entry) }.unwrap(),
+            to_map(&[("x-empty", "")])
+        );
+    }
+
+    #[test]
+    fn rpc_req_reports_invalid_metadata() {
+        let call = TemporalCall {
+            req: vec![],
+            retry: false,
+            metadata: Err("bad metadata".into()),
+            timeout_millis: None,
+        };
+        let err = rpc_req::<prost_types::Empty>(call).unwrap_err();
+        assert_eq!(err, "bad metadata");
     }
 
     fn full_client_config() -> serde_json::Value {
@@ -465,18 +536,60 @@ mod tests {
         })
     }
 
-    fn connect_with_raw_config(config: &std::ffi::CStr) -> Result<ClientRef, CArray<u8>> {
+    fn connect_with_raw_config(config: Option<&CStr>) -> Result<ClientRef, CArray<u8>> {
         let runtime = new_test_runtime();
         call_bridge(|mvar, cap, error_slot, result_slot| unsafe {
             hs_temporal_connect_client(
                 &runtime,
-                config.as_ptr(),
+                config.map_or(std::ptr::null(), CStr::as_ptr),
                 mvar,
                 cap,
                 error_slot,
                 result_slot,
             )
         })
+    }
+
+    fn connect_error(config: Option<&CStr>) -> String {
+        error_text(
+            connect_with_raw_config(config)
+                .err()
+                .expect("the client must not connect"),
+        )
+    }
+
+    fn connect_error_for(config: serde_json::Value) -> String {
+        let config = CString::new(config.to_string()).unwrap();
+        connect_error(Some(&config))
+    }
+
+    #[test]
+    fn connect_client_reports_invalid_config_to_the_waiter() {
+        let err = connect_error(Some(c"{not json"));
+        assert!(err.starts_with("Invalid client config"), "{err}");
+
+        let err = connect_error(None);
+        assert_eq!(err, "client config pointer is null");
+
+        let mut config = full_client_config();
+        config["target_url"] = json!("not a url");
+        assert_eq!(
+            connect_error_for(config),
+            "Invalid client config: relative URL without a base"
+        );
+    }
+
+    #[test]
+    fn connect_client_reports_a_partial_tls_credential_to_the_waiter() {
+        for credential in ["client_cert", "client_private_key"] {
+            let mut config = full_client_config();
+            config["tls_config"][credential] = json!(null);
+            assert_eq!(
+                connect_error_for(config),
+                "Invalid client config: Must have both client cert and private key or neither",
+                "without {credential}"
+            );
+        }
     }
 
     /// A local WorkflowService that records the headers of each request and
@@ -526,6 +639,10 @@ mod tests {
             (server, addr, recorder)
         }
 
+        fn request_count(&self) -> usize {
+            self.requests.lock().unwrap().len()
+        }
+
         fn last_request(&self) -> HeaderMap {
             let requests = self.requests.lock().unwrap();
             requests
@@ -545,8 +662,8 @@ mod tests {
         config["tls_config"] = json!(null);
         config["retry_config"] = json!(null);
         let config = CString::new(config.to_string()).unwrap();
-        connect_with_raw_config(&config)
-            .map_err(|error| String::from_utf8(error.as_rust().unwrap()).unwrap())
+        connect_with_raw_config(Some(&config))
+            .map_err(error_text)
             .expect("the client connects to the local server")
     }
 
@@ -563,32 +680,30 @@ mod tests {
         assert_eq!(header(&headers, "client-version"), Some("1.2.3"));
     }
 
+    fn get_system_info(
+        client: &mut ClientRef,
+        metadata: *const HaskellHashMapEntries,
+    ) -> Result<CArray<u8>, CRPCError> {
+        let request = runtime::byte_array(vec![]);
+        let call = RpcCall {
+            req: &request,
+            retry: false,
+            metadata,
+            timeout_millis: std::ptr::null(),
+        };
+        call_bridge(|mvar, cap, error_slot, result_slot| unsafe {
+            crate::rpc::hs_get_system_info(client, &call, mvar, cap, error_slot, result_slot)
+        })
+    }
+
     #[test]
     fn rpc_call_sends_per_call_metadata() {
         let (_server, addr, recorder) = HeaderRecorder::start();
         let mut client = connect_to_recorder(addr);
 
-        let request = CArray::c_repr_of(Vec::<u8>::new()).unwrap();
         let metadata =
             HashMapEntries::new(&[("x-call-a", "1"), ("x-call-b", "2"), ("x-call-c", "3")]);
-        let call = RpcCall {
-            req: &request,
-            retry: false,
-            metadata: metadata.head(),
-            timeout_millis: std::ptr::null(),
-        };
-        let result: Result<CArray<u8>, CRPCError> =
-            call_bridge(|mvar, cap, error_slot, result_slot| unsafe {
-                crate::rpc::hs_get_system_info(
-                    &mut client,
-                    &call,
-                    mvar,
-                    cap,
-                    error_slot,
-                    result_slot,
-                )
-            });
-        let err: RPCError = result
+        let err: RPCError = get_system_info(&mut client, metadata.head())
             .expect_err("the local server answers Unimplemented")
             .as_rust()
             .unwrap();
@@ -600,5 +715,39 @@ mod tests {
         assert_eq!(header(&headers, "x-call-c"), Some("3"));
         // Client-wide headers still apply.
         assert_eq!(header(&headers, "x-one"), Some("1"));
+    }
+
+    #[test]
+    fn rpc_call_reports_invalid_metadata_without_sending_the_request() {
+        let (_server, addr, recorder) = HeaderRecorder::start();
+        let mut client = connect_to_recorder(addr);
+        let requests_before = recorder.request_count();
+
+        let invalid = [0xff_u8, 0xfe];
+        let metadata = HaskellHashMapEntries {
+            key: invalid.as_ptr(),
+            key_len: invalid.len(),
+            value: std::ptr::null(),
+            value_len: 0,
+            next: std::ptr::null(),
+        };
+        let err: RPCError = get_system_info(&mut client, &metadata)
+            .expect_err("invalid metadata fails the call")
+            .as_rust()
+            .unwrap();
+        assert_eq!(err.code, 0);
+        assert!(
+            err.message.starts_with("RPC metadata is not valid UTF-8"),
+            "{}",
+            err.message
+        );
+        assert_eq!(recorder.request_count(), requests_before);
+    }
+
+    #[test]
+    fn rpc_error_conversion_tolerates_nul_bytes() {
+        let err = CRPCError::from("bad\0message".to_string());
+        let err: RPCError = err.as_rust().unwrap();
+        assert_eq!(err.message, "bad\u{FFFD}message");
     }
 }

@@ -176,6 +176,16 @@ pub(crate) fn error_bytes(message: impl Into<String>) -> CArray<u8> {
     byte_array(message.into().into_bytes())
 }
 
+/// Error messages can quote caller or server data. An interior NUL byte would
+/// make the C string conversion fail.
+pub(crate) fn c_string_safe(message: String) -> String {
+    if message.contains('\0') {
+        message.replace('\0', "\u{FFFD}")
+    } else {
+        message
+    }
+}
+
 /// # Safety
 ///
 /// `slot` must be null or valid for writes.
@@ -535,6 +545,12 @@ mod tests {
     }
 
     #[test]
+    fn c_string_safe_replaces_interior_nul() {
+        assert_eq!(c_string_safe("a\0b".into()), "a\u{FFFD}b");
+        assert_eq!(c_string_safe("plain".into()), "plain");
+    }
+
+    #[test]
     fn copy_byte_array_rejects_null_pointers() {
         let err = unsafe { copy_byte_array(std::ptr::null(), "input") }.unwrap_err();
         assert_eq!(err, "input pointer is null");
@@ -616,6 +632,10 @@ pub(crate) mod test_support {
                 Err(E::from_raw_pointer_mut(error).unwrap())
             }
         }
+    }
+
+    pub(crate) fn error_text(error: CArray<u8>) -> String {
+        String::from_utf8(error.as_rust().unwrap()).unwrap()
     }
 }
 
