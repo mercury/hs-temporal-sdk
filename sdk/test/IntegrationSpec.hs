@@ -897,6 +897,46 @@ needsClient = do
         workflowHandle <- useClient $ C.start wf.reference "payload-decode-error-workflow" startOptions
         timeout 5_000_000 (useClient $ C.waitWorkflowResult workflowHandle) `shouldReturn` Just ("caught" :: Text)
 
+    specify "returns a caught ValueError when activity payload encode fails" $ \TestEnv {..} -> do
+      let failingArgEncode =
+            PayloadProcessor
+              { payloadProcessorEncode = \p ->
+                  if BS.isInfixOf "payload-encode-error-sentinel" p.payloadData
+                    then throwIO (ValueError "encode failed")
+                    else pure p
+              , payloadProcessorDecode = pure . Right
+              }
+          act :: Text -> Activity () Text
+          act _ = pure "ok"
+          actDef = provideActivity defaultCodec "payload-encode-error-activity" act
+          workflow = provideCallStack do
+            (result :: Either ValueError Text) <-
+              Catch.try $
+                W.executeActivity
+                  actDef.reference
+                  (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
+                  "payload-encode-error-sentinel"
+            pure $ case result of
+              Left _ -> "caught" :: Text
+              Right _ -> "uncaught"
+          wf = W.provideWorkflow defaultCodec "payload-encode-error-workflow" workflow
+          conf =
+            (configure () (wf, actDef) baseConf)
+              { payloadProcessor = failingArgEncode
+              }
+          startOptions =
+            (C.startWorkflowOptions taskQueue)
+              { C.timeouts =
+                  C.TimeoutOptions
+                    { C.runTimeout = Just $ seconds 10
+                    , C.executionTimeout = Nothing
+                    , C.taskTimeout = Nothing
+                    }
+              }
+      withWorker conf do
+        workflowHandle <- useClient $ C.start wf.reference "payload-encode-error-workflow" startOptions
+        timeout 5_000_000 (useClient $ C.waitWorkflowResult workflowHandle) `shouldReturn` Just ("caught" :: Text)
+
     specify "rejects an update whose payload fails to decode and leaves the workflow running" $ \TestEnv {..} -> do
       handlerReady <- newEmptyMVar
       let failingDecode =

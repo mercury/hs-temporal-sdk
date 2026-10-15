@@ -299,7 +299,13 @@ runWorkflowToCompletion wf = do
         step <- resumeWithDeadline current
         case step of
           Right result -> pure result
-          Left suspension -> completeStep suspension >>= runSteps
+          Left suspension@(Await continue) -> do
+            -- The scheduling action is still waiting on its encode ivar. Run the
+            -- processor now, then resume that action inside the deadlock timer.
+            woke <- resolveEncodeWaiters
+            if woke
+              then runSteps (continue [])
+              else completeStep suspension >>= runSteps
   runSteps wf
 
 

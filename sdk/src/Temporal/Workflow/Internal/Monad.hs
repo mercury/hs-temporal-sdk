@@ -88,11 +88,34 @@ askInstance :: Workflow WorkflowInstance
 askInstance = Workflow $ \_ -> asks Done
 
 
+-- A command kept until flush. `outboundEncoded` is set once the payload
+-- processor has run, so a later flush does not encode those bytes again.
+-- `outboundEncodeWaiter` is the scheduling action's continuation. The
+-- processor runs after the deadlock timer returns, and the waiter is how a
+-- `catch` around that action still sees a processor exception.
+data OutboundCommand = OutboundCommand
+  { outboundCommand :: WorkflowCommand
+  , outboundEncoded :: !Bool
+  , outboundEncodeWaiter :: !(Maybe (IVar ()))
+  }
+
+
 addCommand :: WorkflowCommand -> InstanceM ()
 addCommand command = do
   inst <- ask
-  atomically $ do
-    modifyTVar' inst.workflowCommands $ \cmds -> push command cmds
+  atomically $
+    modifyTVar' inst.workflowCommands $ \cmds ->
+      push (OutboundCommand command False Nothing) cmds
+
+
+queueEncodedCommand :: WorkflowCommand -> InstanceM (IVar ())
+queueEncodedCommand command = do
+  waiter <- newIVar
+  inst <- ask
+  atomically $
+    modifyTVar' inst.workflowCommands $ \cmds ->
+      push (OutboundCommand command False (Just waiter)) cmds
+  pure waiter
 
 
 {- | This function can be used to trace a bunch of lines to stdout when
@@ -773,7 +796,7 @@ data WorkflowInstance = WorkflowInstance
   , workflowSequences :: {-# UNPACK #-} !(IORef Sequences)
   , workflowTime :: {-# UNPACK #-} !(IORef SystemTime)
   , workflowIsReplaying :: {-# UNPACK #-} !(IORef Bool)
-  , workflowCommands :: {-# UNPACK #-} !(TVar (Reversed WorkflowCommand))
+  , workflowCommands :: {-# UNPACK #-} !(TVar (Reversed OutboundCommand))
   , workflowSequenceMaps :: {-# UNPACK #-} !(TVar SequenceMaps)
   , workflowSignalHandlers :: {-# UNPACK #-} !(IORef (HashMap (Maybe Text) (Vector Payload -> Workflow ())))
   , -- | Signals that arrived before their handler was registered.

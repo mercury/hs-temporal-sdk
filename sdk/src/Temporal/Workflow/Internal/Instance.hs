@@ -10,6 +10,7 @@ module Temporal.Workflow.Internal.Instance (
   push,
   flushCommands,
   encodePendingCommands,
+  resolveEncodeWaiters,
   deliverWorkflowCompletion,
   nextExternalCancelSequence,
   nextChildWorkflowSequence,
@@ -49,6 +50,44 @@ flushCommands = do
   deliverWorkflowCompletion completionMessage
 
 
+-- Encode every command that still has a scheduling waiter, then wake those
+-- waiters. Processor IO stays here, outside `resumeWithDeadline`. A waiter
+-- that receives `ThrowWorkflow` resumes inside the workflow `catch` that
+-- scheduled the command. Commands without a waiter stay for `encodePendingCommands`.
+resolveEncodeWaiters :: InstanceM Bool
+resolveEncodeWaiters = do
+  inst <- ask
+  ordered <- atomically $ fromReversed <$> readTVar inst.workflowCommands
+  let waiting cmd = case cmd.outboundEncodeWaiter of
+        Just _ -> not cmd.outboundEncoded
+        Nothing -> False
+  if any waiting ordered
+    then do
+      kept <- encodeOutbound inst [] ordered
+      atomically $ writeTVar inst.workflowCommands $ Reversed (reverse kept)
+      pure True
+    else pure False
+  where
+    encodeOutbound _ acc [] = pure acc
+    encodeOutbound inst acc (cmd : rest)
+      | cmd.outboundEncoded = encodeOutbound inst (cmd : acc) rest
+      | otherwise = do
+          encoded <- UnliftIO.try $ liftIO $ encodeWorkflowCommand inst.payloadProcessor cmd.outboundCommand
+          case encoded of
+            Right command -> do
+              wake inst cmd.outboundEncodeWaiter (Ok ())
+              encodeOutbound inst (cmd {outboundCommand = command, outboundEncoded = True} : acc) rest
+            Left err -> do
+              wake inst cmd.outboundEncodeWaiter (ThrowWorkflow err)
+              case cmd.outboundEncodeWaiter of
+                Nothing -> throwIO err
+                Just _ -> encodeOutbound inst acc rest
+    wake inst waiter result =
+      liftIO $ case waiter of
+        Nothing -> pure ()
+        Just ivar -> putIVar ivar result inst.workflowInstanceContinuationEnv
+
+
 encodePendingCommands :: InstanceM Core.WorkflowActivationCompletion
 encodePendingCommands = do
   inst <- ask
@@ -57,13 +96,17 @@ encodePendingCommands = do
     currentCmds <- readTVar inst.workflowCommands
     writeTVar inst.workflowCommands $ Reversed []
     pure currentCmds
-  encodedCmds <- liftIO $ traverse (encodeWorkflowCommand inst.payloadProcessor) (fromReversed cmds)
+  encodedCmds <- liftIO $ traverse (encodeOne inst) (fromReversed cmds)
   let completionSuccessful :: Core.Success
       completionSuccessful = defMessage & Completion.commands .~ encodedCmds
   pure $
     defMessage
       & Completion.runId .~ rawRunId info.runId
       & Completion.successful .~ completionSuccessful
+  where
+    encodeOne inst cmd
+      | cmd.outboundEncoded = pure cmd.outboundCommand
+      | otherwise = encodeWorkflowCommand inst.payloadProcessor cmd.outboundCommand
 
 
 deliverWorkflowCompletion :: HasCallStack => Core.WorkflowActivationCompletion -> InstanceM ()
