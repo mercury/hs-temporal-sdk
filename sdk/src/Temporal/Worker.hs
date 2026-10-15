@@ -567,7 +567,8 @@ data WorkerShutdownState
   | WorkerShutdownStarted !(Control.Concurrent.MVar (Either SomeException ()))
 
 
-data Worker env = forall ty.
+data Worker env
+  = forall ty.
   Core.KnownWorkerType ty =>
   Worker
   { workerType :: !(Core.SWorkerType ty)

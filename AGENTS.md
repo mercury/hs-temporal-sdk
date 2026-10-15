@@ -84,4 +84,6 @@ cd ../..
 - Shell: `shfmt` + `shellcheck`
 - No list comprehensions in Haskell — use `do` syntax or datatype-specific
   functions
-- No `threadDelay` in tests — use query-based readiness probes
+- Delays in tests are permitted only when elapsed time is what the test exercises.
+  Never use delays for readiness or synchronization; use explicit synchronization
+  or query-based readiness probes instead.

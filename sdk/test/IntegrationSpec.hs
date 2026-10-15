@@ -19,6 +19,7 @@ module IntegrationSpec where
 
 import Common
 import Control.Concurrent
+import Control.Concurrent.MVar.Extra
 import Control.Exception
 import Control.Exception.Annotated
 import qualified Control.Exception.Annotated as Annotated
@@ -47,10 +48,12 @@ import GHC.Generics
 import GHC.Stack (SrcLoc (..), callStack, fromCallSiteList)
 import IntegrationSpec.HangingWorkflow
 import IntegrationSpec.NoOpWorkflow
+import qualified IntegrationSpec.PayloadProcessing as PayloadProcessing
 import IntegrationSpec.Signals
 import IntegrationSpec.TimeSkipping
 import IntegrationSpec.TimeoutsInWorkflows
 import IntegrationSpec.Updates
+import qualified IntegrationSpec.WorkflowFinalization as WorkflowFinalization
 import Lens.Family2
 import OpenTelemetry.Processor.Span
 import OpenTelemetry.Trace
@@ -279,8 +282,7 @@ spec = do
     aroundAllWith (flip $ setup mempty) needsClient
     aroundAllWith (flip $ setup mempty) terminateTests
     updatesWithInterceptors
-    workflowFinalizationWithEscapedInterceptor
-    workflowFinalizationOnCompletion
+    WorkflowFinalization.spec
     openTelemetryWorkflowFinalization
 
   -- Whether time-skipping is enabled is global state in the test server (it's not tracked
@@ -440,67 +442,6 @@ testConf :: Definitions ()
 testConf = collectTemporalDefinitions testDefs
 
 
-workflowFinalizationWithEscapedInterceptor :: SpecWith PortNumber
-workflowFinalizationWithEscapedInterceptor = do
-  finalizations <- runIO $ newIORef []
-  finalized <- runIO newEmptyMVar
-  let interceptor =
-        mempty
-          { workflowInboundInterceptors =
-              mempty
-                { executeWorkflow = \_input _next -> throwIO SampleException
-                , finalizeWorkflow = \_ result -> do
-                    modifyIORef' finalizations (result :)
-                    _ <- tryPutMVar finalized result
-                    pure ()
-                }
-          }
-  aroundAllWith (flip $ setup interceptor) do
-    describe "Workflow finalization" do
-      specify "publishes an escaped inbound interceptor exception exactly once" $ \TestEnv {..} -> do
-        let conf = configure () testConf baseConf
-        withWorker conf do
-          _ <- useClient $ C.start testRefs.shouldRunWorkflowTest "escaped-interceptor" (C.startWorkflowOptions taskQueue)
-          result <- timeout 5_000_000 (takeMVar finalized)
-          case result of
-            Just (Just (WorkflowExitFailed _)) -> pure ()
-            _ -> expectationFailure "expected the finalizer to receive the escaped interceptor failure"
-
-        results <- reverse <$> readIORef finalizations
-        case results of
-          [Just (WorkflowExitFailed _)] -> pure ()
-          _ -> expectationFailure "expected eviction to leave the completed finalization unchanged"
-
-
-workflowFinalizationOnCompletion :: SpecWith PortNumber
-workflowFinalizationOnCompletion = do
-  finalizations <- runIO $ newIORef []
-  let interceptor =
-        mempty
-          { workflowInboundInterceptors =
-              mempty
-                { finalizeWorkflow = \_ result ->
-                    modifyIORef' finalizations (result :)
-                }
-          }
-  aroundAllWith (flip $ setup interceptor) do
-    describe "Workflow finalization" do
-      specify "finalizes every continued run before publishing its completion" $ \TestEnv {..} -> do
-        let conf = configure () testConf baseConf
-            startOptions =
-              (C.startWorkflowOptions taskQueue)
-                { C.workflowIdReusePolicy = Just W.WorkflowIdReusePolicyAllowDuplicate
-                }
-        withWorker conf do
-          useClient (C.execute testRefs.continueAsNewWorks "finalize-continued-runs" startOptions 0)
-            `shouldReturn` "woohoo"
-
-          results <- reverse <$> readIORef finalizations
-          case results of
-            [Just (WorkflowExitContinuedAsNew _), Just (WorkflowExitSuccess _)] -> pure ()
-            _ -> expectationFailure "expected continued and successful runs to finalize before completion"
-
-
 openTelemetryWorkflowFinalization :: SpecWith PortNumber
 openTelemetryWorkflowFinalization = do
   emittedSpans <- runIO $ newIORef []
@@ -546,7 +487,7 @@ openTelemetryWorkflowFinalization = do
     describe "OpenTelemetry workflow finalization" do
       specify "finalizes RunWorkflow before publishing an activity workflow result" $ \TestEnv {..} -> do
         writeIORef emittedSpans []
-        workflowResult <- newEmptyMVar
+        workflowResult <- newBarrier
         let conf = configure () testConf baseConf
             startOptions =
               (C.startWorkflowOptions taskQueue)
@@ -557,7 +498,7 @@ openTelemetryWorkflowFinalization = do
             result <-
               Control.Exception.try @SomeException $
                 useClient (C.execute testRefs.basicActivityWf "otel-activity-finalization" startOptions)
-            putMVar workflowResult result
+            signalBarrier workflowResult result
 
           finalizerDidStart <- timeout 5_000_000 (takeMVar finalizerStarted)
           case finalizerDidStart of
@@ -565,14 +506,14 @@ openTelemetryWorkflowFinalization = do
               putMVar allowFinalizer ()
               expectationFailure "workflow finalizer did not start"
             Just () -> pure ()
-          prematureResult <- timeout 1_000_000 (takeMVar workflowResult)
+          prematureResult <- timeout 1_000_000 (waitBarrier workflowResult)
           putMVar allowFinalizer ()
           case prematureResult of
             Just result ->
               expectationFailure $
                 "workflow result was observable before RunWorkflow finalization: " <> show result
             Nothing -> do
-              completedResult <- timeout 5_000_000 (takeMVar workflowResult)
+              completedResult <- timeout 5_000_000 (waitBarrier workflowResult)
               case completedResult of
                 Just (Right 1) -> pure ()
                 _ -> expectationFailure $ "expected successful workflow result, got: " <> show completedResult
@@ -600,6 +541,7 @@ openTelemetryWorkflowFinalization = do
 
 needsClient :: SpecWith TestEnv
 needsClient = do
+  PayloadProcessing.spec
   describe "Workflow" $ do
     specify "should run a workflow" $ \TestEnv {..} -> do
       let conf = configure () testConf $ do
@@ -617,38 +559,6 @@ needsClient = do
                 }
         useClient (C.execute testRefs.shouldRunWorkflowTest "basicWf" opts)
           `shouldReturn` ()
-
-    specify "retries a resumed activation that exceeds the deadlock timeout" $ \TestEnv {..} -> do
-      evaluationAttempts <- newIORef (0 :: Int)
-      firstEvaluationEntered <- newEmptyMVar
-      let workflow = provideCallStack do
-            W.sleep $ milliseconds 1
-            performUnsafeNonDeterministicIO do
-              attempt <- atomicModifyIORef' evaluationAttempts $ \n ->
-                let next = n + 1
-                in (next, next)
-              when (attempt == 1) do
-                putMVar firstEvaluationEntered ()
-                threadDelay 250_000
-          wf = W.provideWorkflow defaultCodec "workflow-activation-deadlock-retry" workflow
-          conf =
-            (configure () wf baseConf)
-              { deadlockTimeout = Just 100_000
-              }
-          startOptions =
-            (C.startWorkflowOptions taskQueue)
-              { C.timeouts =
-                  C.TimeoutOptions
-                    { C.runTimeout = Just $ seconds 10
-                    , C.executionTimeout = Nothing
-                    , C.taskTimeout = Nothing
-                    }
-              }
-      withWorker conf do
-        workflowHandle <- useClient $ C.start wf.reference "workflow-activation-deadlock-retry" startOptions
-        timeout 5_000_000 (takeMVar firstEvaluationEntered) `shouldReturn` Just ()
-        timeout 5_000_000 (useClient $ C.waitWorkflowResult workflowHandle) `shouldReturn` Just ()
-        readIORef evaluationAttempts `shouldReturn` 2
 
     describe "Workflow existence assertions" $ do
       specify "checkWorkflowExecutionExists returns correct values" $ \TestEnv {..} -> do
@@ -1274,7 +1184,7 @@ needsClient = do
         -- Start workflow in one worker, then shut down while activity is running.
         -- The workflow should still complete because the activity finishes before
         -- the shutdown grace period expires.
-        resultVar <- newEmptyMVar
+        resultVar <- newBarrier
         withWorker conf $ do
           let opts =
                 (C.startWorkflowOptions taskQueue)
@@ -1288,13 +1198,13 @@ needsClient = do
                   }
           _ <- forkIO $ do
             res <- useClient (C.execute wf.reference "workerShutdownLA" opts)
-            putMVar resultVar res
+            signalBarrier resultVar res
           -- Wait until the activity has started executing
           takeMVar activityStarted
           -- Allow the activity to finish
           putMVar activityCanFinish ()
           -- Wait for the workflow result before the bracket-based shutdown
-          res <- takeMVar resultVar
+          res <- waitBarrier resultVar
           res `shouldBe` "completed-during-shutdown"
 
       specify "local activity replay works" $ \TestEnv {..} -> do

@@ -326,7 +326,7 @@ import Temporal.Activity.Definition (ActivityRef (..), KnownActivity (..))
 import Temporal.Common
 import qualified Temporal.Common.Logging as Logging
 import Temporal.Common.TimeoutType
-import Temporal.Duration (Duration (..), diffSystemTime, durationFromProto, durationToProto, nanoseconds, seconds)
+import Temporal.Duration (Duration (..), diffSystemTime, durationFromProto, durationToProto, seconds)
 import Temporal.Exception
 import Temporal.Payload
 import Temporal.SearchAttributes
@@ -421,7 +421,6 @@ startActivityFromPayloads (KnownActivity codec name) opts typedPayloads = ilift 
       seqMaps {activities = HashMap.insert s resultSlot (activities seqMaps)}
 
     i <- readIORef inst.workflowInstanceInfo
-    args <- processorEncodePayloads inst.payloadProcessor activityInput.args
     let actId = maybe (Text.pack $ show actSeq) rawActivityId (activityInput.options.activityId)
         scheduleActivity =
           defMessage
@@ -430,7 +429,7 @@ startActivityFromPayloads (KnownActivity codec name) opts typedPayloads = ilift 
             & Command.activityType .~ activityInput.activityType
             & Command.taskQueue .~ rawTaskQueue (fromMaybe i.taskQueue activityInput.options.taskQueue)
             & Command.headers .~ fmap convertToProtoPayload activityInput.options.headers
-            & Command.vec'arguments .~ fmap convertToProtoPayload args
+            & Command.vec'arguments .~ fmap convertToProtoPayload activityInput.args
             & Command.maybe'retryPolicy .~ fmap retryPolicyToProto activityInput.options.retryPolicy
             & Command.cancellationType .~ activityCancellationTypeToProto activityInput.options.cancellationType
             & Command.maybe'scheduleToStartTimeout .~ fmap durationToProto activityInput.options.scheduleToStartTimeout
@@ -455,11 +454,8 @@ startActivityFromPayloads (KnownActivity codec name) opts typedPayloads = ilift 
             Logging.logDebug ("Activity result: " <> Text.pack (show res))
             Workflow $ \_ -> case res ^. Activation.result . ActivityResult.maybe'status of
               Nothing -> error "Activity result missing status"
-              Just (ActivityResult.ActivityResolution'Completed success) -> do
-                decoded <- liftIO $ payloadProcessorDecode inst.payloadProcessor $ convertFromProtoPayload (success ^. ActivityResult.result)
-                pure $ case decoded of
-                  Left err -> Throw $ toException $ ValueError err
-                  Right val -> Done val
+              Just (ActivityResult.ActivityResolution'Completed success) ->
+                pure $ Done $ convertFromProtoPayload (success ^. ActivityResult.result)
               Just (ActivityResult.ActivityResolution'Failed failure_) ->
                 let failure = failure_ ^. ActivityResult.failure
                 in pure $
@@ -552,14 +548,13 @@ startNexusOperation client operationName opts input = ilift $ do
   atomically $ modifyTVar' inst.workflowSequenceMaps $ \seqMaps ->
     seqMaps {nexusOperations = HashMap.insert s (NexusOperationHandles startVar resultVar) (nexusOperations seqMaps)}
 
-  encodedInput <- liftIO $ payloadProcessorEncode inst.payloadProcessor input
   let scheduleCmd =
         defMessage
           & Command.seq .~ nexusSeq
           & Command.endpoint .~ rawNexusEndpointName client.nexusEndpoint
           & Command.service .~ rawNexusServiceName client.nexusService
           & Command.operation .~ rawNexusOperationName operationName
-          & Command.maybe'input .~ Just (convertToProtoPayload encodedInput)
+          & Command.maybe'input .~ Just (convertToProtoPayload input)
           & Command.maybe'scheduleToCloseTimeout .~ fmap durationToProto opts.scheduleToCloseTimeout
           & Command.nexusHeader .~ opts.nexusHeaders
           & Command.cancellationType .~ nexusOperationCancellationTypeToProto opts.cancellationType
@@ -572,11 +567,8 @@ startNexusOperation client operationName opts input = ilift $ do
           result <- getIVar resultVar
           Workflow $ \_ -> case result ^. NexusFields.maybe'status of
             Nothing -> pure $ Throw $ toException $ RuntimeError "Nexus operation result missing status"
-            Just (NexusProto.NexusOperationResult'Completed payload) -> do
-              decoded <- liftIO $ payloadProcessorDecode inst.payloadProcessor (convertFromProtoPayload payload)
-              pure $ case decoded of
-                Left err -> Throw $ toException $ ValueError err
-                Right val -> Done val
+            Just (NexusProto.NexusOperationResult'Completed payload) ->
+              pure $ Done $ convertFromProtoPayload payload
             Just (NexusProto.NexusOperationResult'Failed failure) ->
               pure $ Throw $ toException $ NexusOperationFailed (failure ^. Failure.message) Nothing
             Just (NexusProto.NexusOperationResult'Cancelled _) ->
@@ -646,7 +638,6 @@ signalWorkflow _ f (signalRef -> KnownSignal signalName signalCodec) = withWorkf
     resVar <- newTrackedIVar
     inst <- ask
     s <- nextExternalSignalSequence
-    args <- processorEncodePayloads inst.payloadProcessor ps
     let cmd =
           defMessage
             & Command.signalExternalWorkflowExecution
@@ -654,7 +645,7 @@ signalWorkflow _ f (signalRef -> KnownSignal signalName signalCodec) = withWorkf
                 ( defMessage
                     & Command.seq .~ rawSequence s
                     & Command.signalName .~ signalName
-                    & Command.vec'args .~ fmap convertToProtoPayload args
+                    & Command.vec'args .~ fmap convertToProtoPayload ps
                     -- TODO
                     -- & Command.headers .~ _
                 )
@@ -701,10 +692,6 @@ startChildWorkflowFromPayloads (workflowRef -> k@(KnownWorkflow codec _)) opts p
       -- TODO these need to pass through the interceptor
       runInIO <- askRunInIO
       wfHandle <- liftIO $ inst.outboundInterceptor.startChildWorkflowExecution (knownWorkflowName k) opts $ \wfName opts' -> runInIO $ do
-        args <- processorEncodePayloads inst.payloadProcessor typedPayloads
-        let convertedPayloads = fmap convertToProtoPayload args
-        memo <- processorEncodePayloads inst.payloadProcessor opts'.initialMemo
-
         s@(Sequence wfSeq) <- nextChildWorkflowSequence
         startSlot <- newTrackedIVar
         resultSlot <- newTrackedIVar
@@ -718,7 +705,7 @@ startChildWorkflowFromPayloads (workflowRef -> k@(KnownWorkflow codec _)) opts p
                 & Command.workflowId .~ rawWorkflowId wfId
                 & Command.workflowType .~ wfName
                 & Command.taskQueue .~ rawTaskQueue (fromMaybe i.taskQueue opts'.taskQueue)
-                & Command.vec'input .~ convertedPayloads
+                & Command.vec'input .~ fmap convertToProtoPayload typedPayloads
                 & Command.maybe'workflowExecutionTimeout .~ fmap durationToProto opts'.timeoutOptions.executionTimeout
                 & Command.maybe'workflowRunTimeout .~ fmap durationToProto opts'.timeoutOptions.runTimeout
                 & Command.maybe'workflowTaskTimeout .~ fmap durationToProto opts'.timeoutOptions.taskTimeout
@@ -727,7 +714,7 @@ startChildWorkflowFromPayloads (workflowRef -> k@(KnownWorkflow codec _)) opts p
                 & Command.maybe'retryPolicy .~ fmap retryPolicyToProto opts'.retryPolicy
                 & Command.cronSchedule .~ fromMaybe "" opts'.cronSchedule
                 & Command.headers .~ fmap convertToProtoPayload opts'.headers
-                & Command.memo .~ fmap convertToProtoPayload memo
+                & Command.memo .~ fmap convertToProtoPayload opts'.initialMemo
                 & Command.searchAttributes .~ searchAttrs
                 & Command.cancellationType .~ childWorkflowCancellationTypeToProto opts'.cancellationType
                 & Command.maybe'priority .~ fmap priorityToProto opts'.priority
@@ -754,7 +741,7 @@ startChildWorkflowFromPayloads (workflowRef -> k@(KnownWorkflow codec _)) opts p
       pure $
         wfHandle
           { childWorkflowResultConverter = \r -> do
-              decodingResult <- decode codec =<< either (throwIO . ValueError) pure =<< payloadProcessorDecode inst.payloadProcessor r
+              decodingResult <- decode codec r
               case decodingResult of
                 Left err -> throwIO $ ValueError err
                 Right val -> pure val
@@ -852,8 +839,6 @@ scheduleLocalActivityAttempt name opts typedPayloads attemptNum origSchedTime ca
     atomically $ modifyTVar' inst.workflowSequenceMaps $ \seqMaps ->
       seqMaps {activities = HashMap.insert s resultSlot (activities seqMaps)}
     let localOpts = localInput.localOptions
-    hdrs <- processorEncodePayloads inst.payloadProcessor localOpts.headers
-    args <- processorEncodePayloads inst.payloadProcessor localInput.localArgs
     let actId = maybe (Text.pack $ show actSeq) rawActivityId localOpts.activityId
         cmd =
           defMessage
@@ -862,10 +847,10 @@ scheduleLocalActivityAttempt name opts typedPayloads attemptNum origSchedTime ca
                     & Command.seq .~ actSeq
                     & Command.activityId .~ actId
                     & Command.activityType .~ localInput.localActivityType
-                    & Command.headers .~ fmap convertToProtoPayload hdrs
+                    & Command.headers .~ fmap convertToProtoPayload localOpts.headers
                     & Command.attempt .~ attemptNum
                     & Command.originalScheduleTime .~ origSchedTime
-                    & Command.vec'arguments .~ fmap convertToProtoPayload args
+                    & Command.vec'arguments .~ fmap convertToProtoPayload localInput.localArgs
                     & Command.maybe'scheduleToCloseTimeout .~ (durationToProto <$> localOpts.scheduleToCloseTimeout)
                     & Command.maybe'scheduleToStartTimeout .~ (durationToProto <$> localOpts.scheduleToStartTimeout)
                     & Command.maybe'startToCloseTimeout .~ (durationToProto <$> localOpts.startToCloseTimeout)
@@ -880,11 +865,8 @@ scheduleLocalActivityAttempt name opts typedPayloads attemptNum origSchedTime ca
             res <- getIVar resultSlot
             case res ^. Activation.result . ActivityResult.maybe'status of
               Nothing -> error "Local activity result missing status"
-              Just (ActivityResult.ActivityResolution'Completed success) -> do
-                res' <- ilift $ liftIO $ payloadProcessorDecode inst.payloadProcessor $ convertFromProtoPayload (success ^. ActivityResult.result)
-                case res' of
-                  Left err -> Temporal.Workflow.Internal.Monad.throw $ ValueError err
-                  Right val -> pure val
+              Just (ActivityResult.ActivityResolution'Completed success) ->
+                pure $ convertFromProtoPayload (success ^. ActivityResult.result)
               Just (ActivityResult.ActivityResolution'Failed failure_) ->
                 let failure = failure_ ^. ActivityResult.failure
                     cause_ = failure ^. Failure.cause
