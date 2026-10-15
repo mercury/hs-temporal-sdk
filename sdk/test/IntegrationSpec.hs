@@ -858,6 +858,87 @@ needsClient = do
         workflowHandle <- useClient $ C.start wf.reference "slow-processor-workflow" startOptions 41
         timeout 5_000_000 (useClient $ C.waitWorkflowResult workflowHandle) `shouldReturn` Just 42
 
+    specify "returns a caught ValueError when activity payload decode fails" $ \TestEnv {..} -> do
+      let failingResultDecode =
+            PayloadProcessor
+              { payloadProcessorEncode = pure
+              , payloadProcessorDecode = \p ->
+                  if BS.isInfixOf "payload-decode-error-sentinel" p.payloadData
+                    then pure (Left "decode failed")
+                    else pure (Right p)
+              }
+          act :: Activity () Text
+          act = pure "payload-decode-error-sentinel"
+          actDef = provideActivity defaultCodec "payload-decode-error-activity" act
+          workflow = provideCallStack do
+            (result :: Either ValueError Text) <-
+              Catch.try $
+                W.executeActivity
+                  actDef.reference
+                  (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
+            pure $ case result of
+              Left _ -> "caught" :: Text
+              Right _ -> "uncaught"
+          wf = W.provideWorkflow defaultCodec "payload-decode-error-workflow" workflow
+          conf =
+            (configure () (wf, actDef) baseConf)
+              { payloadProcessor = failingResultDecode
+              }
+          startOptions =
+            (C.startWorkflowOptions taskQueue)
+              { C.timeouts =
+                  C.TimeoutOptions
+                    { C.runTimeout = Just $ seconds 10
+                    , C.executionTimeout = Nothing
+                    , C.taskTimeout = Nothing
+                    }
+              }
+      withWorker conf do
+        workflowHandle <- useClient $ C.start wf.reference "payload-decode-error-workflow" startOptions
+        timeout 5_000_000 (useClient $ C.waitWorkflowResult workflowHandle) `shouldReturn` Just ("caught" :: Text)
+
+    specify "rejects an update whose payload fails to decode and leaves the workflow running" $ \TestEnv {..} -> do
+      handlerReady <- newEmptyMVar
+      let failingDecode =
+            PayloadProcessor
+              { payloadProcessorEncode = pure
+              , payloadProcessorDecode = \_ -> pure (Left "decode failed")
+              }
+          updateFn :: Int -> W.Workflow Int
+          updateFn = pure
+          updateDef :: W.ProvidedUpdate (Int -> W.Workflow Int) SomeException
+          updateDef = W.provideUpdate defaultCodec "decode-fail-update" updateFn
+          workflow = provideCallStack do
+            W.setUpdateHandler updateDef updateFn Nothing
+            performUnsafeNonDeterministicIO $ putMVar handlerReady ()
+            W.sleep $ seconds 2
+          wf = W.provideWorkflow defaultCodec "decode-fail-update-workflow" workflow
+          conf =
+            (configure () wf baseConf)
+              { payloadProcessor = failingDecode
+              }
+          startOptions =
+            (C.startWorkflowOptions taskQueue)
+              { C.timeouts =
+                  C.TimeoutOptions
+                    { C.runTimeout = Just $ seconds 10
+                    , C.executionTimeout = Nothing
+                    , C.taskTimeout = Nothing
+                    }
+              }
+          updateOpts =
+            C.UpdateOptions
+              { updateId = "decode-fail-update"
+              , updateHeaders = mempty
+              }
+      withWorker conf do
+        workflowHandle <- useClient $ C.start wf.reference "decode-fail-update-workflow" startOptions
+        timeout 5_000_000 (takeMVar handlerReady) `shouldReturn` Just ()
+        useClient (C.executeUpdate workflowHandle updateDef.updateReference updateOpts 7)
+          `shouldThrow` \case
+            UpdateFailure _ -> True
+        timeout 5_000_000 (useClient $ C.waitWorkflowResult workflowHandle) `shouldReturn` Just ()
+
     describe "Workflow existence assertions" $ do
       specify "checkWorkflowExecutionExists returns correct values" $ \TestEnv {..} -> do
         let wfId = WorkflowId "test-existence-check"

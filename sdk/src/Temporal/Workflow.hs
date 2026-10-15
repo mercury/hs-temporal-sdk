@@ -454,8 +454,11 @@ startActivityFromPayloads (KnownActivity codec name) opts typedPayloads = ilift 
             Logging.logDebug ("Activity result: " <> Text.pack (show res))
             Workflow $ \_ -> case res ^. Activation.result . ActivityResult.maybe'status of
               Nothing -> error "Activity result missing status"
-              Just (ActivityResult.ActivityResolution'Completed success) ->
-                pure $ Done $ convertFromProtoPayload (success ^. ActivityResult.result)
+              Just (ActivityResult.ActivityResolution'Completed success) -> do
+                let payload = convertFromProtoPayload (success ^. ActivityResult.result)
+                case payloadDecodeError payload of
+                  Just err -> pure $ Throw $ toException $ ValueError err
+                  Nothing -> pure $ Done payload
               Just (ActivityResult.ActivityResolution'Failed failure_) ->
                 let failure = failure_ ^. ActivityResult.failure
                 in pure $
@@ -567,8 +570,11 @@ startNexusOperation client operationName opts input = ilift $ do
           result <- getIVar resultVar
           Workflow $ \_ -> case result ^. NexusFields.maybe'status of
             Nothing -> pure $ Throw $ toException $ RuntimeError "Nexus operation result missing status"
-            Just (NexusProto.NexusOperationResult'Completed payload) ->
-              pure $ Done $ convertFromProtoPayload payload
+            Just (NexusProto.NexusOperationResult'Completed payload) -> do
+              let decoded = convertFromProtoPayload payload
+              case payloadDecodeError decoded of
+                Just err -> pure $ Throw $ toException $ ValueError err
+                Nothing -> pure $ Done decoded
             Just (NexusProto.NexusOperationResult'Failed failure) ->
               pure $ Throw $ toException $ NexusOperationFailed (failure ^. Failure.message) Nothing
             Just (NexusProto.NexusOperationResult'Cancelled _) ->
@@ -742,11 +748,14 @@ startChildWorkflowFromPayloads (workflowRef -> k@(KnownWorkflow codec _)) opts p
         pure wfHandle
       pure $
         wfHandle
-          { childWorkflowResultConverter = \r -> do
-              decodingResult <- decode codec r
-              case decodingResult of
-                Left err -> throwIO $ ValueError err
-                Right val -> pure val
+          { childWorkflowResultConverter = \r ->
+              case payloadDecodeError r of
+                Just err -> throwIO $ ValueError err
+                Nothing -> do
+                  decodingResult <- decode codec r
+                  case decodingResult of
+                    Left err -> throwIO $ ValueError err
+                    Right val -> pure val
           }
 
 
@@ -867,8 +876,11 @@ scheduleLocalActivityAttempt name opts typedPayloads attemptNum origSchedTime ca
             res <- getIVar resultSlot
             case res ^. Activation.result . ActivityResult.maybe'status of
               Nothing -> error "Local activity result missing status"
-              Just (ActivityResult.ActivityResolution'Completed success) ->
-                pure $ convertFromProtoPayload (success ^. ActivityResult.result)
+              Just (ActivityResult.ActivityResolution'Completed success) -> do
+                let payload = convertFromProtoPayload (success ^. ActivityResult.result)
+                case payloadDecodeError payload of
+                  Just err -> Temporal.Workflow.Internal.Monad.throw $ ValueError err
+                  Nothing -> pure payload
               Just (ActivityResult.ActivityResolution'Failed failure_) ->
                 let failure = failure_ ^. ActivityResult.failure
                     cause_ = failure ^. Failure.cause

@@ -9,6 +9,8 @@ module Temporal.Workflow.Internal.Instance (
   fromReversed,
   push,
   flushCommands,
+  encodePendingCommands,
+  deliverWorkflowCompletion,
   nextExternalCancelSequence,
   nextChildWorkflowSequence,
   nextExternalSignalSequence,
@@ -43,6 +45,12 @@ runInstanceM worker m = runReaderT (unInstanceM m) worker
 
 flushCommands :: HasCallStack => InstanceM ()
 flushCommands = do
+  completionMessage <- encodePendingCommands
+  deliverWorkflowCompletion completionMessage
+
+
+encodePendingCommands :: InstanceM Core.WorkflowActivationCompletion
+encodePendingCommands = do
   inst <- ask
   info <- readIORef inst.workflowInstanceInfo
   cmds <- atomically $ do
@@ -52,11 +60,15 @@ flushCommands = do
   encodedCmds <- liftIO $ traverse (encodeWorkflowCommand inst.payloadProcessor) (fromReversed cmds)
   let completionSuccessful :: Core.Success
       completionSuccessful = defMessage & Completion.commands .~ encodedCmds
-      completionMessage :: Core.WorkflowActivationCompletion
-      completionMessage =
-        defMessage
-          & Completion.runId .~ rawRunId info.runId
-          & Completion.successful .~ completionSuccessful
+  pure $
+    defMessage
+      & Completion.runId .~ rawRunId info.runId
+      & Completion.successful .~ completionSuccessful
+
+
+deliverWorkflowCompletion :: HasCallStack => Core.WorkflowActivationCompletion -> InstanceM ()
+deliverWorkflowCompletion completionMessage = do
+  inst <- ask
   Logging.logDebug ("flushCommands: " <> T.pack (show completionMessage) <> " " <> T.pack (prettyCallStack callStack))
   res <- liftIO $ inst.workflowCompleteActivation completionMessage
   case res of
