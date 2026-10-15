@@ -42,6 +42,7 @@ import System.Random.Stateful (FrozenGen (..), RandomGenM (..), StatefulGen (..)
 #endif
                               )
 import Temporal.Common
+import Temporal.Common.Watchdog (Watchdog)
 import qualified Temporal.Core.Worker as Core
 import Temporal.Exception
 import Temporal.Payload
@@ -788,7 +789,7 @@ data WorkflowInstance = WorkflowInstance
   , workflowCompleteActivation :: !(Core.WorkflowActivationCompletion -> IO (Either Core.WorkerError ()))
   , workflowInstanceContinuationEnv :: {-# UNPACK #-} !ContinuationEnv
   , workflowCancellationVar :: {-# UNPACK #-} !(IVar ())
-  , workflowDeadlockTimeout :: Maybe Int
+  , workflowWatchdog :: !Watchdog
   , workflowVault :: {-# UNPACK #-} !(IORef Vault)
   , -- | Ensures inbound interceptor finalizers observe one terminal outcome.
     workflowFinalized :: {-# UNPACK #-} !(IORef Bool)

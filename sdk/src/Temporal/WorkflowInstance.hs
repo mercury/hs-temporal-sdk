@@ -91,6 +91,7 @@ import System.Random (mkStdGen)
 import Temporal.Common
 import Temporal.Common.Async (asyncLabelled)
 import qualified Temporal.Common.Logging as Logging
+import qualified Temporal.Common.Watchdog as Watchdog
 import qualified Temporal.Core.Worker as Core
 import Temporal.Coroutine
 import Temporal.Duration
@@ -124,8 +125,7 @@ create
   :: (HasCallStack, MonadLoggerIO m)
   => (Core.WorkflowActivationCompletion -> IO (Either Core.WorkerError ()))
   -> (Vector Payload -> IO (Either String (Workflow Payload)))
-  -> Maybe Int
-  -- ^ Deadlock timeout in seconds.
+  -> Maybe Duration
   -> [ApplicationFailureHandler]
   -> WorkflowInboundInterceptor
   -> WorkflowOutboundInterceptor
@@ -144,11 +144,17 @@ create
   inboundInterceptor
   outboundInterceptor
   baseWorkflowVault
-  payloadProcessor
+  processor
   info
   start
   initialSignals = do
     Logging.logDebug "Instantiating workflow instance"
+    workflowWatchdog <- liftIO $ Watchdog.new workflowDeadlockTimeout
+    let payloadProcessor =
+          PayloadProcessor
+            { payloadProcessorEncode = Watchdog.pause workflowWatchdog . payloadProcessorEncode processor
+            , payloadProcessorDecode = Watchdog.pause workflowWatchdog . payloadProcessorDecode processor
+            }
     workflowInstanceLogger <- askLoggerIO
     workflowRandomnessSeed <- WorkflowGenM <$> newIORef (mkStdGen 0)
     workflowNotifiedPatches <- newIORef mempty
@@ -259,17 +265,19 @@ runWithWorkflowExecutionContext inst action = do
       liftIO $ runWorkflowExecutionContext $ runInstanceM inst action
 
 
+-- Only processor IO is excluded. Workflow code, codecs and interceptors still
+-- have to yield within the configured execution budget.
+withWatchdog :: WorkflowInstance -> InstanceM a -> InstanceM a
+withWatchdog inst action = withRunInIO $ \run -> do
+  result <- Watchdog.run inst.workflowWatchdog (run action)
+  maybe (throwIO $ LogicBug WorkflowActivationDeadlock) pure result
+
+
 runWorkflowToCompletion :: HasCallStack => SuspendableWorkflowExecution Payload -> InstanceM Payload
 runWorkflowToCompletion wf = do
   inst <- ask
   let resumeWithDeadline current =
-        case inst.workflowDeadlockTimeout of
-          Nothing -> resume current
-          Just timeoutDuration -> do
-            result <- UnliftIO.timeout timeoutDuration (resume current)
-            case result of
-              Nothing -> throwIO $ LogicBug WorkflowActivationDeadlock
-              Just step -> pure step
+        withWatchdog inst $ resume current
 
       completeStep suspension = do
         Logging.logDebug "Awaiting activation results from workflow"
@@ -426,13 +434,7 @@ activate act suspension = do
     in (info', info')
   writeIORef inst.workflowTime (act ^. Activation.timestamp . to timespecFromTimestamp)
   writeIORef inst.workflowIsReplaying (act ^. Activation.isReplaying)
-  eResult <- case inst.workflowDeadlockTimeout of
-    Nothing -> applyJobs (act ^. Activation.vec'jobs) suspension
-    Just timeoutDuration -> do
-      res <- UnliftIO.timeout timeoutDuration $ applyJobs (act ^. Activation.vec'jobs) suspension
-      case res of
-        Nothing -> pure $ Left $ toException $ LogicBug WorkflowActivationDeadlock
-        Just res' -> pure res'
+  eResult <- withWatchdog inst $ applyJobs (act ^. Activation.vec'jobs) suspension
   either throwIO pure eResult
 
 

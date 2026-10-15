@@ -54,7 +54,7 @@ import qualified Temporal.Common.Logging as Logging
 import qualified Temporal.Core.Client as C
 import Temporal.Core.Worker (InactiveForReplay)
 import qualified Temporal.Core.Worker as Core
-import Temporal.Duration (durationFromProto)
+import Temporal.Duration (Duration, durationFromProto)
 import qualified Temporal.Exception as Err
 import Temporal.Payload
 import Temporal.SearchAttributes.Internal
@@ -83,7 +83,7 @@ data WorkflowWorker = forall ty.
   , workerCore :: Core.Worker ty
   , workerInboundInterceptors :: {-# UNPACK #-} !WorkflowInboundInterceptor
   , workerOutboundInterceptors :: {-# UNPACK #-} !WorkflowOutboundInterceptor
-  , workerDeadlockTimeout :: Maybe Int
+  , workerDeadlockTimeout :: Maybe Duration
   , workerTaskQueue :: TaskQueue
   , workerErrorConverters :: [Err.ApplicationFailureHandler]
   , processor :: {-# UNPACK #-} !PayloadProcessor

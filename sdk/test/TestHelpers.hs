@@ -101,7 +101,7 @@ mkWithWorker :: PortNumber -> WorkerConfig actEnv -> IO a -> IO a
 mkWithWorker pn conf m = do
   let clientConfig_ = configWithRetry pn
   c <- runStdoutLoggingT $ connectClient globalRuntime clientConfig_
-  bracket (startWorker c (conf {payloadProcessor = sillyEncryptionPayloadProcessor})) shutdown (const m)
+  bracket (startWorker c (conf {payloadProcessor = conf.payloadProcessor <> sillyEncryptionPayloadProcessor})) shutdown (const m)
 
 
 sillyEncryptionPayloadProcessor :: PayloadProcessor

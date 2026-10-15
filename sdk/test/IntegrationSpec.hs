@@ -19,6 +19,7 @@ module IntegrationSpec where
 
 import Common
 import Control.Concurrent
+import Control.Concurrent.MVar.Extra
 import Control.Exception
 import Control.Exception.Annotated
 import qualified Control.Exception.Annotated as Annotated
@@ -182,7 +183,7 @@ mkWithWorker :: PortNumber -> WorkerConfig actEnv -> IO a -> IO a
 mkWithWorker pn conf m = do
   let clientConfig_ = configWithRetry pn
   c <- runStdoutLoggingT $ connectClient globalRuntime clientConfig_
-  bracket (startWorker c (conf {payloadProcessor = sillyEncryptionPayloadProcessor})) shutdown (const m)
+  bracket (startWorker c (conf {payloadProcessor = conf.payloadProcessor <> sillyEncryptionPayloadProcessor})) shutdown (const m)
 
 
 -- Increment the bytestring words by 1 on encode, and decrement by 1 on decode
@@ -715,7 +716,7 @@ openTelemetryWorkflowFinalization = do
     describe "OpenTelemetry workflow finalization" do
       specify "finalizes RunWorkflow before publishing an activity workflow result" $ \TestEnv {..} -> do
         writeIORef emittedSpans []
-        workflowResult <- newEmptyMVar
+        workflowResult <- newBarrier
         let conf = configure () testConf baseConf
             startOptions =
               (C.startWorkflowOptions taskQueue)
@@ -726,7 +727,7 @@ openTelemetryWorkflowFinalization = do
             result <-
               Control.Exception.try @SomeException $
                 useClient (C.execute testRefs.basicActivityWf "otel-activity-finalization" startOptions)
-            putMVar workflowResult result
+            signalBarrier workflowResult result
 
           finalizerDidStart <- timeout 5_000_000 (takeMVar finalizerStarted)
           case finalizerDidStart of
@@ -734,14 +735,14 @@ openTelemetryWorkflowFinalization = do
               putMVar allowFinalizer ()
               expectationFailure "workflow finalizer did not start"
             Just () -> pure ()
-          prematureResult <- timeout 1_000_000 (takeMVar workflowResult)
+          prematureResult <- timeout 1_000_000 (waitBarrier workflowResult)
           putMVar allowFinalizer ()
           case prematureResult of
             Just result ->
               expectationFailure $
                 "workflow result was observable before RunWorkflow finalization: " <> show result
             Nothing -> do
-              completedResult <- timeout 5_000_000 (takeMVar workflowResult)
+              completedResult <- timeout 5_000_000 (waitBarrier workflowResult)
               case completedResult of
                 Just (Right 1) -> pure ()
                 _ -> expectationFailure $ "expected successful workflow result, got: " <> show completedResult
@@ -789,16 +790,14 @@ needsClient = do
 
     specify "retries a resumed activation that exceeds the deadlock timeout" $ \TestEnv {..} -> do
       evaluationAttempts <- newIORef (0 :: Int)
-      firstEvaluationEntered <- newEmptyMVar
+      blocked <- (newEmptyMVar :: IO (MVar ()))
       let workflow = provideCallStack do
             W.sleep $ milliseconds 1
             performUnsafeNonDeterministicIO do
               attempt <- atomicModifyIORef' evaluationAttempts $ \n ->
                 let next = n + 1
                 in (next, next)
-              when (attempt == 1) do
-                putMVar firstEvaluationEntered ()
-                threadDelay 250_000
+              when (attempt == 1) $ takeMVar blocked
           wf = W.provideWorkflow defaultCodec "workflow-activation-deadlock-retry" workflow
           conf =
             (configure () wf baseConf)
@@ -815,9 +814,167 @@ needsClient = do
               }
       withWorker conf do
         workflowHandle <- useClient $ C.start wf.reference "workflow-activation-deadlock-retry" startOptions
-        timeout 5_000_000 (takeMVar firstEvaluationEntered) `shouldReturn` Just ()
         timeout 5_000_000 (useClient $ C.waitWorkflowResult workflowHandle) `shouldReturn` Just ()
         readIORef evaluationAttempts `shouldReturn` 2
+
+    specify "does not count payload processor IO against the deadlock timeout" $ \TestEnv {..} -> do
+      -- Deliberately exceed the watchdog budget to test that processor IO is excluded.
+      let slowProcessor =
+            PayloadProcessor
+              { payloadProcessorEncode = \p -> do
+                  threadDelay 250_000
+                  pure p
+              , payloadProcessorDecode = \p -> do
+                  threadDelay 250_000
+                  pure (Right p)
+              }
+          act :: Int -> Activity () Int
+          act n = pure (n + 1)
+          actDef = provideActivity defaultCodec "slow-processor-activity" act
+          workflow :: Int -> MyWorkflow Int
+          workflow =
+            W.executeActivity
+              actDef.reference
+              (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
+          wf = W.provideWorkflow defaultCodec "slow-processor-workflow" workflow
+          conf =
+            (configure () (wf, actDef) baseConf)
+              { deadlockTimeout = Just 100_000
+              , payloadProcessor = slowProcessor
+              }
+          startOptions =
+            (C.startWorkflowOptions taskQueue)
+              { C.timeouts =
+                  C.TimeoutOptions
+                    { C.runTimeout = Just $ seconds 10
+                    , C.executionTimeout = Nothing
+                    , C.taskTimeout = Nothing
+                    }
+              }
+      withWorker conf do
+        workflowHandle <- useClient $ C.start wf.reference "slow-processor-workflow" startOptions 41
+        timeout 5_000_000 (useClient $ C.waitWorkflowResult workflowHandle) `shouldReturn` Just 42
+
+    specify "returns a caught ValueError when activity payload decode fails" $ \TestEnv {..} -> do
+      let failingResultDecode =
+            PayloadProcessor
+              { payloadProcessorEncode = pure
+              , payloadProcessorDecode = \p ->
+                  if BS.isInfixOf "payload-decode-error-sentinel" p.payloadData
+                    then pure (Left "decode failed")
+                    else pure (Right p)
+              }
+          act :: Activity () Text
+          act = pure "payload-decode-error-sentinel"
+          actDef = provideActivity defaultCodec "payload-decode-error-activity" act
+          workflow = provideCallStack do
+            (result :: Either ValueError Text) <-
+              Catch.try $
+                W.executeActivity
+                  actDef.reference
+                  (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
+            pure $ case result of
+              Left _ -> "caught" :: Text
+              Right _ -> "uncaught"
+          wf = W.provideWorkflow defaultCodec "payload-decode-error-workflow" workflow
+          conf =
+            (configure () (wf, actDef) baseConf)
+              { payloadProcessor = failingResultDecode
+              }
+          startOptions =
+            (C.startWorkflowOptions taskQueue)
+              { C.timeouts =
+                  C.TimeoutOptions
+                    { C.runTimeout = Just $ seconds 10
+                    , C.executionTimeout = Nothing
+                    , C.taskTimeout = Nothing
+                    }
+              }
+      withWorker conf do
+        workflowHandle <- useClient $ C.start wf.reference "payload-decode-error-workflow" startOptions
+        timeout 5_000_000 (useClient $ C.waitWorkflowResult workflowHandle) `shouldReturn` Just ("caught" :: Text)
+
+    specify "returns a caught ValueError when activity payload encode fails" $ \TestEnv {..} -> do
+      let failingArgEncode =
+            PayloadProcessor
+              { payloadProcessorEncode = \p ->
+                  if BS.isInfixOf "payload-encode-error-sentinel" p.payloadData
+                    then throwIO (ValueError "encode failed")
+                    else pure p
+              , payloadProcessorDecode = pure . Right
+              }
+          act :: Text -> Activity () Text
+          act _ = pure "ok"
+          actDef = provideActivity defaultCodec "payload-encode-error-activity" act
+          workflow = provideCallStack do
+            (result :: Either ValueError Text) <-
+              Catch.try $
+                W.executeActivity
+                  actDef.reference
+                  (W.defaultStartActivityOptions $ W.StartToClose $ seconds 5)
+                  "payload-encode-error-sentinel"
+            pure $ case result of
+              Left _ -> "caught" :: Text
+              Right _ -> "uncaught"
+          wf = W.provideWorkflow defaultCodec "payload-encode-error-workflow" workflow
+          conf =
+            (configure () (wf, actDef) baseConf)
+              { payloadProcessor = failingArgEncode
+              }
+          startOptions =
+            (C.startWorkflowOptions taskQueue)
+              { C.timeouts =
+                  C.TimeoutOptions
+                    { C.runTimeout = Just $ seconds 10
+                    , C.executionTimeout = Nothing
+                    , C.taskTimeout = Nothing
+                    }
+              }
+      withWorker conf do
+        workflowHandle <- useClient $ C.start wf.reference "payload-encode-error-workflow" startOptions
+        timeout 5_000_000 (useClient $ C.waitWorkflowResult workflowHandle) `shouldReturn` Just ("caught" :: Text)
+
+    specify "rejects an update whose payload fails to decode and leaves the workflow running" $ \TestEnv {..} -> do
+      handlerReady <- newEmptyMVar
+      let failingDecode =
+            PayloadProcessor
+              { payloadProcessorEncode = pure
+              , payloadProcessorDecode = \_ -> pure (Left "decode failed")
+              }
+          updateFn :: Int -> W.Workflow Int
+          updateFn = pure
+          updateDef :: W.ProvidedUpdate (Int -> W.Workflow Int) SomeException
+          updateDef = W.provideUpdate defaultCodec "decode-fail-update" updateFn
+          workflow = provideCallStack do
+            W.setUpdateHandler updateDef updateFn Nothing
+            performUnsafeNonDeterministicIO $ putMVar handlerReady ()
+            W.sleep $ seconds 2
+          wf = W.provideWorkflow defaultCodec "decode-fail-update-workflow" workflow
+          conf =
+            (configure () wf baseConf)
+              { payloadProcessor = failingDecode
+              }
+          startOptions =
+            (C.startWorkflowOptions taskQueue)
+              { C.timeouts =
+                  C.TimeoutOptions
+                    { C.runTimeout = Just $ seconds 10
+                    , C.executionTimeout = Nothing
+                    , C.taskTimeout = Nothing
+                    }
+              }
+          updateOpts =
+            C.UpdateOptions
+              { updateId = "decode-fail-update"
+              , updateHeaders = mempty
+              }
+      withWorker conf do
+        workflowHandle <- useClient $ C.start wf.reference "decode-fail-update-workflow" startOptions
+        timeout 5_000_000 (takeMVar handlerReady) `shouldReturn` Just ()
+        useClient (C.executeUpdate workflowHandle updateDef.updateReference updateOpts 7)
+          `shouldThrow` \case
+            UpdateFailure _ -> True
+        timeout 5_000_000 (useClient $ C.waitWorkflowResult workflowHandle) `shouldReturn` Just ()
 
     describe "Workflow existence assertions" $ do
       specify "checkWorkflowExecutionExists returns correct values" $ \TestEnv {..} -> do
@@ -1443,7 +1600,7 @@ needsClient = do
         -- Start workflow in one worker, then shut down while activity is running.
         -- The workflow should still complete because the activity finishes before
         -- the shutdown grace period expires.
-        resultVar <- newEmptyMVar
+        resultVar <- newBarrier
         withWorker conf $ do
           let opts =
                 (C.startWorkflowOptions taskQueue)
@@ -1457,13 +1614,13 @@ needsClient = do
                   }
           _ <- forkIO $ do
             res <- useClient (C.execute wf.reference "workerShutdownLA" opts)
-            putMVar resultVar res
+            signalBarrier resultVar res
           -- Wait until the activity has started executing
           takeMVar activityStarted
           -- Allow the activity to finish
           putMVar activityCanFinish ()
           -- Wait for the workflow result before the bracket-based shutdown
-          res <- takeMVar resultVar
+          res <- waitBarrier resultVar
           res `shouldBe` "completed-during-shutdown"
 
       specify "local activity replay works" $ \TestEnv {..} -> do

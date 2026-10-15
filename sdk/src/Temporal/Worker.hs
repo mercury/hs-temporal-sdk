@@ -158,6 +158,7 @@ import qualified Temporal.Common.Logging as Logging
 import Temporal.Core.Client
 import Temporal.Core.Worker (InactiveForReplay)
 import qualified Temporal.Core.Worker as Core
+import Temporal.Duration (microseconds)
 import Temporal.Exception
 import Temporal.Interceptor
 import qualified Temporal.Nexus.Worker as Nexus
@@ -633,7 +634,7 @@ startReplayWorker rt conf = provideCallStack $ runWorkerContext conf $ do
         workerTaskQueue = TaskQueue (Core.taskQueue conf.coreConfig <> "-" <> UUID.toText uuid)
         workerInboundInterceptors = conf.interceptorConfig.workflowInboundInterceptors
         workerOutboundInterceptors = conf.interceptorConfig.workflowOutboundInterceptors
-        workerDeadlockTimeout = conf.deadlockTimeout
+        workerDeadlockTimeout = microseconds . toInteger <$> conf.deadlockTimeout
         workerClient = ()
         workerErrorConverters = conf.applicationErrorConverters
         processor = conf.payloadProcessor
@@ -814,7 +815,7 @@ startWorker client conf = provideCallStack $ runWorkerContext conf $ inSpan "sta
         workerTaskQueue = TaskQueue $ Core.taskQueue conf.coreConfig
         workerInboundInterceptors = conf.interceptorConfig.workflowInboundInterceptors
         workerOutboundInterceptors = conf.interceptorConfig.workflowOutboundInterceptors
-        workerDeadlockTimeout = conf.deadlockTimeout
+        workerDeadlockTimeout = microseconds . toInteger <$> conf.deadlockTimeout
         workerErrorConverters = errorConverters
         workerVault = conf.interceptorConfig.interceptorVault
         processor = conf.payloadProcessor

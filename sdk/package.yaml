@@ -151,6 +151,8 @@ tests:
     source-dirs: test
     other-modules:
       ActivationLoopSpec,
+      WatchdogSpec,
+      Control.Concurrent.MVar.Extra,
       Spec,
       ClientHistorySpec,
       ContinueAsNewSpec,
