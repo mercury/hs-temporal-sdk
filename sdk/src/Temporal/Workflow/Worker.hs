@@ -72,7 +72,8 @@ data EvictionWithRunID = EvictionWithRunID
   deriving stock (Show)
 
 
-data WorkflowWorker = forall ty.
+data WorkflowWorker
+  = forall ty.
   Core.KnownWorkerType ty =>
   WorkflowWorker
   { workerWorkflowFunctions :: {-# UNPACK #-} !(HashMap Text WorkflowDefinition)
@@ -323,8 +324,8 @@ handleActivation activation = inSpan' "handleActivation" (defaultSpanArguments {
               searchAttrs <- liftIO $ do
                 decodedAttrs <- initializeWorkflow ^. Activation.searchAttributes . Message.indexedFields . to searchAttributesFromProto
                 either (throwIO . ValueError) pure decodedAttrs
-              hdrs <- processorTryDecodePayloads worker.processor (initializeWorkflow ^. Activation.headers . to (fmap convertFromProtoPayload))
-              memo <- processorDecodePayloads worker.processor (initializeWorkflow ^. Activation.memo . Message.fields . to (fmap convertFromProtoPayload))
+              let hdrs = initializeWorkflow ^. Activation.headers . to (fmap convertFromProtoPayload)
+                  memo = initializeWorkflow ^. Activation.memo . Message.fields . to (fmap convertFromProtoPayload)
               pure (searchAttrs, hdrs, memo)
             case ePayloads of
               Left err -> do

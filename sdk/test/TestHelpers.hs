@@ -24,9 +24,11 @@ module TestHelpers (
 import Common
 import Control.Concurrent
 import Control.Exception
+import Control.Monad (when)
 import Control.Monad.Logger
 import Control.Monad.Reader
 import qualified Data.ByteString as BS
+import Data.IORef (atomicModifyIORef', newIORef)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
@@ -40,6 +42,7 @@ import RequireCallStack
 import System.Directory
 import System.Environment (lookupEnv)
 import System.IO
+import System.Timeout (timeout)
 import Temporal.Activity
 import Temporal.Bundle
 import Temporal.Bundle.TH
@@ -101,7 +104,7 @@ mkWithWorker :: PortNumber -> WorkerConfig actEnv -> IO a -> IO a
 mkWithWorker pn conf m = do
   let clientConfig_ = configWithRetry pn
   c <- runStdoutLoggingT $ connectClient globalRuntime clientConfig_
-  bracket (startWorker c (conf {payloadProcessor = sillyEncryptionPayloadProcessor})) shutdown (const m)
+  bracket (startWorker c (conf {payloadProcessor = conf.payloadProcessor <> sillyEncryptionPayloadProcessor})) shutdown (const m)
 
 
 sillyEncryptionPayloadProcessor :: PayloadProcessor
@@ -265,16 +268,17 @@ defaultStartOptsWithTimeout tq d =
     }
 
 
--- | Block until the workflow's first workflow task has been processed.
---
--- Queries the built-in @__stack_trace@ handler, which is registered on every
--- workflow instance at creation time. A successful response proves the worker
--- has executed the workflow code up to its first blocking point, so all
--- user-registered query\/update\/signal handlers are in place.
---
--- Retries up to @maxAttempts@ times on any exception (transport errors,
--- "workflow not found", etc.). Each retry is a full gRPC round-trip, so
--- there is a natural backoff without needing @threadDelay@.
+{- | Block until the workflow's first workflow task has been processed.
+
+Queries the built-in @__stack_trace@ handler, which is registered on every
+workflow instance at creation time. A successful response proves the worker
+has executed the workflow code up to its first blocking point, so all
+user-registered query\/update\/signal handlers are in place.
+
+Retries up to @maxAttempts@ times on any exception (transport errors,
+"workflow not found", etc.). Each retry is a full gRPC round-trip, so
+there is a natural backoff without needing @threadDelay@.
+-}
 waitForWorkflowStart :: MonadIO m => C.WorkflowHandle a -> m ()
 waitForWorkflowStart h = liftIO $ go maxAttempts
   where
@@ -288,3 +292,40 @@ waitForWorkflowStart h = liftIO $ go maxAttempts
       case result of
         Right (Right _) -> pure ()
         _ -> go (n - 1)
+
+
+-- Match the chosen bytes once, so processing can succeed when the task retries.
+matchPayloadOnce :: BS.ByteString -> IO (Payload -> IO Bool)
+matchPayloadOnce matchingBytes = do
+  matched <- newIORef False
+  pure $ \payload ->
+    if BS.isInfixOf matchingBytes payload.payloadData
+      then atomicModifyIORef' matched $ \alreadyMatched -> (True, not alreadyMatched)
+      else pure False
+
+
+failEncodingOnce :: BS.ByteString -> IO PayloadProcessor
+failEncodingOnce matchingBytes = do
+  shouldFail <- matchPayloadOnce matchingBytes
+  pure
+    mempty
+      { payloadProcessorEncode = \payload -> do
+          failing <- shouldFail payload
+          when failing $ throwIO $ ValueError "deliberate encode failure"
+          pure payload
+      }
+
+
+failDecodingOnce :: BS.ByteString -> IO PayloadProcessor
+failDecodingOnce matchingBytes = do
+  shouldFail <- matchPayloadOnce matchingBytes
+  pure
+    mempty
+      { payloadProcessorDecode = \payload -> do
+          failing <- shouldFail payload
+          pure $ if failing then Left "deliberate decode failure" else Right payload
+      }
+
+
+shouldCompleteWith :: (Eq a, Show a) => IO a -> a -> Expectation
+shouldCompleteWith action expected = timeout 5_000_000 action `shouldReturn` Just expected

@@ -9,6 +9,8 @@ module Temporal.Workflow.Internal.Instance (
   fromReversed,
   push,
   flushCommands,
+  prepareCompletion,
+  publishCompletion,
   nextExternalCancelSequence,
   nextChildWorkflowSequence,
   nextExternalSignalSequence,
@@ -20,6 +22,7 @@ module Temporal.Workflow.Internal.Instance (
 
 import Control.Monad.Reader
 import Data.Atomics (atomicModifyIORefCAS)
+import Data.Traversable (for)
 import Data.ProtoLens
 import qualified Data.Text as T
 import GHC.Stack
@@ -29,6 +32,7 @@ import qualified Proto.Temporal.Sdk.Core.WorkflowCompletion.WorkflowCompletion_F
 import Temporal.Common
 import qualified Temporal.Common.Logging as Logging
 import Temporal.Workflow.Internal.Monad
+import Temporal.Workflow.Internal.Payload
 import Temporal.Workflow.Types
 import UnliftIO
 
@@ -38,25 +42,41 @@ runInstanceM worker m = runReaderT (unInstanceM m) worker
 
 
 flushCommands :: HasCallStack => InstanceM ()
-flushCommands = do
+flushCommands = prepareCompletion >>= publishCompletion
+
+
+-- | Drain pending commands and encode a successful activation completion
+-- __without__ publishing it.
+--
+-- The command buffer is cleared before encoding, and remains empty if encoding
+-- fails.
+prepareCompletion :: InstanceM Core.WorkflowActivationCompletion
+prepareCompletion = do
   inst <- ask
   info <- readIORef inst.workflowInstanceInfo
   cmds <- atomically $ do
     currentCmds <- readTVar inst.workflowCommands
     writeTVar inst.workflowCommands $ Reversed []
     pure currentCmds
+  encoded <- liftIO $ for (fromReversed cmds) (encodeCommand inst.payloadProcessor) 
   let completionSuccessful :: Core.Success
-      completionSuccessful = defMessage & Completion.commands .~ fromReversed cmds
+      completionSuccessful = defMessage & Completion.commands .~ encoded
       completionMessage :: Core.WorkflowActivationCompletion
       completionMessage =
         defMessage
           & Completion.runId .~ rawRunId info.runId
           & Completion.successful .~ completionSuccessful
-  Logging.logDebug ("flushCommands: " <> T.pack (show completionMessage) <> " " <> T.pack (prettyCallStack callStack))
+  pure completionMessage
+
+
+publishCompletion :: HasCallStack => Core.WorkflowActivationCompletion -> InstanceM ()
+publishCompletion completionMessage = do
+  inst <- ask
+  Logging.logDebug $ "flushCommands: " <> T.pack (show completionMessage) <> " " <> T.pack (prettyCallStack callStack)
   res <- liftIO $ inst.workflowCompleteActivation completionMessage
   case res of
     Left err -> do
-      Logging.logError ("flushCommands: failed: " <> T.pack (show err))
+      Logging.logError $ "flushCommands: failed: " <> T.pack (show err)
       throwIO err
     Right () -> pure ()
 

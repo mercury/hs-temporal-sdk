@@ -11,7 +11,6 @@ import Control.Monad.Logger
 import Control.Monad.Reader
 import Data.HashMap.Strict (HashMap)
 import Data.Text (Text)
-import qualified Temporal.Nexus.Worker as Nexus
 import OpenTelemetry.Trace.Core
 import Temporal.Activity.Definition (ActivityDefinition)
 import Temporal.Activity.Worker (ActivityWorker)
@@ -20,6 +19,7 @@ import Temporal.Core.Worker (InactiveForReplay)
 import qualified Temporal.Core.Worker as Core
 import Temporal.Exception (ApplicationFailureHandler)
 import Temporal.Interceptor
+import qualified Temporal.Nexus.Worker as Nexus
 import Temporal.Payload
 import Temporal.Workflow.Definition (WorkflowDefinition)
 import Temporal.Workflow.Internal.Monad
@@ -29,6 +29,7 @@ import UnliftIO hiding (race)
 
 data WorkerConfig activityEnv = WorkerConfig
   { deadlockTimeout :: Maybe Int
+  -- ^ Workflow execution budget, in microseconds.
   , wfDefs :: HashMap Text WorkflowDefinition
   , actEnv :: activityEnv
   , actDefs :: HashMap Text (ActivityDefinition activityEnv)

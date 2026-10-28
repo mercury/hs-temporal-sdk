@@ -89,8 +89,6 @@ pub struct TemporalDevServerConfigDef {
     pub extra_args: Vec<String>,
 }
 
-/// Parse the dev server configuration sent by
-/// `Temporal.Core.EphemeralServer.startDevServer`.
 pub(crate) fn parse_dev_server_config(json: &[u8]) -> Result<TemporalDevServerConfig, String> {
     let mut de = serde_json::Deserializer::from_slice(json);
     TemporalDevServerConfigDef::deserialize(&mut de)
@@ -98,8 +96,6 @@ pub(crate) fn parse_dev_server_config(json: &[u8]) -> Result<TemporalDevServerCo
         .map_err(|err| format!("Invalid dev server config: {err}"))
 }
 
-/// Parse the test server configuration sent by
-/// `Temporal.Core.EphemeralServer.startTestServer`.
 pub(crate) fn parse_test_server_config(json: &[u8]) -> Result<TestServerConfig, String> {
     let mut de = serde_json::Deserializer::from_slice(json);
     TestServerConfigDef::deserialize(&mut de)
@@ -107,8 +103,6 @@ pub(crate) fn parse_test_server_config(json: &[u8]) -> Result<TestServerConfig, 
         .map_err(|err| format!("Invalid test server config: {err}"))
 }
 
-/// Read a nullable, NUL-terminated JSON string from Haskell.
-///
 /// # Safety
 ///
 /// `json` must be null or point to a NUL-terminated string.
@@ -120,8 +114,6 @@ unsafe fn json_bytes<'a>(json: *const c_char) -> Result<&'a [u8], String> {
     }
 }
 
-/// Start `start` on `runtime_ref` and report the server through `hs`.
-///
 /// An invalid `config` is reported through `hs`, so the Haskell waiter is
 /// always woken.
 fn start_server<C, F>(
@@ -246,7 +238,7 @@ pub unsafe extern "C" fn hs_temporal_start_test_server(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runtime::test_support::{TestWaiter, error_text, new_test_runtime, test_cap};
+    use crate::runtime::test_support::{call_bridge, error_text, new_test_runtime};
     use serde_json::json;
 
     fn full_dev_server_config() -> serde_json::Value {
@@ -329,29 +321,29 @@ mod tests {
         *mut *mut EphemeralServerRef,
     );
 
-    fn start_with_raw_config(start: StartServer, json: *const c_char) -> String {
+    fn start_with_raw_config(start: StartServer, json: Option<&CStr>) -> String {
         let mut runtime = new_test_runtime();
-        let mut waiter = TestWaiter::<EphemeralServerRef, CArray<u8>>::new();
-        unsafe {
-            start(
-                &mut runtime,
-                json,
-                waiter.mvar(),
-                test_cap(),
-                &mut *waiter.error_slot,
-                &mut *waiter.result_slot,
-            )
-        };
-        error_text(waiter.wait().err().expect("the server must not start"))
+        let result: Result<EphemeralServerRef, CArray<u8>> =
+            call_bridge(|mvar, cap, error_slot, result_slot| unsafe {
+                start(
+                    &mut runtime,
+                    json.map_or(std::ptr::null(), CStr::as_ptr),
+                    mvar,
+                    cap,
+                    error_slot,
+                    result_slot,
+                )
+            });
+        error_text(result.err().expect("the server must not start"))
     }
 
     #[test]
     fn start_server_reports_invalid_config_to_the_waiter() {
-        let err = start_with_raw_config(hs_temporal_start_dev_server, c"{\"exe\":1}".as_ptr());
+        let err = start_with_raw_config(hs_temporal_start_dev_server, Some(c"{\"exe\":1}"));
         assert!(err.starts_with("Invalid dev server config"), "{err}");
-        let err = start_with_raw_config(hs_temporal_start_test_server, c"[]".as_ptr());
+        let err = start_with_raw_config(hs_temporal_start_test_server, Some(c"[]"));
         assert!(err.starts_with("Invalid test server config"), "{err}");
-        let err = start_with_raw_config(hs_temporal_start_dev_server, std::ptr::null());
+        let err = start_with_raw_config(hs_temporal_start_dev_server, None);
         assert_eq!(err, "server config pointer is null");
     }
 }
