@@ -1707,7 +1707,7 @@ mod tests {
         let config = SlotSupplierConfig::Custom {
             handle: &inner as *const HaskellSlotSupplierInner as u64,
         };
-        let opts = SlotSupplierOptions::<NexusSlotKind>::from(&config);
+        let opts = SlotSupplierOptions::<NexusSlotKind>::try_from(&config).unwrap();
         assert!(matches!(opts, SlotSupplierOptions::Custom(_)));
     }
 
