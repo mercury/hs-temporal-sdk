@@ -681,6 +681,14 @@ pub struct CWorkerValidationError {
     message: *const c_char,
 }
 
+impl runtime::CError for CWorkerError {
+    type Rust = WorkerError;
+}
+
+impl runtime::CError for CWorkerValidationError {
+    type Rust = String;
+}
+
 impl From<String> for CWorkerValidationError {
     fn from(message: String) -> Self {
         CWorkerValidationError::c_repr_of(FormattedError {
@@ -886,17 +894,9 @@ impl WorkerRef {
             .ok_or_else(|| WorkerError::new(code, "Worker finalization has already started"))
     }
 
-    fn spawn_reporting<T, F>(&self, hs: HsCallback<T, CWorkerError>, fut: F)
-    where
-        F: Future<Output = Result<T, WorkerError>> + Send + 'static,
-        T: RawPointerConverter<T> + 'static,
-    {
-        spawn_reporting(&self.runtime, hs, fut)
-    }
-
     fn poll_workflow_activation(&self, hs: HsCallback<CArray<u8>, CWorkerError>) {
         let worker = self.core_worker(WorkerErrorCode::PollShutdownError);
-        self.spawn_reporting(hs, async move {
+        self.runtime.spawn_reporting(hs, async move {
             let act = worker?
                 .poll_workflow_activation()
                 .await
@@ -907,7 +907,7 @@ impl WorkerRef {
 
     fn poll_activity_task(&self, hs: HsCallback<CArray<u8>, CWorkerError>) {
         let worker = self.core_worker(WorkerErrorCode::PollShutdownError);
-        self.spawn_reporting(hs, async move {
+        self.runtime.spawn_reporting(hs, async move {
             let task = worker?
                 .poll_activity_task()
                 .await
@@ -918,7 +918,7 @@ impl WorkerRef {
 
     fn poll_nexus_task(&self, hs: HsCallback<CArray<u8>, CWorkerError>) {
         let worker = self.core_worker(WorkerErrorCode::PollShutdownError);
-        self.spawn_reporting(hs, async move {
+        self.runtime.spawn_reporting(hs, async move {
             let task = worker?
                 .poll_nexus_task()
                 .await
@@ -941,7 +941,7 @@ impl WorkerRef {
                 )
             })
         });
-        self.spawn_reporting(hs, async move {
+        self.runtime.spawn_reporting(hs, async move {
             let completion = completion?;
             worker?
                 .complete_workflow_activation(completion)
@@ -963,7 +963,7 @@ impl WorkerRef {
             ActivityTaskCompletion::decode(proto.as_slice())
                 .map_err(|err| WorkerError::new(WorkerErrorCode::InvalidProto, format!("{}", err)))
         });
-        self.spawn_reporting(hs, async move {
+        self.runtime.spawn_reporting(hs, async move {
             let completion = completion?;
             worker?
                 .complete_activity_task(completion)
@@ -989,7 +989,7 @@ impl WorkerRef {
                 )
             })
         });
-        self.spawn_reporting(hs, async move {
+        self.runtime.spawn_reporting(hs, async move {
             let completion = completion?;
             worker?
                 .complete_nexus_task(completion)
@@ -1036,7 +1036,7 @@ impl WorkerRef {
 
     fn finalize_shutdown(&mut self, hs: HsCallback<CUnit, CWorkerError>) {
         let core_worker = self.worker.take();
-        self.spawn_reporting(hs, async move {
+        self.runtime.spawn_reporting(hs, async move {
             let Some(core_worker) = core_worker else {
                 return Err(WorkerError::new(
                     WorkerErrorCode::SDKError,
@@ -1064,15 +1064,6 @@ impl WorkerRef {
     }
 }
 
-/// Schedule `fut` on `runtime` and report its result through `hs`.
-fn spawn_reporting<T, F>(runtime: &runtime::Runtime, hs: HsCallback<T, CWorkerError>, fut: F)
-where
-    F: Future<Output = Result<T, WorkerError>> + Send + 'static,
-    T: RawPointerConverter<T> + 'static,
-{
-    runtime.future_result_into_hs(hs, async move { fut.await.map_err(CWorkerError::from) })
-}
-
 // TODO: [publish-crate]
 /// # Safety
 ///
@@ -1094,12 +1085,12 @@ pub unsafe extern "C" fn hs_temporal_validate_worker(
     };
 
     let w = worker.core_worker(WorkerErrorCode::SDKError);
-    worker.runtime.future_result_into_hs(hs, async move {
-        let w = w.map_err(|err| CWorkerValidationError::from(err.message))?;
-        match w.validate().await {
-            Ok(()) => Ok(CUnit {}),
-            Err(err) => Err(CWorkerValidationError::from(format!("{}", err))),
-        }
+    worker.runtime.spawn_reporting(hs, async move {
+        w.map_err(|err| err.message)?
+            .validate()
+            .await
+            .map_err(|err| err.to_string())?;
+        Ok(CUnit {})
     })
 }
 
@@ -1382,7 +1373,7 @@ impl HistoryPusher {
                 message: "Replay worker is no longer accepting new histories".to_string(),
             })
         };
-        spawn_reporting(&self.runtime, hs, async move {
+        self.runtime.spawn_reporting(hs, async move {
             let wfid = workflow_id?;
             let history = history?;
             tx?.send(HistoryForReplay::new(history, wfid))
@@ -1665,7 +1656,7 @@ mod tests {
     #[test]
     fn calls_after_finalization_report_errors() {
         let runtime = new_test_runtime();
-        let worker = WorkerRef {
+        let mut worker = WorkerRef {
             worker: None,
             runtime: runtime.runtime.clone(),
         };
@@ -1696,6 +1687,13 @@ mod tests {
             });
         let err: WorkerError = result.err().unwrap().as_rust().unwrap();
         assert!(matches!(err.code, WorkerErrorCode::CompletionFailure));
+
+        let result: Result<CUnit, CWorkerValidationError> =
+            call_bridge(|mvar, cap, error_slot, result_slot| unsafe {
+                hs_temporal_validate_worker(&mut worker, mvar, cap, error_slot, result_slot)
+            });
+        let err: FormattedError = result.err().unwrap().as_rust().unwrap();
+        assert_eq!(err.message, "Worker finalization has already started");
 
         // Eviction has no error result; it must not panic.
         worker.request_workflow_eviction("run");
