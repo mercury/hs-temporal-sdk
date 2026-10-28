@@ -375,6 +375,26 @@ impl Runtime {
             }
         });
     }
+
+    /// Like [`Runtime::future_result_into_hs`], but `fut` fails with the Rust
+    /// error type. The error is converted into the C error type `E` when the
+    /// task finishes.
+    pub(crate) fn spawn_reporting<F, T, E>(&self, callback: HsCallback<T, E>, fut: F)
+    where
+        F: Future<Output = Result<T, E::Rust>> + Send + 'static,
+        T: RawPointerConverter<T> + 'static,
+        E: CError,
+    {
+        self.future_result_into_hs(callback, async move { fut.await.map_err(Into::into) })
+    }
+}
+
+/// A C error type that a bridge call builds from a Rust error.
+///
+/// The callback fixes the C error type, so `Rust` also tells the compiler
+/// which error type `?` converts to in a [`Runtime::spawn_reporting`] future.
+pub(crate) trait CError: RawPointerConverter<Self> + 'static {
+    type Rust: Into<Self>;
 }
 
 #[cfg(test)]
