@@ -46,6 +46,8 @@ pub enum SlotSupplierConfig {
         maximum_slots: Option<usize>,
         ramp_throttle_ms: Option<u64>,
     },
+    /// `handle` is the `HaskellSlotSupplierInner` pointer that
+    /// `hs_temporal_new_custom_slot_supplier` returned, stored as a number.
     #[serde(rename = "custom")]
     Custom { handle: u64 },
 }
@@ -65,11 +67,12 @@ pub struct TunerConfig {
     pub resource_based_tuner_options: Option<ResourceBasedTunerConfig>,
 }
 
-impl<SK: SlotKind + Send + Sync + 'static> From<&SlotSupplierConfig>
+impl<SK: SlotKind + Send + Sync + 'static> TryFrom<&SlotSupplierConfig>
     for temporalio_sdk_core::SlotSupplierOptions<SK>
 {
-    fn from(cfg: &SlotSupplierConfig) -> SlotSupplierOptions<SK> {
-        match cfg {
+    type Error = WorkerError;
+    fn try_from(cfg: &SlotSupplierConfig) -> Result<SlotSupplierOptions<SK>, WorkerError> {
+        let options = match cfg {
             SlotSupplierConfig::FixedSize { slots } => {
                 SlotSupplierOptions::FixedSize { slots: *slots }
             }
@@ -84,7 +87,13 @@ impl<SK: SlotKind + Send + Sync + 'static> From<&SlotSupplierConfig>
             )),
             SlotSupplierConfig::Custom { handle } => {
                 let inner_ptr = *handle as *const HaskellSlotSupplierInner;
-                let inner = unsafe { &*inner_ptr };
+                // Null is the only invalid handle that can be detected here.
+                let inner = unsafe { inner_ptr.as_ref() }.ok_or_else(|| {
+                    WorkerError::new(
+                        WorkerErrorCode::InvalidWorkerConfig,
+                        "custom slot supplier handle is null",
+                    )
+                })?;
                 let supplier: HaskellSlotSupplier<SK> = HaskellSlotSupplier {
                     inner: Arc::new(HaskellSlotSupplierInner {
                         reserve_fn: inner.reserve_fn,
@@ -96,7 +105,8 @@ impl<SK: SlotKind + Send + Sync + 'static> From<&SlotSupplierConfig>
                 };
                 SlotSupplierOptions::Custom(Arc::new(supplier))
             }
-        }
+        };
+        Ok(options)
     }
 }
 
@@ -127,22 +137,10 @@ impl TryFrom<&TunerConfig> for TunerHolderOptions {
             });
         }
 
-        // Converting a custom supplier dereferences its handle.
-        if suppliers
-            .iter()
-            .any(|s| matches!(s, Some(SlotSupplierConfig::Custom { handle: 0 })))
-        {
-            return Err(WorkerError {
-                code: WorkerErrorCode::InvalidWorkerConfig,
-                message: "custom slot supplier handle is null".to_string(),
-            });
-        }
-
-        let maybe_workflow_slot_opts = cfg.workflow_slot_supplier.as_ref().map(Into::into);
-        let maybe_activity_slot_opts = cfg.activity_slot_supplier.as_ref().map(Into::into);
-        let maybe_local_activity_slot_opts =
-            cfg.local_activity_slot_supplier.as_ref().map(Into::into);
-        let maybe_nexus_slot_opts = cfg.nexus_slot_supplier.as_ref().map(Into::into);
+        let maybe_workflow_slot_opts = slot_options(&cfg.workflow_slot_supplier)?;
+        let maybe_activity_slot_opts = slot_options(&cfg.activity_slot_supplier)?;
+        let maybe_local_activity_slot_opts = slot_options(&cfg.local_activity_slot_supplier)?;
+        let maybe_nexus_slot_opts = slot_options(&cfg.nexus_slot_supplier)?;
 
         TunerHolderOptions::builder()
             .maybe_workflow_slot_options(maybe_workflow_slot_opts)
@@ -156,6 +154,12 @@ impl TryFrom<&TunerConfig> for TunerHolderOptions {
                 message: format!("Invalid tuner config: {}", err),
             })
     }
+}
+
+fn slot_options<SK: SlotKind + Send + Sync + 'static>(
+    cfg: &Option<SlotSupplierConfig>,
+) -> Result<Option<SlotSupplierOptions<SK>>, WorkerError> {
+    cfg.as_ref().map(SlotSupplierOptions::try_from).transpose()
 }
 
 impl TryFrom<&TunerConfig> for TunerHolder {
