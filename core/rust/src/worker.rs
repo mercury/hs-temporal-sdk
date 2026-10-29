@@ -95,12 +95,7 @@ impl<SK: SlotKind + Send + Sync + 'static> TryFrom<&SlotSupplierConfig>
                     )
                 })?;
                 let supplier: HaskellSlotSupplier<SK> = HaskellSlotSupplier {
-                    inner: Arc::new(HaskellSlotSupplierInner {
-                        reserve_fn: inner.reserve_fn,
-                        try_reserve_fn: inner.try_reserve_fn,
-                        mark_used_fn: inner.mark_used_fn,
-                        release_fn: inner.release_fn,
-                    }),
+                    inner: Arc::new(*inner),
                     _phantom: PhantomData,
                 };
                 SlotSupplierOptions::Custom(Arc::new(supplier))
@@ -201,6 +196,7 @@ pub struct SlotReserveCompletion {
     sender: Option<tokio::sync::oneshot::Sender<()>>,
 }
 
+#[derive(Clone, Copy)]
 pub struct HaskellSlotSupplierInner {
     reserve_fn: ReserveSlotFn,
     try_reserve_fn: TryReserveSlotFn,
