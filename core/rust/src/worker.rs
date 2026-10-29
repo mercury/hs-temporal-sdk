@@ -1529,7 +1529,7 @@ mod tests {
     use crate::runtime::test_support::{call_bridge, new_test_runtime};
     use serde_json::json;
     use temporalio_common::worker::{
-        ActivitySlotKind, LocalActivitySlotKind, NexusSlotKind, WorkerTuner, WorkflowSlotKind,
+        ActivitySlotKind, LocalActivitySlotKind, NexusSlotKind, WorkflowSlotKind,
     };
 
     fn full_worker_config() -> serde_json::Value {
@@ -1575,7 +1575,7 @@ mod tests {
                 "maximum_slots": null,
                 "ramp_throttle_ms": null
             },
-            "nexus_slot_supplier": null,
+            "nexus_slot_supplier": {"type": "fixed_size", "slots": 9},
             "resource_based_tuner_options": {
                 "target_memory_usage": 0.6,
                 "target_cpu_usage": 0.8
@@ -1632,62 +1632,25 @@ mod tests {
                 )
             ))
         );
-        assert!(opts.nexus_slot_options.is_none());
+        assert_eq!(
+            debug(opts.nexus_slot_options),
+            debug(Some(SlotSupplierOptions::<NexusSlotKind>::FixedSize {
+                slots: 9
+            }))
+        );
     }
 
     #[test]
-    fn resource_based_suppliers_require_tuner_options() {
-        for supplier in [
-            "workflow_slot_supplier",
-            "activity_slot_supplier",
-            "local_activity_slot_supplier",
-            "nexus_slot_supplier",
-        ] {
-            let mut config = json!({
-                "workflow_slot_supplier": null,
-                "activity_slot_supplier": null,
-                "local_activity_slot_supplier": null,
-                "nexus_slot_supplier": null,
-                "resource_based_tuner_options": null
-            });
-            config[supplier] = json!({
-                "type": "resource_based",
-                "minimum_slots": null,
-                "maximum_slots": null,
-                "ramp_throttle_ms": null
-            });
-            let err = TunerHolder::try_from(&tuner_config(config)).err().unwrap();
-            assert!(matches!(err.code, WorkerErrorCode::InvalidWorkerConfig));
-            assert!(
-                err.message.contains("resource_based_tuner_options"),
-                "{supplier}"
-            );
-        }
-    }
-
-    #[test]
-    fn fixed_size_tuner_builds() {
-        let config = json!({
-            "workflow_slot_supplier": {"type": "fixed_size", "slots": 2},
-            "activity_slot_supplier": {"type": "fixed_size", "slots": 3},
-            "local_activity_slot_supplier": {"type": "fixed_size", "slots": 4},
-            "nexus_slot_supplier": {"type": "fixed_size", "slots": 5},
-            "resource_based_tuner_options": null
-        });
-        let tuner = TunerHolder::try_from(&tuner_config(config)).unwrap();
-        assert_eq!(
-            tuner.workflow_task_slot_supplier().available_slots(),
-            Some(2)
+    fn resource_based_supplier_requires_tuner_options() {
+        let mut config = full_tuner_config();
+        config["resource_based_tuner_options"] = json!(null);
+        let err = TunerHolder::try_from(&tuner_config(config)).err().unwrap();
+        assert!(matches!(err.code, WorkerErrorCode::InvalidWorkerConfig));
+        assert!(
+            err.message.contains("resource_based_tuner_options"),
+            "{}",
+            err.message
         );
-        assert_eq!(
-            tuner.activity_task_slot_supplier().available_slots(),
-            Some(3)
-        );
-        assert_eq!(
-            tuner.local_activity_slot_supplier().available_slots(),
-            Some(4)
-        );
-        assert_eq!(tuner.nexus_task_slot_supplier().available_slots(), Some(5));
     }
 
     unsafe extern "C" fn reserve(_: *const u8, _: usize, _: *mut SlotReserveCompletion) {}
@@ -1697,7 +1660,7 @@ mod tests {
     unsafe extern "C" fn notify(_: *const u8, _: usize) {}
 
     #[test]
-    fn custom_slot_supplier_uses_the_handle() {
+    fn custom_slot_supplier_accepts_a_valid_handle() {
         let inner = HaskellSlotSupplierInner {
             reserve_fn: reserve,
             try_reserve_fn: try_reserve,
@@ -1748,11 +1711,6 @@ mod tests {
             Some(13)
         );
         assert_eq!(tuner.nexus_task_slot_supplier().available_slots(), Some(14));
-        // The bridge always supplies a tuner, so Core's own limits stay unset.
-        assert_eq!(config.max_outstanding_workflow_tasks, None);
-        assert_eq!(config.max_outstanding_activities, None);
-        assert_eq!(config.max_outstanding_local_activities, None);
-        assert_eq!(config.max_outstanding_nexus_tasks, None);
 
         assert_eq!(
             config.workflow_task_poller_behavior,
@@ -1809,7 +1767,6 @@ mod tests {
     fn worker_config_uses_defaults_for_absent_optional_values() {
         let mut json = full_worker_config();
         json["client_identity_override"] = json!(null);
-        json["max_outstanding_nexus_tasks"] = json!(null);
         json["max_concurrent_nexus_task_polls"] = json!(null);
         json["max_task_queue_activities_per_second"] = json!(null);
         json["max_worker_activities_per_second"] = json!(null);

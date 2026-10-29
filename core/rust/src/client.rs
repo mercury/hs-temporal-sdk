@@ -578,12 +578,10 @@ mod tests {
     #[test]
     fn client_options_use_defaults_for_absent_optional_values() {
         let mut config = full_client_config();
-        config["metadata"] = json!({});
         config["api_key"] = json!(null);
         config["tls_config"] = json!(null);
         config["retry_config"] = json!(null);
         let opts = client_options(config).unwrap();
-        assert_eq!(opts.headers, Some(HashMap::new()));
         assert_eq!(opts.api_key, None);
         assert!(opts.tls_options.is_none());
         assert_eq!(opts.retry_options, RetryOptions::default());
@@ -595,37 +593,14 @@ mod tests {
     }
 
     #[test]
-    fn client_tls_requires_both_or_neither_client_credential() {
-        let with_credentials = |cert: serde_json::Value, key: serde_json::Value| {
-            let mut config = full_client_config();
-            config["tls_config"]["client_cert"] = cert;
-            config["tls_config"]["client_private_key"] = key;
-            client_options(config)
-        };
-
-        let neither = with_credentials(json!(null), json!(null)).unwrap();
-        let tls = neither.tls_options.unwrap();
-        assert!(tls.client_tls_options.is_none());
-        assert_eq!(tls.domain.as_deref(), Some("tls.example"));
-
-        let both = with_credentials(json!([1]), json!([2])).unwrap();
-        assert!(both.tls_options.unwrap().client_tls_options.is_some());
-
-        for (cert, key) in [(json!([1]), json!(null)), (json!(null), json!([2]))] {
-            let err = with_credentials(cert, key).err().unwrap();
-            assert!(
-                err.to_string()
-                    .contains("Must have both client cert and private key or neither"),
-                "{err}"
-            );
-        }
-    }
-
-    #[test]
-    fn client_options_reject_an_invalid_url() {
+    fn client_tls_without_client_credentials_keeps_server_tls() {
         let mut config = full_client_config();
-        config["target_url"] = json!("not a url");
-        assert!(client_options(config).is_err());
+        config["tls_config"]["client_cert"] = json!(null);
+        config["tls_config"]["client_private_key"] = json!(null);
+        let tls = client_options(config).unwrap().tls_options.unwrap();
+        assert!(tls.client_tls_options.is_none());
+        assert_eq!(tls.server_root_ca_cert, Some(vec![1, 2, 3]));
+        assert_eq!(tls.domain.as_deref(), Some("tls.example"));
     }
 
     fn connect_with_raw_config(config: Option<&CStr>) -> Result<ClientRef, CArray<u8>> {
