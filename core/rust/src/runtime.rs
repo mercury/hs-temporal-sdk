@@ -612,9 +612,9 @@ mod tests {
 
     #[test]
     fn init_runtime_returns_an_error_for_invalid_options() {
-        let (runtime, error) = init_runtime_from_json(br#"{"tag":"NoTelemetry","x":1}"#);
+        let (runtime, error) = init_runtime_from_json(br#"{"tag":"Unknown"}"#);
         assert!(runtime.is_null());
-        assert!(error.unwrap().contains("unknown field"));
+        assert!(error.unwrap().starts_with("Invalid telemetry options"));
 
         let (runtime, error) = init_runtime_from_json(
             br#"{"tag":"OtelTelemetryOptions","url":"not a url","headers":{},

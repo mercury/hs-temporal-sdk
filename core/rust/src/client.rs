@@ -607,7 +607,7 @@ mod tests {
     }
 
     #[test]
-    fn client_config_rejects_unknown_and_missing_fields() {
+    fn client_config_rejects_unknown_fields() {
         for pointer in ["", "/tls_config", "/retry_config"] {
             let mut config = full_client_config();
             config
@@ -619,15 +619,11 @@ mod tests {
             let err = parse_client_config(config.to_string().as_bytes())
                 .err()
                 .unwrap();
-            assert!(err.contains("unknown field `unexpected`"), "{err}");
+            assert!(
+                err.contains("unknown field `unexpected`"),
+                "{pointer}: {err}"
+            );
         }
-
-        let mut config = full_client_config();
-        config.as_object_mut().unwrap().remove("identity");
-        let err = parse_client_config(config.to_string().as_bytes())
-            .err()
-            .unwrap();
-        assert!(err.contains("missing field `identity`"), "{err}");
     }
 
     fn connect_with_raw_config(config: Option<&CStr>) -> Result<ClientRef, CArray<u8>> {

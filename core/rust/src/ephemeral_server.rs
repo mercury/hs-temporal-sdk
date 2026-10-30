@@ -276,39 +276,44 @@ mod tests {
     }
 
     #[test]
-    fn server_configs_reject_unknown_fields() {
-        // Before this check existed, Haskell sent `ttl` next to `contents`
-        // and the bridge silently ignored it.
-        let mut misplaced_ttl = full_dev_server_config();
-        misplaced_ttl["exe"]["ttl"] = json!(60);
-        let mut extra_in_download = full_dev_server_config();
-        extra_in_download["exe"]["contents"]["extra"] = json!(1);
-        let mut extra_in_version = full_dev_server_config();
-        extra_in_version["exe"]["contents"]["version"]["contents"]["extra"] = json!(1);
-        let mut extra_top_level = full_dev_server_config();
-        extra_top_level["extra"] = json!(1);
-        for config in [
-            misplaced_ttl,
-            extra_in_download,
-            extra_in_version,
-            extra_top_level,
+    fn dev_server_config_rejects_unknown_fields() {
+        let valid = full_dev_server_config();
+        assert!(parse_dev_server_config(valid.to_string().as_bytes()).is_ok());
+
+        let mut ttl_next_to_contents = valid.clone();
+        ttl_next_to_contents["exe"]["ttl"] = json!({"secs": 60, "nanos": 0});
+        let mut extra_in_download = valid.clone();
+        extra_in_download["exe"]["contents"]["unexpected"] = json!(1);
+        let mut extra_in_version = valid.clone();
+        extra_in_version["exe"]["contents"]["version"]["contents"]["unexpected"] = json!(1);
+        let mut extra_top_level = valid;
+        extra_top_level["unexpected"] = json!(1);
+        for (config, expected) in [
+            (ttl_next_to_contents, r#"invalid value: string "ttl""#),
+            (extra_in_download, "unknown field `unexpected`"),
+            (extra_in_version, "unknown field `unexpected`"),
+            (extra_top_level, "unknown field `unexpected`"),
         ] {
             let err = parse_dev_server_config(config.to_string().as_bytes())
                 .err()
-                .unwrap();
-            // Adjacently tagged enums report an unknown key as an invalid tag.
-            assert!(
-                err.contains("unknown field") || err.contains(r#"expected "type" or "contents""#),
-                "{err}"
-            );
+                .unwrap_or_else(|| panic!("accepted {config}"));
+            assert!(err.contains(expected), "{err}");
         }
+    }
 
-        let err = parse_test_server_config(
-            br#"{"exe":{"type":"ExistingPath","contents":"x"},"port":null,"extra_args":[],"x":1}"#,
-        )
-        .err()
-        .unwrap();
-        assert!(err.contains("unknown field"), "{err}");
+    #[test]
+    fn test_server_config_rejects_unknown_fields() {
+        let mut config = json!({
+            "exe": {"type": "ExistingPath", "contents": "/bin/server"},
+            "port": null,
+            "extra_args": []
+        });
+        assert!(parse_test_server_config(config.to_string().as_bytes()).is_ok());
+        config["unexpected"] = json!(1);
+        let err = parse_test_server_config(config.to_string().as_bytes())
+            .err()
+            .unwrap();
+        assert!(err.contains("unknown field `unexpected`"), "{err}");
     }
 
     type StartServer = unsafe extern "C" fn(
