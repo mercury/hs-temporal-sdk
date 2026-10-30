@@ -19,6 +19,7 @@ module IntegrationSpec where
 
 import Common
 import Control.Concurrent
+import Control.Concurrent.MVar.Extra
 import Control.Exception
 import Control.Exception.Annotated
 import qualified Control.Exception.Annotated as Annotated
@@ -28,7 +29,6 @@ import Control.Monad.Logger
 import Control.Monad.Reader
 import Data.Aeson (FromJSON, ToJSON, Value (..), toJSON)
 import qualified Data.Aeson as Aeson
-import qualified Data.ByteString as BS
 import Data.Either (isLeft, isRight)
 import Data.Foldable (traverse_)
 import Data.Functor
@@ -41,8 +41,6 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Time (Day (ModifiedJulianDay), diffUTCTime, getCurrentTime)
 import Data.Time.Clock (UTCTime)
-import qualified Data.UUID as UUID
-import qualified Data.UUID.V4 as UUID
 import Data.Vector (Vector)
 import qualified Data.Vector as V
 import DiscoverInstances (discoverInstances)
@@ -50,10 +48,12 @@ import GHC.Generics
 import GHC.Stack (SrcLoc (..), callStack, fromCallSiteList)
 import IntegrationSpec.HangingWorkflow
 import IntegrationSpec.NoOpWorkflow
+import qualified IntegrationSpec.PayloadProcessing as PayloadProcessing
 import IntegrationSpec.Signals
 import IntegrationSpec.TimeSkipping
 import IntegrationSpec.TimeoutsInWorkflows
 import IntegrationSpec.Updates
+import qualified IntegrationSpec.WorkflowFinalization as WorkflowFinalization
 import Lens.Family2
 import OpenTelemetry.Processor.Span
 import OpenTelemetry.Trace
@@ -62,9 +62,6 @@ import OpenTelemetry.Trace.Id.Generator.Default (defaultIdGenerator)
 import qualified Proto.Temporal.Api.Failure.V1.Message_Fields as Failure
 import qualified Proto.Temporal.Api.History.V1.Message_Fields as History
 import RequireCallStack
-import System.Directory
-import System.Environment (lookupEnv)
-import System.IO
 import System.Timeout (timeout)
 import Temporal.Activity hiding (activityId, retryPolicy, workflowId)
 import Temporal.Bundle
@@ -72,14 +69,9 @@ import Temporal.Bundle.TH
 import qualified Temporal.Client as C
 import qualified Temporal.Client.TestService
 import Temporal.Contrib.OpenTelemetry
-import Temporal.Core.Client hiding (RpcError)
 import Temporal.Duration
-import Temporal.EphemeralServer
-import qualified Temporal.EphemeralServer as TemporalDevServerConfig (TemporalDevServerConfig (..))
-import qualified Temporal.EphemeralServer as TemporalTestServerConfig (TemporalTestServerConfig (..))
 import Temporal.Exception hiding (activityId)
 import Temporal.Interceptor
-import Temporal.Operator (IndexedValueType (..), SearchAttributes (..), addSearchAttributes, listSearchAttributes)
 import Temporal.Payload hiding (around)
 import Temporal.SearchAttributes
 import Temporal.TH (ActivityFn, WorkflowFn, discoverDefinitions)
@@ -92,7 +84,20 @@ import Temporal.Workflow (
 import qualified Temporal.Workflow as W
 import Temporal.Workflow.Unsafe (performUnsafeNonDeterministicIO)
 import Test.Hspec
-import TestHelpers (waitForWorkflowStart)
+import TestHelpers (
+  MyWorkflow,
+  PortNumber,
+  TestEnv (..),
+  defaultCodec,
+  setup,
+  setupTimeSkipping,
+  sillyEncryptionPayloadProcessor,
+  uuidText,
+  waitForWorkflowStart,
+  withInterceptors,
+  withServer,
+  withTimeSkippingServer,
+ )
 
 
 temporalBundle
@@ -160,78 +165,6 @@ instance ToApplicationFailure AnApplicationFailure where
       (Just $ seconds 1)
 
 
-configWithRetry :: PortNumber -> ClientConfig
-configWithRetry pn =
-  defaultClientConfig
-    { targetUrl = "http://localhost:" <> Text.pack (show pn)
-    , retryConfig =
-        Just $
-          ClientRetryConfig
-            { initialIntervalMillis = 500
-            , randomizationFactor = 0.2
-            , multiplier = 1.5
-            , maxIntervalMillis = 10_000
-            , maxRetries = 15
-            , maxElapsedTimeMillis = Just 60_000
-            }
-            -- , targetUrl = pack ("http://localhost:" <> show pn)
-    }
-
-
-mkWithWorker :: PortNumber -> WorkerConfig actEnv -> IO a -> IO a
-mkWithWorker pn conf m = do
-  let clientConfig_ = configWithRetry pn
-  c <- runStdoutLoggingT $ connectClient globalRuntime clientConfig_
-  bracket (startWorker c (conf {payloadProcessor = sillyEncryptionPayloadProcessor})) shutdown (const m)
-
-
--- Increment the bytestring words by 1 on encode, and decrement by 1 on decode
---
--- This is used to test that the payload processor is working correctly
-sillyEncryptionPayloadProcessor :: PayloadProcessor
-sillyEncryptionPayloadProcessor = PayloadProcessor incr decr
-  where
-    incr (Payload data_ meta) = pure $ Payload (BS.map (+ 1) data_) meta
-    decr (Payload data_ meta) = pure $ Right $ Payload (BS.map (\x -> x - 1) data_) meta
-
-
-makeClient :: PortNumber -> Interceptors env -> IO (C.WorkflowClient, Client)
-makeClient pn interceptors = makeClient' pn interceptors False
-
-
-makeTimeSkippingClient :: PortNumber -> Interceptors env -> IO (C.WorkflowClient, Client)
-makeTimeSkippingClient pn interceptors = makeClient' pn interceptors True
-
-
-makeClient' :: PortNumber -> Interceptors env -> Bool -> IO (C.WorkflowClient, Client)
-makeClient' pn Interceptors {..} enableTimeSkipping = do
-  let conf = configWithRetry pn
-  c <- runStdoutLoggingT $ connectClient globalRuntime conf
-  (,)
-    <$> C.workflowClient
-      c
-      ( C.WorkflowClientConfig
-          { namespace = "default"
-          , interceptors = clientInterceptors
-          , payloadProcessor = sillyEncryptionPayloadProcessor
-          , enableTimeSkipping
-          }
-      )
-    <*> pure c
-
-
-uuidText :: IO Text
-uuidText = UUID.toText <$> UUID.nextRandom
-
-
-data TestEnv = TestEnv
-  { useClient :: forall a. ReaderT C.WorkflowClient IO a -> IO a
-  , baseConf :: ConfigM () ()
-  , taskQueue :: W.TaskQueue
-  , withWorker :: forall a. WorkerConfig () -> IO a -> IO a
-  }
-
-
 data TemporalWorkflowJobPayload = TemporalWorkflowJobPayload
   { workflowId :: W.WorkflowId
   , workflowType :: W.WorkflowType
@@ -249,85 +182,6 @@ instance ToJSON TemporalWorkflowJobPayload
 
 
 instance FromJSON TemporalWorkflowJobPayload
-
-
-withServer :: (PortNumber -> IO a) -> IO a
-withServer f = do
-  lookupEnv "HS_TEMPORAL_SDK_LOCAL_TEST_SERVER" >>= \case
-    Just _ -> f 7233
-    _ -> do
-      fp <- getFreePort
-      mTemporalPath <- findExecutable "temporal"
-      conf <- case mTemporalPath of
-        Nothing -> error "Could not find the 'temporal' executable in PATH"
-        Just temporalPath -> do
-          let serverConfig =
-                defaultTemporalDevServerConfig
-                  { TemporalDevServerConfig.port = Just $ fromIntegral fp
-                  , TemporalDevServerConfig.exe = ExistingPath temporalPath
-                  }
-          pure serverConfig
-      withDevServer globalRuntime conf $ \_ -> do
-        f fp
-
-
-withTimeSkippingServer :: (PortNumber -> IO a) -> IO a
-withTimeSkippingServer f = do
-  lookupEnv "HS_TEMPORAL_SDK_LOCAL_TIME_SKIPPING_TEST_SERVER" >>= \case
-    Just _ -> f 7234
-    _ -> do
-      fp <- getFreePort
-      mTemporalPath <- findExecutable "temporal-test-server"
-      conf <- case mTemporalPath of
-        Nothing -> error "Could not find the 'temporal-test-server' (time-skipping) executable in PATH"
-        Just temporalPath -> do
-          pure
-            TemporalTestServerConfig
-              { TemporalTestServerConfig.exe = ExistingPath temporalPath
-              , TemporalTestServerConfig.port = Just $ fromIntegral fp
-              , TemporalTestServerConfig.extraArgs = []
-              }
-      withTestServer globalRuntime conf $ \_ -> do
-        f fp
-
-
-setup :: Interceptors () -> PortNumber -> (TestEnv -> IO ()) -> IO ()
-setup additionalInterceptors fp go = do
-  otelInterceptors <- makeOpenTelemetryInterceptor
-  let interceptors = otelInterceptors <> additionalInterceptors
-  (client, coreClient) <- makeClient fp interceptors
-
-  SearchAttributes {customAttributes} <- either throwIO pure =<< listSearchAttributes coreClient (W.Namespace "default")
-  let allTestAttributes =
-        Map.fromList
-          [ ("attr1", Temporal.Operator.Bool)
-          , ("attr2", Temporal.Operator.Int)
-          ]
-  _ <- addSearchAttributes coreClient (W.Namespace "default") (allTestAttributes `Map.difference` customAttributes)
-
-  (conf, taskQueue) <- mkBaseConf interceptors
-  go
-    TestEnv
-      { useClient = flip runReaderT client
-      , withWorker = mkWithWorker fp
-      , baseConf = conf
-      , taskQueue
-      }
-
-
-setupTimeSkipping :: Interceptors () -> PortNumber -> (TestEnv -> IO ()) -> IO ()
-setupTimeSkipping additionalInterceptors fp go = do
-  otelInterceptors <- makeOpenTelemetryInterceptor
-  let interceptors = otelInterceptors <> additionalInterceptors
-  (client, _) <- makeTimeSkippingClient fp interceptors
-  (conf, taskQueue) <- mkBaseConf interceptors
-  go
-    TestEnv
-      { useClient = flip runReaderT client
-      , withWorker = mkWithWorker fp
-      , baseConf = conf
-      , taskQueue
-      }
 
 
 spec :: Spec
@@ -428,8 +282,7 @@ spec = do
     aroundAllWith (flip $ setup mempty) needsClient
     aroundAllWith (flip $ setup mempty) terminateTests
     updatesWithInterceptors
-    workflowFinalizationWithEscapedInterceptor
-    workflowFinalizationOnCompletion
+    WorkflowFinalization.spec
     openTelemetryWorkflowFinalization
 
   -- Whether time-skipping is enabled is global state in the test server (it's not tracked
@@ -437,13 +290,6 @@ spec = do
   -- distinct server for each test
   around withTimeSkippingServer $ do
     aroundWith (flip $ setupTimeSkipping mempty) needsTimeSkipping
-
-
-type MyWorkflow a = W.RequireCallStack => W.Workflow a
-
-
-defaultCodec :: JSON
-defaultCodec = JSON
 
 
 data RegressionTask = Foo | Bar
@@ -596,80 +442,6 @@ testConf :: Definitions ()
 testConf = collectTemporalDefinitions testDefs
 
 
-mkBaseConf :: Interceptors () -> IO (ConfigM () (), W.TaskQueue)
-mkBaseConf interceptors = do
-  taskQueue <- W.TaskQueue <$> uuidText
-  pure
-    ( do
-        setNamespace $ W.Namespace "default"
-        setTaskQueue taskQueue
-        addInterceptors interceptors
-        setLogger $ defaultOutput stdout
-    , taskQueue
-    )
-
-
-workflowFinalizationWithEscapedInterceptor :: SpecWith PortNumber
-workflowFinalizationWithEscapedInterceptor = do
-  finalizations <- runIO $ newIORef []
-  finalized <- runIO newEmptyMVar
-  let interceptor =
-        mempty
-          { workflowInboundInterceptors =
-              mempty
-                { executeWorkflow = \_input _next -> throwIO SampleException
-                , finalizeWorkflow = \_ result -> do
-                    modifyIORef' finalizations (result :)
-                    _ <- tryPutMVar finalized result
-                    pure ()
-                }
-          }
-  aroundAllWith (flip $ setup interceptor) do
-    describe "Workflow finalization" do
-      specify "publishes an escaped inbound interceptor exception exactly once" $ \TestEnv {..} -> do
-        let conf = configure () testConf baseConf
-        withWorker conf do
-          _ <- useClient $ C.start testRefs.shouldRunWorkflowTest "escaped-interceptor" (C.startWorkflowOptions taskQueue)
-          result <- timeout 5_000_000 (takeMVar finalized)
-          case result of
-            Just (Just (WorkflowExitFailed _)) -> pure ()
-            _ -> expectationFailure "expected the finalizer to receive the escaped interceptor failure"
-
-        results <- reverse <$> readIORef finalizations
-        case results of
-          [Just (WorkflowExitFailed _)] -> pure ()
-          _ -> expectationFailure "expected eviction to leave the completed finalization unchanged"
-
-
-workflowFinalizationOnCompletion :: SpecWith PortNumber
-workflowFinalizationOnCompletion = do
-  finalizations <- runIO $ newIORef []
-  let interceptor =
-        mempty
-          { workflowInboundInterceptors =
-              mempty
-                { finalizeWorkflow = \_ result ->
-                    modifyIORef' finalizations (result :)
-                }
-          }
-  aroundAllWith (flip $ setup interceptor) do
-    describe "Workflow finalization" do
-      specify "finalizes every continued run before publishing its completion" $ \TestEnv {..} -> do
-        let conf = configure () testConf baseConf
-            startOptions =
-              (C.startWorkflowOptions taskQueue)
-                { C.workflowIdReusePolicy = Just W.WorkflowIdReusePolicyAllowDuplicate
-                }
-        withWorker conf do
-          useClient (C.execute testRefs.continueAsNewWorks "finalize-continued-runs" startOptions 0)
-            `shouldReturn` "woohoo"
-
-          results <- reverse <$> readIORef finalizations
-          case results of
-            [Just (WorkflowExitContinuedAsNew _), Just (WorkflowExitSuccess _)] -> pure ()
-            _ -> expectationFailure "expected continued and successful runs to finalize before completion"
-
-
 openTelemetryWorkflowFinalization :: SpecWith PortNumber
 openTelemetryWorkflowFinalization = do
   emittedSpans <- runIO $ newIORef []
@@ -715,7 +487,7 @@ openTelemetryWorkflowFinalization = do
     describe "OpenTelemetry workflow finalization" do
       specify "finalizes RunWorkflow before publishing an activity workflow result" $ \TestEnv {..} -> do
         writeIORef emittedSpans []
-        workflowResult <- newEmptyMVar
+        workflowResult <- newBarrier
         let conf = configure () testConf baseConf
             startOptions =
               (C.startWorkflowOptions taskQueue)
@@ -726,7 +498,7 @@ openTelemetryWorkflowFinalization = do
             result <-
               Control.Exception.try @SomeException $
                 useClient (C.execute testRefs.basicActivityWf "otel-activity-finalization" startOptions)
-            putMVar workflowResult result
+            signalBarrier workflowResult result
 
           finalizerDidStart <- timeout 5_000_000 (takeMVar finalizerStarted)
           case finalizerDidStart of
@@ -734,14 +506,14 @@ openTelemetryWorkflowFinalization = do
               putMVar allowFinalizer ()
               expectationFailure "workflow finalizer did not start"
             Just () -> pure ()
-          prematureResult <- timeout 1_000_000 (takeMVar workflowResult)
+          prematureResult <- timeout 1_000_000 (waitBarrier workflowResult)
           putMVar allowFinalizer ()
           case prematureResult of
             Just result ->
               expectationFailure $
                 "workflow result was observable before RunWorkflow finalization: " <> show result
             Nothing -> do
-              completedResult <- timeout 5_000_000 (takeMVar workflowResult)
+              completedResult <- timeout 5_000_000 (waitBarrier workflowResult)
               case completedResult of
                 Just (Right 1) -> pure ()
                 _ -> expectationFailure $ "expected successful workflow result, got: " <> show completedResult
@@ -769,6 +541,7 @@ openTelemetryWorkflowFinalization = do
 
 needsClient :: SpecWith TestEnv
 needsClient = do
+  PayloadProcessing.spec
   describe "Workflow" $ do
     specify "should run a workflow" $ \TestEnv {..} -> do
       let conf = configure () testConf $ do
@@ -786,38 +559,6 @@ needsClient = do
                 }
         useClient (C.execute testRefs.shouldRunWorkflowTest "basicWf" opts)
           `shouldReturn` ()
-
-    specify "retries a resumed activation that exceeds the deadlock timeout" $ \TestEnv {..} -> do
-      evaluationAttempts <- newIORef (0 :: Int)
-      firstEvaluationEntered <- newEmptyMVar
-      let workflow = provideCallStack do
-            W.sleep $ milliseconds 1
-            performUnsafeNonDeterministicIO do
-              attempt <- atomicModifyIORef' evaluationAttempts $ \n ->
-                let next = n + 1
-                in (next, next)
-              when (attempt == 1) do
-                putMVar firstEvaluationEntered ()
-                threadDelay 250_000
-          wf = W.provideWorkflow defaultCodec "workflow-activation-deadlock-retry" workflow
-          conf =
-            (configure () wf baseConf)
-              { deadlockTimeout = Just 100_000
-              }
-          startOptions =
-            (C.startWorkflowOptions taskQueue)
-              { C.timeouts =
-                  C.TimeoutOptions
-                    { C.runTimeout = Just $ seconds 10
-                    , C.executionTimeout = Nothing
-                    , C.taskTimeout = Nothing
-                    }
-              }
-      withWorker conf do
-        workflowHandle <- useClient $ C.start wf.reference "workflow-activation-deadlock-retry" startOptions
-        timeout 5_000_000 (takeMVar firstEvaluationEntered) `shouldReturn` Just ()
-        timeout 5_000_000 (useClient $ C.waitWorkflowResult workflowHandle) `shouldReturn` Just ()
-        readIORef evaluationAttempts `shouldReturn` 2
 
     describe "Workflow existence assertions" $ do
       specify "checkWorkflowExecutionExists returns correct values" $ \TestEnv {..} -> do
@@ -1443,7 +1184,7 @@ needsClient = do
         -- Start workflow in one worker, then shut down while activity is running.
         -- The workflow should still complete because the activity finishes before
         -- the shutdown grace period expires.
-        resultVar <- newEmptyMVar
+        resultVar <- newBarrier
         withWorker conf $ do
           let opts =
                 (C.startWorkflowOptions taskQueue)
@@ -1457,13 +1198,13 @@ needsClient = do
                   }
           _ <- forkIO $ do
             res <- useClient (C.execute wf.reference "workerShutdownLA" opts)
-            putMVar resultVar res
+            signalBarrier resultVar res
           -- Wait until the activity has started executing
           takeMVar activityStarted
           -- Allow the activity to finish
           putMVar activityCanFinish ()
           -- Wait for the workflow result before the bracket-based shutdown
-          res <- takeMVar resultVar
+          res <- waitBarrier resultVar
           res `shouldBe` "completed-during-shutdown"
 
       specify "local activity replay works" $ \TestEnv {..} -> do
@@ -3235,10 +2976,6 @@ updatesWithInterceptors = do
             pure (updateResult, workflowResult)
           updateResult `shouldBe` 24
           workflowResult `shouldBe` 24
-
-
-withInterceptors :: Interceptors () -> SpecWith TestEnv -> SpecWith PortNumber
-withInterceptors interceptors = aroundAllWith $ flip $ setup interceptors
 
 
 terminateTests :: SpecWith TestEnv

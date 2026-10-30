@@ -105,6 +105,7 @@ library:
   - Temporal.Activity.Types
   - Temporal.Workflow.Unsafe.Handle
   - Temporal.Workflow.Internal.Instance
+  - Temporal.Workflow.Internal.Payload
   - Temporal.Workflow.Internal.Monad
   - Temporal.Workflow.Signal
   - Temporal.Workflow.Query
@@ -158,12 +159,15 @@ tests:
       IntegrationSpec,
       IntegrationSpec.HangingWorkflow,
       IntegrationSpec.NoOpWorkflow,
+      IntegrationSpec.PayloadProcessing,
+      IntegrationSpec.WorkflowFinalization,
       IntegrationSpec.TimeoutsInWorkflows,
       IntegrationSpec.Updates,
       LocalActivitySpec,
       MockActivityEnvironmentSpec,
       IntegrationSpec.TimeSkipping,
       Common,
+      Control.Concurrent.MVar.Extra,
       RegisterWorkflowsSpec,
       ReplaySpec,
       ScheduleSpec,

@@ -101,44 +101,67 @@ fn init_runtime(
     }))
 }
 
-fn build_core_meter(options: HsTelemetryOptions) -> Result<Arc<dyn CoreMeter>, String> {
-    match options {
-        HsTelemetryOptions::NoTelemetry {} => Ok(Arc::new(NoOpCoreMeter)),
-        HsTelemetryOptions::OtelTelemetryOptions {
-            url,
-            headers,
-            metric_periodicity,
-            global_tags,
-        } => {
-            let url = url
-                .parse()
-                .map_err(|err| format!("Invalid OpenTelemetry collector URL {url:?}: {err}"))?;
-            let meter = build_otlp_metric_exporter(
-                OtelCollectorOptions::builder()
-                    .url(url)
-                    .metric_periodicity(metric_periodicity.unwrap_or_else(|| Duration::new(1, 0)))
-                    .headers(headers)
-                    .global_tags(global_tags)
-                    .build(),
-            )
-            .map_err(|err| format!("Failed to build the OpenTelemetry metric exporter: {err:#}"))?;
-            Ok(Arc::new(meter))
-        }
-        HsTelemetryOptions::PrometheusTelemetryOptions {
-            socket_addr,
-            global_tags,
-            counters_total_suffix,
-            unit_suffix,
-        } => {
-            let srv = start_prometheus_metric_exporter(
+enum MeterOptions {
+    NoOp,
+    Otel(OtelCollectorOptions),
+    Prometheus(PrometheusExporterOptions),
+}
+
+impl TryFrom<HsTelemetryOptions> for MeterOptions {
+    type Error = String;
+
+    fn try_from(options: HsTelemetryOptions) -> Result<Self, String> {
+        match options {
+            HsTelemetryOptions::NoTelemetry {} => Ok(MeterOptions::NoOp),
+            HsTelemetryOptions::OtelTelemetryOptions {
+                url,
+                headers,
+                metric_periodicity,
+                global_tags,
+            } => {
+                let url = url
+                    .parse()
+                    .map_err(|err| format!("Invalid OpenTelemetry collector URL {url:?}: {err}"))?;
+                Ok(MeterOptions::Otel(
+                    OtelCollectorOptions::builder()
+                        .url(url)
+                        .metric_periodicity(
+                            metric_periodicity.unwrap_or_else(|| Duration::new(1, 0)),
+                        )
+                        .headers(headers)
+                        .global_tags(global_tags)
+                        .build(),
+                ))
+            }
+            HsTelemetryOptions::PrometheusTelemetryOptions {
+                socket_addr,
+                global_tags,
+                counters_total_suffix,
+                unit_suffix,
+            } => Ok(MeterOptions::Prometheus(
                 PrometheusExporterOptions::builder()
                     .socket_addr(socket_addr)
                     .unit_suffix(unit_suffix)
                     .global_tags(global_tags)
                     .counters_total_suffix(counters_total_suffix)
                     .build(),
-            )
-            .map_err(|err| {
+            )),
+        }
+    }
+}
+
+fn build_core_meter(options: HsTelemetryOptions) -> Result<Arc<dyn CoreMeter>, String> {
+    match MeterOptions::try_from(options)? {
+        MeterOptions::NoOp => Ok(Arc::new(NoOpCoreMeter)),
+        MeterOptions::Otel(options) => {
+            let meter = build_otlp_metric_exporter(options).map_err(|err| {
+                format!("Failed to build the OpenTelemetry metric exporter: {err:#}")
+            })?;
+            Ok(Arc::new(meter))
+        }
+        MeterOptions::Prometheus(options) => {
+            let socket_addr = options.socket_addr;
+            let srv = start_prometheus_metric_exporter(options).map_err(|err| {
                 format!("Failed to start the Prometheus exporter on {socket_addr}: {err:#}")
             })?;
             Ok(srv.meter)
@@ -146,13 +169,10 @@ fn build_core_meter(options: HsTelemetryOptions) -> Result<Arc<dyn CoreMeter>, S
     }
 }
 
-/// Parse the telemetry options sent by `Temporal.Runtime.initializeRuntime`.
 pub(crate) fn parse_telemetry_options(json: &[u8]) -> Result<HsTelemetryOptions, String> {
     serde_json::from_slice(json).map_err(|err| format!("Invalid telemetry options: {err}"))
 }
 
-/// Copy a byte array owned by Haskell.
-///
 /// # Safety
 ///
 /// `array` must be null or point to a live `CArray<u8>` whose `data_ptr` is valid
@@ -171,21 +191,16 @@ pub(crate) unsafe fn copy_byte_array(
         .map_err(|err| format!("Failed to read {description}: {err}"))
 }
 
-/// Move `bytes` into a byte array that Haskell frees with `hs_temporal_drop_byte_array`.
 pub(crate) fn byte_array(bytes: Vec<u8>) -> CArray<u8> {
-    // Converting a `Vec<u8>` only boxes it, so this cannot fail.
     CArray::c_repr_of(bytes).expect("byte arrays have a C representation")
 }
 
-/// Build the byte-array error value used by bridge calls that report a message.
 pub(crate) fn error_bytes(message: impl Into<String>) -> CArray<u8> {
     byte_array(message.into().into_bytes())
 }
 
-/// Make `message` safe to convert into a NUL-terminated C string.
-///
 /// Error messages can quote caller or server data. An interior NUL byte would
-/// make the C string conversion fail, so replace it.
+/// make the C string conversion fail.
 pub(crate) fn c_string_safe(message: String) -> String {
     if message.contains('\0') {
         message.replace('\0', "\u{FFFD}")
@@ -194,8 +209,6 @@ pub(crate) fn c_string_safe(message: String) -> String {
     }
 }
 
-/// Store `message` in a nullable error out-parameter.
-///
 /// # Safety
 ///
 /// `slot` must be null or valid for writes.
@@ -230,9 +243,8 @@ pub enum HsTelemetryOptions {
 ///
 /// Haskell FFI bridge invariants.
 ///
-/// Returns null on failure and stores a UTF-8 message in `*error_slot`, which
-/// the caller frees with `hs_temporal_drop_byte_array`. On success,
-/// `*error_slot` is set to null.
+/// Returns null on failure and stores an error message in `*error_slot`, which
+/// the caller frees with `hs_temporal_drop_byte_array`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn hs_temporal_init_runtime(
     telemetry_opts: *const CArray<u8>,
@@ -388,6 +400,26 @@ impl Runtime {
             }
         });
     }
+
+    /// Like [`Runtime::future_result_into_hs`], but `fut` fails with the Rust
+    /// error type. The error is converted into the C error type `E` when the
+    /// task finishes.
+    pub(crate) fn spawn_reporting<F, T, E>(&self, callback: HsCallback<T, E>, fut: F)
+    where
+        F: Future<Output = Result<T, E::Rust>> + Send + 'static,
+        T: RawPointerConverter<T> + 'static,
+        E: CError,
+    {
+        self.future_result_into_hs(callback, async move { fut.await.map_err(Into::into) })
+    }
+}
+
+/// A C error type that a bridge call builds from a Rust error.
+///
+/// The callback fixes the C error type, so `Rust` also tells the compiler
+/// which error type `?` converts to in a [`Runtime::spawn_reporting`] future.
+pub(crate) trait CError: RawPointerConverter<Self> + 'static {
+    type Rust: Into<Self>;
 }
 
 #[cfg(test)]
@@ -462,51 +494,58 @@ mod tests {
         assert_eq!(core_weak.strong_count(), 0);
     }
 
-    #[test]
-    fn telemetry_options_parse_every_variant() {
-        let otel = parse_telemetry_options(
-            br#"{"tag":"OtelTelemetryOptions","url":"http://collector:4317",
-                 "headers":{"h":"v"},"metric_periodicity":{"secs":3,"nanos":4},
-                 "global_tags":{"t":"g"}}"#,
-        )
-        .unwrap();
-        let HsTelemetryOptions::OtelTelemetryOptions {
-            url,
-            headers,
+    fn otel_options(metric_periodicity: Option<Duration>) -> OtelCollectorOptions {
+        let options = HsTelemetryOptions::OtelTelemetryOptions {
+            url: "http://collector:4317".into(),
+            headers: HashMap::from([("h".into(), "v".into())]),
             metric_periodicity,
-            global_tags,
-        } = otel
-        else {
-            panic!("expected OtelTelemetryOptions");
+            global_tags: HashMap::from([("t".into(), "g".into())]),
         };
-        assert_eq!(url, "http://collector:4317");
-        assert_eq!(headers, HashMap::from([("h".into(), "v".into())]));
-        assert_eq!(metric_periodicity, Some(Duration::new(3, 4)));
-        assert_eq!(global_tags, HashMap::from([("t".into(), "g".into())]));
+        let MeterOptions::Otel(options) = MeterOptions::try_from(options).unwrap() else {
+            panic!("expected OpenTelemetry options");
+        };
+        options
+    }
 
-        let prometheus = parse_telemetry_options(
-            br#"{"tag":"PrometheusTelemetryOptions","socket_addr":"127.0.0.1:9464",
-                 "global_tags":{"t":"g"},"counters_total_suffix":true,"unit_suffix":true}"#,
-        )
-        .unwrap();
-        let HsTelemetryOptions::PrometheusTelemetryOptions {
+    #[test]
+    fn otel_options_receive_every_field() {
+        let options = otel_options(Some(Duration::new(3, 4)));
+        assert_eq!(options.url.as_str(), "http://collector:4317/");
+        assert_eq!(options.headers, HashMap::from([("h".into(), "v".into())]));
+        assert_eq!(options.metric_periodicity, Duration::new(3, 4));
+        assert_eq!(
+            options.global_tags,
+            HashMap::from([("t".into(), "g".into())])
+        );
+    }
+
+    #[test]
+    fn otel_options_default_to_a_one_second_periodicity() {
+        assert_eq!(
+            otel_options(None).metric_periodicity,
+            Duration::from_secs(1)
+        );
+    }
+
+    #[test]
+    fn prometheus_options_receive_every_field() {
+        let socket_addr = SocketAddr::from(([127, 0, 0, 1], 9464));
+        let options = HsTelemetryOptions::PrometheusTelemetryOptions {
             socket_addr,
-            global_tags,
-            counters_total_suffix,
-            unit_suffix,
-        } = prometheus
-        else {
-            panic!("expected PrometheusTelemetryOptions");
+            global_tags: HashMap::from([("t".into(), "g".into())]),
+            counters_total_suffix: true,
+            unit_suffix: false,
         };
-        assert_eq!(socket_addr, "127.0.0.1:9464".parse::<SocketAddr>().unwrap());
-        assert_eq!(global_tags, HashMap::from([("t".into(), "g".into())]));
-        assert!(counters_total_suffix);
-        assert!(unit_suffix);
-
-        assert!(matches!(
-            parse_telemetry_options(br#"{"tag":"NoTelemetry"}"#).unwrap(),
-            HsTelemetryOptions::NoTelemetry {}
-        ));
+        let MeterOptions::Prometheus(options) = MeterOptions::try_from(options).unwrap() else {
+            panic!("expected Prometheus options");
+        };
+        assert_eq!(options.socket_addr, socket_addr);
+        assert_eq!(
+            options.global_tags,
+            HashMap::from([("t".into(), "g".into())])
+        );
+        assert!(options.counters_total_suffix);
+        assert!(!options.unit_suffix);
     }
 
     #[test]
@@ -695,6 +734,10 @@ pub(crate) mod test_support {
                 Err(E::from_raw_pointer_mut(error).unwrap())
             }
         }
+    }
+
+    pub(crate) fn error_text(error: CArray<u8>) -> String {
+        String::from_utf8(error.as_rust().unwrap()).unwrap()
     }
 }
 

@@ -118,7 +118,6 @@ test-suite temporal-sdk-core-tests
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
-      Assertions
       BridgeErrorSpec
   hs-source-dirs:
       test

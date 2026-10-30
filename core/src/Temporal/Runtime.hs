@@ -17,7 +17,6 @@ module Temporal.Runtime (
 ) where
 
 import Control.Exception
-import Control.Monad ((>=>))
 import Data.Aeson
 import qualified Data.ByteString.Lazy as BL
 import Data.Text (Text)
@@ -29,11 +28,6 @@ import Temporal.Core.CTypes
 import Temporal.Internal.FFI
 
 
-{- | Thrown by 'initializeRuntime' when the Rust bridge cannot start a runtime.
-
-For example, the telemetry options are invalid, the OpenTelemetry collector URL
-does not parse, or the Prometheus exporter cannot bind its socket.
--}
 newtype RuntimeInitializationError = RuntimeInitializationError Text
   deriving stock (Show, Eq)
 
@@ -60,7 +54,7 @@ initializeRuntime opts = withCArrayBS (BL.toStrict $ encode opts) $ \optsP ->
         message <-
           if errP == nullPtr
             then pure "the Rust bridge returned no runtime and no error"
-            else bracket (pure errP) rust_dropByteArray (peek >=> cArrayToText)
+            else (peek errP >>= cArrayToText) `finally` rust_dropByteArray errP
         throwIO $ RuntimeInitializationError message
 
 
