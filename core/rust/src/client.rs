@@ -536,6 +536,73 @@ mod tests {
         })
     }
 
+    fn client_options(config: serde_json::Value) -> anyhow::Result<ClientOptions> {
+        parse_client_config(config.to_string().as_bytes())
+            .map_err(anyhow::Error::msg)?
+            .try_into()
+    }
+
+    #[test]
+    fn client_options_receive_every_field() {
+        let opts = client_options(full_client_config()).unwrap();
+        assert_eq!(opts.target_url.as_str(), "https://temporal.example:7233/");
+        assert_eq!(opts.client_name, "client-name");
+        assert_eq!(opts.client_version, "1.2.3");
+        assert_eq!(opts.identity, "worker@host");
+        assert_eq!(
+            opts.headers,
+            Some(to_map(&[("x-one", "1"), ("x-two", "2")]))
+        );
+        assert_eq!(opts.api_key.as_deref(), Some("secret"));
+
+        let tls = opts.tls_options.unwrap();
+        assert_eq!(tls.server_root_ca_cert, Some(vec![1, 2, 3]));
+        assert_eq!(tls.domain.as_deref(), Some("tls.example"));
+        let client_tls = tls.client_tls_options.unwrap();
+        assert_eq!(client_tls.client_cert, vec![4, 5]);
+        assert_eq!(client_tls.client_private_key, vec![6, 7]);
+
+        assert_eq!(
+            opts.retry_options,
+            RetryOptions {
+                initial_interval: Duration::from_millis(11),
+                randomization_factor: 0.25,
+                multiplier: 1.5,
+                max_interval: Duration::from_millis(22),
+                max_elapsed_time: Some(Duration::from_millis(33)),
+                max_retries: 4,
+            }
+        );
+    }
+
+    #[test]
+    fn client_options_use_defaults_for_absent_optional_values() {
+        let mut config = full_client_config();
+        config["api_key"] = json!(null);
+        config["tls_config"] = json!(null);
+        config["retry_config"] = json!(null);
+        let opts = client_options(config).unwrap();
+        assert_eq!(opts.api_key, None);
+        assert!(opts.tls_options.is_none());
+        assert_eq!(opts.retry_options, RetryOptions::default());
+
+        let mut config = full_client_config();
+        config["retry_config"]["max_elapsed_time_millis"] = json!(null);
+        let opts = client_options(config).unwrap();
+        assert_eq!(opts.retry_options.max_elapsed_time, None);
+    }
+
+    #[test]
+    fn client_tls_without_client_credentials_keeps_server_tls() {
+        let mut config = full_client_config();
+        config["tls_config"]["client_cert"] = json!(null);
+        config["tls_config"]["client_private_key"] = json!(null);
+        let tls = client_options(config).unwrap().tls_options.unwrap();
+        assert!(tls.client_tls_options.is_none());
+        assert_eq!(tls.server_root_ca_cert, Some(vec![1, 2, 3]));
+        assert_eq!(tls.domain.as_deref(), Some("tls.example"));
+    }
+
     fn connect_with_raw_config(config: Option<&CStr>) -> Result<ClientRef, CArray<u8>> {
         let runtime = new_test_runtime();
         call_bridge(|mvar, cap, error_slot, result_slot| unsafe {

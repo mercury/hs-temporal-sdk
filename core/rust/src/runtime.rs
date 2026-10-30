@@ -101,44 +101,67 @@ fn init_runtime(
     }))
 }
 
-fn build_core_meter(options: HsTelemetryOptions) -> Result<Arc<dyn CoreMeter>, String> {
-    match options {
-        HsTelemetryOptions::NoTelemetry => Ok(Arc::new(NoOpCoreMeter)),
-        HsTelemetryOptions::OtelTelemetryOptions {
-            url,
-            headers,
-            metric_periodicity,
-            global_tags,
-        } => {
-            let url = url
-                .parse()
-                .map_err(|err| format!("Invalid OpenTelemetry collector URL {url:?}: {err}"))?;
-            let meter = build_otlp_metric_exporter(
-                OtelCollectorOptions::builder()
-                    .url(url)
-                    .metric_periodicity(metric_periodicity.unwrap_or_else(|| Duration::new(1, 0)))
-                    .headers(headers)
-                    .global_tags(global_tags)
-                    .build(),
-            )
-            .map_err(|err| format!("Failed to build the OpenTelemetry metric exporter: {err:#}"))?;
-            Ok(Arc::new(meter))
-        }
-        HsTelemetryOptions::PrometheusTelemetryOptions {
-            socket_addr,
-            global_tags,
-            counters_total_suffix,
-            unit_suffix,
-        } => {
-            let srv = start_prometheus_metric_exporter(
+enum MeterOptions {
+    NoOp,
+    Otel(OtelCollectorOptions),
+    Prometheus(PrometheusExporterOptions),
+}
+
+impl TryFrom<HsTelemetryOptions> for MeterOptions {
+    type Error = String;
+
+    fn try_from(options: HsTelemetryOptions) -> Result<Self, String> {
+        match options {
+            HsTelemetryOptions::NoTelemetry => Ok(MeterOptions::NoOp),
+            HsTelemetryOptions::OtelTelemetryOptions {
+                url,
+                headers,
+                metric_periodicity,
+                global_tags,
+            } => {
+                let url = url
+                    .parse()
+                    .map_err(|err| format!("Invalid OpenTelemetry collector URL {url:?}: {err}"))?;
+                Ok(MeterOptions::Otel(
+                    OtelCollectorOptions::builder()
+                        .url(url)
+                        .metric_periodicity(
+                            metric_periodicity.unwrap_or_else(|| Duration::new(1, 0)),
+                        )
+                        .headers(headers)
+                        .global_tags(global_tags)
+                        .build(),
+                ))
+            }
+            HsTelemetryOptions::PrometheusTelemetryOptions {
+                socket_addr,
+                global_tags,
+                counters_total_suffix,
+                unit_suffix,
+            } => Ok(MeterOptions::Prometheus(
                 PrometheusExporterOptions::builder()
                     .socket_addr(socket_addr)
                     .unit_suffix(unit_suffix)
                     .global_tags(global_tags)
                     .counters_total_suffix(counters_total_suffix)
                     .build(),
-            )
-            .map_err(|err| {
+            )),
+        }
+    }
+}
+
+fn build_core_meter(options: HsTelemetryOptions) -> Result<Arc<dyn CoreMeter>, String> {
+    match MeterOptions::try_from(options)? {
+        MeterOptions::NoOp => Ok(Arc::new(NoOpCoreMeter)),
+        MeterOptions::Otel(options) => {
+            let meter = build_otlp_metric_exporter(options).map_err(|err| {
+                format!("Failed to build the OpenTelemetry metric exporter: {err:#}")
+            })?;
+            Ok(Arc::new(meter))
+        }
+        MeterOptions::Prometheus(options) => {
+            let socket_addr = options.socket_addr;
+            let srv = start_prometheus_metric_exporter(options).map_err(|err| {
                 format!("Failed to start the Prometheus exporter on {socket_addr}: {err:#}")
             })?;
             Ok(srv.meter)
@@ -467,6 +490,60 @@ mod tests {
         assert!(returned_before_release);
         assert!(error_slot.is_null());
         assert_eq!(core_weak.strong_count(), 0);
+    }
+
+    fn otel_options(metric_periodicity: Option<Duration>) -> OtelCollectorOptions {
+        let options = HsTelemetryOptions::OtelTelemetryOptions {
+            url: "http://collector:4317".into(),
+            headers: HashMap::from([("h".into(), "v".into())]),
+            metric_periodicity,
+            global_tags: HashMap::from([("t".into(), "g".into())]),
+        };
+        let MeterOptions::Otel(options) = MeterOptions::try_from(options).unwrap() else {
+            panic!("expected OpenTelemetry options");
+        };
+        options
+    }
+
+    #[test]
+    fn otel_options_receive_every_field() {
+        let options = otel_options(Some(Duration::new(3, 4)));
+        assert_eq!(options.url.as_str(), "http://collector:4317/");
+        assert_eq!(options.headers, HashMap::from([("h".into(), "v".into())]));
+        assert_eq!(options.metric_periodicity, Duration::new(3, 4));
+        assert_eq!(
+            options.global_tags,
+            HashMap::from([("t".into(), "g".into())])
+        );
+    }
+
+    #[test]
+    fn otel_options_default_to_a_one_second_periodicity() {
+        assert_eq!(
+            otel_options(None).metric_periodicity,
+            Duration::from_secs(1)
+        );
+    }
+
+    #[test]
+    fn prometheus_options_receive_every_field() {
+        let socket_addr = SocketAddr::from(([127, 0, 0, 1], 9464));
+        let options = HsTelemetryOptions::PrometheusTelemetryOptions {
+            socket_addr,
+            global_tags: HashMap::from([("t".into(), "g".into())]),
+            counters_total_suffix: true,
+            unit_suffix: false,
+        };
+        let MeterOptions::Prometheus(options) = MeterOptions::try_from(options).unwrap() else {
+            panic!("expected Prometheus options");
+        };
+        assert_eq!(options.socket_addr, socket_addr);
+        assert_eq!(
+            options.global_tags,
+            HashMap::from([("t".into(), "g".into())])
+        );
+        assert!(options.counters_total_suffix);
+        assert!(!options.unit_suffix);
     }
 
     #[test]
