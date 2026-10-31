@@ -35,7 +35,12 @@ impl RawPointerConverter<EphemeralServerRef> for EphemeralServerRef {
 
 /// Where to find an executable. Can be a path or download.
 #[derive(Deserialize)]
-#[serde(tag = "type", content = "contents", remote = "EphemeralExe")]
+#[serde(
+    tag = "type",
+    content = "contents",
+    remote = "EphemeralExe",
+    deny_unknown_fields
+)]
 pub enum EphemeralExeDef {
     /// Existing path on the filesystem for the executable.
     ExistingPath(String),
@@ -52,7 +57,12 @@ pub enum EphemeralExeDef {
 
 /// Which version of the exe to download.
 #[derive(Deserialize)]
-#[serde(tag = "type", content = "contents", remote = "EphemeralExeVersion")]
+#[serde(
+    tag = "type",
+    content = "contents",
+    remote = "EphemeralExeVersion",
+    deny_unknown_fields
+)]
 pub enum EphemeralExeVersionDef {
     /// Use a default version for the given SDK name and version.
     SDKDefault {
@@ -66,7 +76,7 @@ pub enum EphemeralExeVersionDef {
 }
 
 #[derive(Deserialize)]
-#[serde(remote = "TemporalDevServerConfig")]
+#[serde(remote = "TemporalDevServerConfig", deny_unknown_fields)]
 pub struct TemporalDevServerConfigDef {
     /// Required path to executable or download info.
     #[serde(with = "EphemeralExeDef")]
@@ -198,7 +208,7 @@ pub unsafe extern "C" fn hs_temporal_shutdown_ephemeral_server(
 
 /// Configuration for the test server.
 #[derive(Deserialize)]
-#[serde(remote = "TestServerConfig")]
+#[serde(remote = "TestServerConfig", deny_unknown_fields)]
 pub struct TestServerConfigDef {
     /// Required path to executable or download info.
     #[serde(with = "EphemeralExeDef")]
@@ -239,6 +249,72 @@ pub unsafe extern "C" fn hs_temporal_start_test_server(
 mod tests {
     use super::*;
     use crate::runtime::test_support::{call_bridge, error_text, new_test_runtime};
+    use serde_json::json;
+
+    fn full_dev_server_config() -> serde_json::Value {
+        json!({
+            "exe": {
+                "type": "CachedDownload",
+                "contents": {
+                    "version": {
+                        "type": "SDKDefault",
+                        "contents": {"sdk_name": "sdk", "sdk_version": "1.0"}
+                    },
+                    "dest_dir": "/tmp/dest",
+                    "ttl": {"secs": 60, "nanos": 0}
+                }
+            },
+            "namespace": "ns",
+            "ip": "127.0.0.2",
+            "port": 1234,
+            "db_filename": "db.sqlite",
+            "ui": true,
+            "ui_port": 2345,
+            "log": ["json", "debug"],
+            "extra_args": ["--flag"]
+        })
+    }
+
+    #[test]
+    fn dev_server_config_rejects_unknown_fields() {
+        let valid = full_dev_server_config();
+        assert!(parse_dev_server_config(valid.to_string().as_bytes()).is_ok());
+
+        let mut ttl_next_to_contents = valid.clone();
+        ttl_next_to_contents["exe"]["ttl"] = json!({"secs": 60, "nanos": 0});
+        let mut extra_in_download = valid.clone();
+        extra_in_download["exe"]["contents"]["unexpected"] = json!(1);
+        let mut extra_in_version = valid.clone();
+        extra_in_version["exe"]["contents"]["version"]["contents"]["unexpected"] = json!(1);
+        let mut extra_top_level = valid;
+        extra_top_level["unexpected"] = json!(1);
+        for (config, expected) in [
+            (ttl_next_to_contents, r#"invalid value: string "ttl""#),
+            (extra_in_download, "unknown field `unexpected`"),
+            (extra_in_version, "unknown field `unexpected`"),
+            (extra_top_level, "unknown field `unexpected`"),
+        ] {
+            let err = parse_dev_server_config(config.to_string().as_bytes())
+                .err()
+                .unwrap_or_else(|| panic!("accepted {config}"));
+            assert!(err.contains(expected), "{err}");
+        }
+    }
+
+    #[test]
+    fn test_server_config_rejects_unknown_fields() {
+        let mut config = json!({
+            "exe": {"type": "ExistingPath", "contents": "/bin/server"},
+            "port": null,
+            "extra_args": []
+        });
+        assert!(parse_test_server_config(config.to_string().as_bytes()).is_ok());
+        config["unexpected"] = json!(1);
+        let err = parse_test_server_config(config.to_string().as_bytes())
+            .err()
+            .unwrap();
+        assert!(err.contains("unknown field `unexpected`"), "{err}");
+    }
 
     type StartServer = unsafe extern "C" fn(
         *mut RuntimeRef,
