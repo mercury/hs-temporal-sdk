@@ -329,14 +329,14 @@ tests = describe "Workflow Replay" $ do
     patchedResult `shouldSatisfy` isRight
 
   specify "patched before the first yield follows a recorded marker" $ \TestEnv {..} -> do
-    -- workflowIsReplaying starts false, so a recorded marker matches even when
-    -- NotifyHasPatch was never applied. Replay with that flag set and the patch
-    -- id missing must fail.
+    -- A recorded marker must select the activity branch during replay. A wrong
+    -- patch result schedules a timer instead and produces nondeterminism.
     let workflow :: W.ProvidedWorkflow (W.Workflow ())
         workflow = W.provideWorkflow JSON "replay-pre-yield-marker" $ provideCallStack $ do
-          _ <- W.patched "recorded-before-yield"
-          _ <- W.executeActivity replayActivityDef.reference (W.defaultStartActivityOptions $ W.StartToClose $ seconds 3)
-          pure ()
+          usePatch <- W.patched "recorded-before-yield"
+          if usePatch
+            then void $ W.executeActivity replayActivityDef.reference (W.defaultStartActivityOptions $ W.StartToClose $ seconds 3)
+            else W.sleep $ milliseconds 10
         defs = (replayActivityDef, workflow)
         conf = provideCallStack $ configure () defs baseConf
 
@@ -357,9 +357,10 @@ tests = describe "Workflow Replay" $ do
     let workflow :: W.ProvidedWorkflow (W.Workflow ())
         workflow = W.provideWorkflow JSON "replay-post-yield-marker" $ provideCallStack $ do
           W.sleep $ milliseconds 10
-          _ <- W.patched "after-yield"
-          _ <- W.executeActivity replayActivityDef.reference (W.defaultStartActivityOptions $ W.StartToClose $ seconds 3)
-          pure ()
+          usePatch <- W.patched "after-yield"
+          if usePatch
+            then void $ W.executeActivity replayActivityDef.reference (W.defaultStartActivityOptions $ W.StartToClose $ seconds 3)
+            else W.sleep $ milliseconds 10
         defs = (replayActivityDef, workflow)
         conf = provideCallStack $ configure () defs baseConf
 
