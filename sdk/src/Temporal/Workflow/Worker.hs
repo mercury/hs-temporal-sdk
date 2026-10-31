@@ -30,6 +30,7 @@ import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
 import Data.Maybe
 import Data.ProtoLens
+import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Vault.Strict (Vault)
@@ -130,6 +131,18 @@ publishWorkflowInstance runId_ inst startWorker = do
   (published, inserted) <- upsertWorkflowInstance runId_ inst
   when inserted $ liftIO startWorker
   pure published
+
+
+-- The executor reads these refs before its first suspend.
+-- 'publishWorkflowInstance' forks that executor, so this has to run on the
+-- new instance first. A later activation still updates them in 'activate'.
+copyInitialPatchState :: WorkflowActivation -> WorkflowInstance -> IO ()
+copyInitialPatchState act inst = do
+  writeIORef inst.workflowIsReplaying (act ^. Activation.isReplaying)
+  forM_ (act ^. Activation.vec'jobs) $ \job ->
+    forM_ (job ^. Activation.maybe'notifyHasPatch) $ \notifyHasPatch ->
+      atomicModifyIORef' inst.workflowNotifiedPatches $ \patchSet ->
+        (Set.insert (notifyHasPatch ^. Activation.patchId . to PatchId) patchSet, ())
 
 
 -- | Execute an action repeatedly as long as it returns True.
@@ -270,13 +283,15 @@ handleActivation activation = inSpan' "handleActivation" (defaultSpanArguments {
     then do
       mInst <- createOrFetchWorkflowInstance
       forM_ mInst $ \inst -> do
-        -- Signals in the initialization activation were already buffered into the
-        -- instance (see applyStartWorkflow), so drop them here rather than
-        -- delivering them a second time through the channel.
+        -- The initialization activation is already applied on the instance.
+        -- Signals were buffered in applyStartWorkflow. Replay flags were copied
+        -- in copyInitialPatchState. Leaving NotifyHasPatch queued makes the
+        -- first yield skip flushCommands.
         let isInitActivation = not $ V.null activationInitializeWorkflowJobs
             keepJob job =
               isNothing (job ^. Activation.maybe'initializeWorkflow)
                 && not (isInitActivation && isJust (job ^. Activation.maybe'signalWorkflow))
+                && not (isInitActivation && isJust (job ^. Activation.maybe'notifyHasPatch))
             withoutStart = filter keepJob (activation ^. Activation.jobs)
         case withoutStart of
           [] -> pure ()
@@ -445,7 +460,9 @@ handleActivation activation = inSpan' "handleActivation" (defaultSpanArguments {
                           workflowInfo
                           initializeWorkflow
                           initialSignals
-                      liftIO $ addBuiltinQueryHandlers inst
+                      liftIO $ do
+                        addBuiltinQueryHandlers inst
+                        copyInitialPatchState activation inst
                       published <- publishWorkflowInstance runId_ inst startWorker
                       pure $ Just published
           pure $ join (vExistingInstance V.!? 0)
