@@ -99,8 +99,8 @@ spec = describe "Duration" $ do
       addDurations d1 d2 `shouldBe` mkDuration (-1) (-100_000_000)
   describe "Semigroup" $ do
     specify "associativity" $ hedgehog $ do
-      ds <- forAll $ (,,) <$> genDuration <*> genDuration <*> genDuration
-      (ds <> (ds <> ds)) === ((ds <> ds) <> ds)
+      (a, b, c) <- forAll $ (,,) <$> genDuration <*> genDuration <*> genDuration
+      (a <> (b <> c)) === ((a <> b) <> c)
   describe "Monoid" $ do
     specify "right identity" $ hedgehog $ do
       d <- forAll genDuration
