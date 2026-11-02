@@ -3,7 +3,7 @@ module ReplaySpec where
 import Control.Concurrent (ThreadId, myThreadId, threadDelay, yield)
 import qualified Control.Concurrent.Async as Async
 import Control.Exception (IOException, bracket, catch, fromException, try)
-import Control.Monad (void, when)
+import Control.Monad (unless, void, when)
 import Data.Either (isLeft, isRight)
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import Data.ProtoLens.Encoding (encodeMessage)
@@ -296,6 +296,84 @@ tests = describe "Workflow Replay" $ do
 
     patchedResult <- runReplayHistory globalRuntime patchedConf history
     patchedResult `shouldSatisfy` isRight
+
+  specify "patched before the first yield follows an unpatched history" $ \TestEnv {..} -> do
+    let originalWorkflow :: W.ProvidedWorkflow (W.Workflow ())
+        originalWorkflow = W.provideWorkflow JSON "replay-pre-yield-unpatched" $ provideCallStack $ do
+          W.sleep $ milliseconds 10
+          _ <- W.executeActivity replayActivityDef.reference (W.defaultStartActivityOptions $ W.StartToClose $ seconds 3)
+          pure ()
+        originalDefs = (replayActivityDef, originalWorkflow)
+        originalConf = provideCallStack $ configure () originalDefs baseConf
+
+    history <- withWorker originalConf $ do
+      uuid <- uuidText
+      let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
+      useClient $ do
+        wfHandle <- C.start originalWorkflow (W.WorkflowId uuid) opts
+        C.waitWorkflowResult wfHandle
+        C.fetchHistory wfHandle
+
+    let patchedWorkflow :: W.ProvidedWorkflow (W.Workflow ())
+        patchedWorkflow = W.provideWorkflow JSON "replay-pre-yield-unpatched" $ provideCallStack $ do
+          usePatch <- W.patched "remove-initial-sleep"
+          unless usePatch $
+            W.sleep $
+              milliseconds 10
+          _ <- W.executeActivity replayActivityDef.reference (W.defaultStartActivityOptions $ W.StartToClose $ seconds 3)
+          pure ()
+        patchedDefs = (replayActivityDef, patchedWorkflow)
+        patchedConf = configure () patchedDefs baseConf
+
+    patchedResult <- runReplayHistory globalRuntime patchedConf history
+    patchedResult `shouldSatisfy` isRight
+
+  specify "patched before the first yield follows a recorded marker" $ \TestEnv {..} -> do
+    -- A recorded marker must select the activity branch during replay. A wrong
+    -- patch result schedules a timer instead and produces nondeterminism.
+    let workflow :: W.ProvidedWorkflow (W.Workflow ())
+        workflow = W.provideWorkflow JSON "replay-pre-yield-marker" $ provideCallStack $ do
+          usePatch <- W.patched "recorded-before-yield"
+          if usePatch
+            then void $ W.executeActivity replayActivityDef.reference (W.defaultStartActivityOptions $ W.StartToClose $ seconds 3)
+            else W.sleep $ milliseconds 10
+        defs = (replayActivityDef, workflow)
+        conf = provideCallStack $ configure () defs baseConf
+
+    history <- withWorker conf $ do
+      uuid <- uuidText
+      let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
+      useClient $ do
+        wfHandle <- C.start workflow (W.WorkflowId uuid) opts
+        C.waitWorkflowResult wfHandle
+        C.fetchHistory wfHandle
+
+    replayResult <- runReplayHistory globalRuntime conf history
+    replayResult `shouldSatisfy` isRight
+
+  specify "patched after the first yield follows a recorded marker" $ \TestEnv {..} -> do
+    -- The marker arrives on the activation that fires the timer.
+    -- Dropping NotifyHasPatch on every activation skips that job.
+    let workflow :: W.ProvidedWorkflow (W.Workflow ())
+        workflow = W.provideWorkflow JSON "replay-post-yield-marker" $ provideCallStack $ do
+          W.sleep $ milliseconds 10
+          usePatch <- W.patched "after-yield"
+          if usePatch
+            then void $ W.executeActivity replayActivityDef.reference (W.defaultStartActivityOptions $ W.StartToClose $ seconds 3)
+            else W.sleep $ milliseconds 10
+        defs = (replayActivityDef, workflow)
+        conf = provideCallStack $ configure () defs baseConf
+
+    history <- withWorker conf $ do
+      uuid <- uuidText
+      let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
+      useClient $ do
+        wfHandle <- C.start workflow (W.WorkflowId uuid) opts
+        C.waitWorkflowResult wfHandle
+        C.fetchHistory wfHandle
+
+    replayResult <- runReplayHistory globalRuntime conf history
+    replayResult `shouldSatisfy` isRight
 
   specify "incompatible replay fails" $ \TestEnv {..} -> do
     let originalWorkflow :: W.ProvidedWorkflow (W.Workflow ())
