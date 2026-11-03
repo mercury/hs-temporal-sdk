@@ -16,13 +16,13 @@ makes a new Haskell field fail to compile here until it is covered.
 -}
 module ConfigContractSpec (spec) where
 
-import Assertions
 import Control.Exception (bracket)
 import Data.Aeson
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Map.Strict as Map
+import qualified Data.Text as T
 import GHC.Stack (HasCallStack)
 import Temporal.Core.Client
 import Temporal.Core.EphemeralServer
@@ -97,24 +97,18 @@ spec = describe "Haskell and Rust config mirrors" $ do
 assertRoundTrip :: (HasCallStack, ToJSON a) => BridgeConfigType -> a -> Expectation
 assertRoundTrip configType config = do
   let sent = encode config
-  expected <- assertRight "the Haskell encoding is JSON" $ eitherDecode @Value sent
   echoed <- echoBridgeConfig configType $ BL.toStrict sent
-  json <- assertRight ("the bridge accepts the " <> show configType) echoed
-  actual <- assertRight "the bridge returns JSON" $ eitherDecodeStrict @Value json
-  assertEq ("the bridge keeps every " <> show configType <> " field") expected actual
+  fmap (decodeStrict @Value) echoed `shouldBe` Right (decode @Value sent)
 
 
 assertRejectsUnknownField :: (HasCallStack, ToJSON a) => BridgeConfigType -> a -> Expectation
 assertRejectsUnknownField configType config = do
-  fields <- case toJSON config of
-    Object fields -> pure fields
-    other -> do
-      expectationFailure $ "expected a JSON object, got " <> show other
-      error "unreachable"
-  let withExtraField = Object $ KeyMap.insert "unexpected_field" (Bool True) fields
-  echoed <- echoBridgeConfig configType . BL.toStrict $ encode withExtraField
-  err <- assertLeft ("the bridge rejects an unknown " <> show configType <> " field") echoed
-  assertContains "the error names the field" "unknown field `unexpected_field`" err
+  echoed <- echoBridgeConfig configType . BL.toStrict . encode . withUnknownField $ toJSON config
+  echoed `shouldSatisfy` either ("unknown field `unexpected_field`" `T.isInfixOf`) (const False)
+  where
+    withUnknownField :: Value -> Value
+    withUnknownField (Object fields) = Object $ KeyMap.insert "unexpected_field" (Bool True) fields
+    withUnknownField other = other
 
 
 withCustomSlotSupplierHandle :: (CustomSlotSupplierHandle -> IO a) -> IO a
