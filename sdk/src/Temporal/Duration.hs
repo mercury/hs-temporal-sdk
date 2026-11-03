@@ -189,7 +189,7 @@ diffTimeToDuration t =
     totalPicos = max 0 (diffTimeToPicoseconds t)
     picosPerSecond = 1_000_000_000_000
     (ds, remainingPicos) = totalPicos `quotRem` picosPerSecond
-    remainingNanosFromPicos = fromIntegral remainingPicos `div` 1_000
+    remainingNanosFromPicos = fromIntegral $ remainingPicos `div` 1_000
 
 
 {- | Convert a 'NominalDiffTime' to a 'Duration'.
@@ -207,7 +207,7 @@ nominalDiffTimeToDuration t =
     (MkFixed totalPicos) = max 0 $ nominalDiffTimeToSeconds t
     picosPerSecond = 1_000_000_000_000
     (ds, remainingPicos) = totalPicos `quotRem` picosPerSecond
-    remainingNanosFromPicos = fromIntegral remainingPicos `div` 1_000
+    remainingNanosFromPicos = fromIntegral $ remainingPicos `div` 1_000
 
 
 -- | Create a 'Duration' from a given number of nanoseconds.
