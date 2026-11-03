@@ -1169,30 +1169,6 @@ void hs_temporal_test_echo_test_server_config(const struct CArray_u8 *json,
                                               struct CArray_u8 **error_slot);
 
 /**
- * Returns a JSON array of slot reservation contexts. Free it with
- * `hs_temporal_drop_byte_array`.
- */
-struct CArray_u8 *hs_temporal_test_sample_slot_reservation_contexts(void);
-
-/**
- * Returns a JSON array of mark-used contexts, one for each kind of slot. Free
- * it with `hs_temporal_drop_byte_array`.
- */
-struct CArray_u8 *hs_temporal_test_sample_slot_mark_used_contexts(void);
-
-/**
- * Returns a JSON array of release contexts, with and without slot info. Free
- * it with `hs_temporal_drop_byte_array`.
- */
-struct CArray_u8 *hs_temporal_test_sample_slot_release_contexts(void);
-
-/**
- * Returns a JSON array of log lines, one for each level. Free it with
- * `hs_temporal_drop_byte_array`.
- */
-struct CArray_u8 *hs_temporal_test_sample_core_logs(void);
-
-/**
  * Create a custom slot supplier handle from Haskell-supplied callback function pointers.
  * Returns a raw pointer that must be freed with `hs_temporal_drop_custom_slot_supplier`.
  *

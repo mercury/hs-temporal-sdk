@@ -11,23 +11,14 @@ use crate::ephemeral_server::{
     parse_test_server_config,
 };
 use crate::runtime::{
-    Capability, HsCallback, MVar, RuntimeRef, byte_array, copy_byte_array, core_log_json,
-    parse_telemetry_options, write_error_slot,
+    Capability, HsCallback, MVar, RuntimeRef, byte_array, copy_byte_array, parse_telemetry_options,
+    write_error_slot,
 };
-use crate::worker::{
-    mark_used_context_json, parse_worker_config, release_context_json, reservation_context_json,
-};
+use crate::worker::parse_worker_config;
 use ffi_convert::*;
 use serde::Serialize;
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{Duration, SystemTime};
-use temporalio_common::protos::coresdk::{
-    ActivitySlotInfo, LocalActivitySlotInfo, NexusSlotInfo, WorkflowSlotInfo,
-};
-use temporalio_common::telemetry::CoreLog;
-use temporalio_common::worker::{SlotInfo, SlotReservationContext, WorkerDeploymentVersion};
-use tracing::Level;
+use std::time::Duration;
 
 /// Total number of [`CTestResource`] values dropped since process start.
 static TEST_RESOURCE_DROPS: AtomicU64 = AtomicU64::new(0);
@@ -228,122 +219,6 @@ pub unsafe extern "C" fn hs_temporal_test_echo_test_server_config(
             })
         })
     }
-}
-
-// The `hs_temporal_test_sample_*` fixtures serialize fixed sample values with
-// the functions that build the JSON the bridge sends to Haskell.
-// `OutputContractSpec` in the Haskell test suite expects these exact values,
-// so change both together.
-
-fn json_array(documents: Vec<Vec<u8>>) -> *mut CArray<u8> {
-    let json = [&b"["[..], &documents.join(&b','), b"]"].concat();
-    byte_array(json).into_raw_pointer_mut()
-}
-
-struct SampleReservationContext {
-    deployment_version: Option<WorkerDeploymentVersion>,
-}
-
-impl SlotReservationContext for SampleReservationContext {
-    fn task_queue(&self) -> &str {
-        "contract-task-queue"
-    }
-
-    fn worker_identity(&self) -> &str {
-        "contract-identity"
-    }
-
-    fn worker_deployment_version(&self) -> &Option<WorkerDeploymentVersion> {
-        &self.deployment_version
-    }
-
-    fn num_issued_slots(&self) -> usize {
-        3
-    }
-
-    fn is_sticky(&self) -> bool {
-        true
-    }
-}
-
-/// Returns a JSON array of slot reservation contexts. Free it with
-/// `hs_temporal_drop_byte_array`.
-#[unsafe(no_mangle)]
-pub extern "C" fn hs_temporal_test_sample_slot_reservation_contexts() -> *mut CArray<u8> {
-    let context = SampleReservationContext {
-        deployment_version: None,
-    };
-    json_array(vec![reservation_context_json(&context)])
-}
-
-/// Returns a JSON array of mark-used contexts, one for each kind of slot. Free
-/// it with `hs_temporal_drop_byte_array`.
-#[unsafe(no_mangle)]
-pub extern "C" fn hs_temporal_test_sample_slot_mark_used_contexts() -> *mut CArray<u8> {
-    let workflow = WorkflowSlotInfo {
-        workflow_type: "contract-workflow".into(),
-        is_sticky: true,
-    };
-    let local_activity = LocalActivitySlotInfo {
-        activity_type: "contract-local-activity".into(),
-    };
-    let nexus = NexusSlotInfo {
-        service: "contract-service".into(),
-        operation: "contract-operation".into(),
-    };
-    json_array(vec![
-        mark_used_context_json(SlotInfo::Workflow(&workflow)),
-        mark_used_context_json(SlotInfo::Activity(&sample_activity_slot_info())),
-        mark_used_context_json(SlotInfo::LocalActivity(&local_activity)),
-        mark_used_context_json(SlotInfo::Nexus(&nexus)),
-    ])
-}
-
-/// Returns a JSON array of release contexts, with and without slot info. Free
-/// it with `hs_temporal_drop_byte_array`.
-#[unsafe(no_mangle)]
-pub extern "C" fn hs_temporal_test_sample_slot_release_contexts() -> *mut CArray<u8> {
-    json_array(vec![
-        release_context_json(Some(SlotInfo::Activity(&sample_activity_slot_info()))),
-        release_context_json(None),
-    ])
-}
-
-fn sample_activity_slot_info() -> ActivitySlotInfo {
-    ActivitySlotInfo {
-        activity_type: "contract-activity".into(),
-    }
-}
-
-/// Returns a JSON array of log lines, one for each level. Free it with
-/// `hs_temporal_drop_byte_array`.
-#[unsafe(no_mangle)]
-pub extern "C" fn hs_temporal_test_sample_core_logs() -> *mut CArray<u8> {
-    let levels = [
-        Level::TRACE,
-        Level::DEBUG,
-        Level::INFO,
-        Level::WARN,
-        Level::ERROR,
-    ];
-    json_array(
-        levels
-            .into_iter()
-            .map(|level| {
-                core_log_json(&CoreLog {
-                    target: "contract_target".into(),
-                    message: "contract message".into(),
-                    timestamp: SystemTime::UNIX_EPOCH + Duration::new(1_700_000_000, 5),
-                    level,
-                    fields: HashMap::from([(
-                        "contract_field".into(),
-                        serde_json::json!({"nested": [1, "two"]}),
-                    )]),
-                    span_contexts: vec!["outer_span".into(), "inner_span".into()],
-                })
-            })
-            .collect(),
-    )
 }
 
 #[cfg(test)]

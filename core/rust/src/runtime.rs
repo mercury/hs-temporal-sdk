@@ -8,8 +8,7 @@ use std::sync::{Arc, mpsc};
 use std::time::{Duration, SystemTime};
 use temporalio_common::telemetry::metrics::{CoreMeter, NoOpCoreMeter};
 use temporalio_common::telemetry::{
-    CoreLog, CoreTelemetry, Logger, OtelCollectorOptions, PrometheusExporterOptions,
-    TelemetryOptions,
+    CoreTelemetry, Logger, OtelCollectorOptions, PrometheusExporterOptions, TelemetryOptions,
 };
 use temporalio_sdk_core::telemetry::{
     build_otlp_metric_exporter, construct_filter_string, start_prometheus_metric_exporter,
@@ -763,18 +762,6 @@ pub struct CoreLogDef {
     pub span_contexts: Vec<String>,
 }
 
-pub(crate) fn core_log_json(log: &CoreLog) -> Vec<u8> {
-    let log = CoreLogDef {
-        target: log.target.clone(),
-        message: log.message.clone(),
-        timestamp: log.timestamp,
-        level: String::from(log.level.as_str()),
-        fields: log.fields.clone(),
-        span_contexts: log.span_contexts.clone(),
-    };
-    serde_json::to_vec(&log).expect("Failed to serialize log line")
-}
-
 // TODO: [publish-crate]
 /// # Safety
 ///
@@ -785,7 +772,20 @@ pub unsafe extern "C" fn hs_temporal_runtime_fetch_logs(
 ) -> *const CArray<CArray<u8>> {
     let runtime = unsafe { &*runtime };
     let logs = runtime.runtime.core.telemetry().fetch_buffered_logs();
-    let hs_logs: Vec<Vec<u8>> = logs.iter().map(core_log_json).collect();
+    let hs_logs: Vec<Vec<u8>> = logs
+        .iter()
+        .map(|log| {
+            let log = CoreLogDef {
+                target: log.target.clone(),
+                message: log.message.clone(),
+                timestamp: log.timestamp,
+                level: String::from(log.level.as_str()),
+                fields: log.fields.clone(),
+                span_contexts: log.span_contexts.clone(),
+            };
+            serde_json::to_vec(&log).expect("Failed to serialize log line")
+        })
+        .collect();
     CArray::c_repr_of(hs_logs).unwrap().into_raw_pointer()
 }
 

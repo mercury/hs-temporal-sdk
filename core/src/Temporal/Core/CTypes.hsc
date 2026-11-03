@@ -108,7 +108,7 @@ data LogLevel
   | Info
   | Warn
   | Error
-  deriving (Show, Eq)
+  deriving (Show)
 
 instance ToJSON LogLevel where
   toJSON = \case
@@ -134,7 +134,7 @@ data CoreLog = CoreLog
   , level :: LogLevel
   , fields :: Object
   , spanContexts :: [Text]
-  } deriving (Show, Eq)
+  } deriving (Show)
 
 deriveJSON (defaultOptions {fieldLabelModifier = camelTo2 '_'}) ''CoreLog
 

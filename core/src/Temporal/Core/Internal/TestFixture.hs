@@ -5,9 +5,8 @@
 These wrap tiny bridge fixtures (prefixed @hs_temporal_test_@ on the Rust
 side). Some let test suites observe cross-language resource management, e.g.
 that a Rust result produced after the Haskell waiter was interrupted is still
-reclaimed by the cleanup thread. Others run the bridge's config parsers, or
-return sample JSON of the kinds that the bridge sends to Haskell, without
-starting a runtime, client, worker or server. They are compiled into
+reclaimed by the cleanup thread. Others run the bridge's config parsers
+without starting a runtime, client, worker or server. They are compiled into
 the production bridge library because the test suites link the same artifact,
 but nothing outside of tests should call them.
 -}
@@ -16,8 +15,6 @@ module Temporal.Core.Internal.TestFixture (
   testResourceDropCount,
   BridgeConfigType (..),
   echoBridgeConfig,
-  BridgeOutputType (..),
-  sampleBridgeOutput,
 ) where
 
 import Control.Exception (bracket, mask_)
@@ -120,42 +117,3 @@ echoBridgeConfig configType json = withCArrayBS json $ \jsonPtr ->
 
     takeByteArray :: (CArray Word8 -> IO a) -> Ptr (CArray Word8) -> IO a
     takeByteArray decode ptr = bracket (pure ptr) rust_dropByteArray (peek >=> decode)
-
-
-{- | A kind of JSON document that the bridge sends to Haskell, named after the
-Haskell type that decodes it.
--}
-data BridgeOutputType
-  = SlotReservationContextOutput
-  | MarkSlotUsedContextOutput
-  | ReleaseSlotContextOutput
-  | CoreLogOutput
-  deriving stock (Show, Eq)
-
-
-foreign import ccall "hs_temporal_test_sample_slot_reservation_contexts" raw_sampleSlotReservationContexts :: IO (Ptr (CArray Word8))
-
-
-foreign import ccall "hs_temporal_test_sample_slot_mark_used_contexts" raw_sampleSlotMarkUsedContexts :: IO (Ptr (CArray Word8))
-
-
-foreign import ccall "hs_temporal_test_sample_slot_release_contexts" raw_sampleSlotReleaseContexts :: IO (Ptr (CArray Word8))
-
-
-foreign import ccall "hs_temporal_test_sample_core_logs" raw_sampleCoreLogs :: IO (Ptr (CArray Word8))
-
-
-{- | A JSON array of fixed sample documents of the given kind. The bridge
-builds each one with the same function that builds the real document. The
-sample values are in @core/rust/src/test_fixtures.rs@.
--}
-sampleBridgeOutput :: BridgeOutputType -> IO ByteString
-sampleBridgeOutput outputType =
-  bracket sample rust_dropByteArray (peek >=> cArrayToByteString)
-  where
-    sample :: IO (Ptr (CArray Word8))
-    sample = case outputType of
-      SlotReservationContextOutput -> raw_sampleSlotReservationContexts
-      MarkSlotUsedContextOutput -> raw_sampleSlotMarkUsedContexts
-      ReleaseSlotContextOutput -> raw_sampleSlotReleaseContexts
-      CoreLogOutput -> raw_sampleCoreLogs

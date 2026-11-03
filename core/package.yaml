@@ -72,7 +72,6 @@ tests:
     other-modules:
       - BridgeErrorSpec
       - ConfigContractSpec
-      - OutputContractSpec
     dependencies:
       - base
       - aeson
