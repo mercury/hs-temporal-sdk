@@ -283,6 +283,25 @@ struct SerializedReleaseContext {
     slot_info: Option<SerializedSlotInfo>,
 }
 
+pub(crate) fn reservation_context_json(ctx: &dyn SlotReservationContext) -> Vec<u8> {
+    serde_json::to_vec(&SerializedSlotReservationContext::from_ctx(ctx))
+        .expect("serialization should not fail")
+}
+
+pub(crate) fn mark_used_context_json(info: temporalio_common::worker::SlotInfo<'_>) -> Vec<u8> {
+    let slot_info = SerializedSlotInfo::from_info(info);
+    serde_json::to_vec(&SerializedMarkUsedContext { slot_info })
+        .expect("serialization should not fail")
+}
+
+pub(crate) fn release_context_json(
+    info: Option<temporalio_common::worker::SlotInfo<'_>>,
+) -> Vec<u8> {
+    let slot_info = info.map(SerializedSlotInfo::from_info);
+    serde_json::to_vec(&SerializedReleaseContext { slot_info })
+        .expect("serialization should not fail")
+}
+
 #[async_trait::async_trait]
 impl<SK: SlotKind + 'static> SlotSupplier for HaskellSlotSupplier<SK>
 where
@@ -291,8 +310,7 @@ where
     type SlotKind = SK;
 
     async fn reserve_slot(&self, ctx: &dyn SlotReservationContext) -> SlotSupplierPermit {
-        let json = serde_json::to_vec(&SerializedSlotReservationContext::from_ctx(ctx))
-            .expect("serialization should not fail");
+        let json = reservation_context_json(ctx);
         let (tx, rx) = tokio::sync::oneshot::channel();
         let completion = Box::into_raw(Box::new(SlotReserveCompletion { sender: Some(tx) }));
 
@@ -304,8 +322,7 @@ where
     }
 
     fn try_reserve_slot(&self, ctx: &dyn SlotReservationContext) -> Option<SlotSupplierPermit> {
-        let json = serde_json::to_vec(&SerializedSlotReservationContext::from_ctx(ctx))
-            .expect("serialization should not fail");
+        let json = reservation_context_json(ctx);
         let result = unsafe { (self.inner.try_reserve_fn)(json.as_ptr(), json.len()) };
         if result != 0 {
             Some(SlotSupplierPermit::default())
@@ -315,18 +332,12 @@ where
     }
 
     fn mark_slot_used(&self, ctx: &dyn SlotMarkUsedContext<SlotKind = SK>) {
-        let info = SerializedSlotInfo::from_info(ctx.info().downcast());
-        let json = serde_json::to_vec(&SerializedMarkUsedContext { slot_info: info })
-            .expect("serialization should not fail");
+        let json = mark_used_context_json(ctx.info().downcast());
         unsafe { (self.inner.mark_used_fn)(json.as_ptr(), json.len()) };
     }
 
     fn release_slot(&self, ctx: &dyn SlotReleaseContext<SlotKind = SK>) {
-        let info = ctx
-            .info()
-            .map(|i| SerializedSlotInfo::from_info(i.downcast()));
-        let json = serde_json::to_vec(&SerializedReleaseContext { slot_info: info })
-            .expect("serialization should not fail");
+        let json = release_context_json(ctx.info().map(|i| i.downcast()));
         unsafe { (self.inner.release_fn)(json.as_ptr(), json.len()) };
     }
 }
