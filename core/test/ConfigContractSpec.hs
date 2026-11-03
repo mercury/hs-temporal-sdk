@@ -20,7 +20,6 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
-import GHC.Stack (HasCallStack)
 import Temporal.Core.Client
 import Temporal.Core.EphemeralServer
 import Temporal.Core.Internal.TestFixture
