@@ -270,6 +270,7 @@ instance Codec Zlib Payload where
 {- | A codec that post-processes the payload after encoding and pre-processes before decoding.
 
 Combining multiple 'PayloadProcessor's will apply them in the order that they are added.
+
 For example, if you want to compress and then encrypt, you would add the compression processor
 first, then the encryption processor.
 -}

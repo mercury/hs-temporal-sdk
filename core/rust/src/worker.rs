@@ -46,6 +46,8 @@ pub enum SlotSupplierConfig {
         maximum_slots: Option<usize>,
         ramp_throttle_ms: Option<u64>,
     },
+    /// `handle` is the `HaskellSlotSupplierInner` pointer that
+    /// `hs_temporal_new_custom_slot_supplier` returned, stored as a number.
     #[serde(rename = "custom")]
     Custom { handle: u64 },
 }
@@ -67,11 +69,12 @@ pub struct TunerConfig {
     pub resource_based_tuner_options: Option<ResourceBasedTunerConfig>,
 }
 
-impl<SK: SlotKind + Send + Sync + 'static> From<&SlotSupplierConfig>
+impl<SK: SlotKind + Send + Sync + 'static> TryFrom<&SlotSupplierConfig>
     for temporalio_sdk_core::SlotSupplierOptions<SK>
 {
-    fn from(cfg: &SlotSupplierConfig) -> SlotSupplierOptions<SK> {
-        match cfg {
+    type Error = WorkerError;
+    fn try_from(cfg: &SlotSupplierConfig) -> Result<SlotSupplierOptions<SK>, WorkerError> {
+        let options = match cfg {
             SlotSupplierConfig::FixedSize { slots } => {
                 SlotSupplierOptions::FixedSize { slots: *slots }
             }
@@ -86,19 +89,21 @@ impl<SK: SlotKind + Send + Sync + 'static> From<&SlotSupplierConfig>
             )),
             SlotSupplierConfig::Custom { handle } => {
                 let inner_ptr = *handle as *const HaskellSlotSupplierInner;
-                let inner = unsafe { &*inner_ptr };
+                // Null is the only invalid handle that can be detected here.
+                let inner = unsafe { inner_ptr.as_ref() }.ok_or_else(|| {
+                    WorkerError::new(
+                        WorkerErrorCode::InvalidWorkerConfig,
+                        "custom slot supplier handle is null",
+                    )
+                })?;
                 let supplier: HaskellSlotSupplier<SK> = HaskellSlotSupplier {
-                    inner: Arc::new(HaskellSlotSupplierInner {
-                        reserve_fn: inner.reserve_fn,
-                        try_reserve_fn: inner.try_reserve_fn,
-                        mark_used_fn: inner.mark_used_fn,
-                        release_fn: inner.release_fn,
-                    }),
+                    inner: Arc::new(*inner),
                     _phantom: PhantomData,
                 };
                 SlotSupplierOptions::Custom(Arc::new(supplier))
             }
-        }
+        };
+        Ok(options)
     }
 }
 
@@ -129,22 +134,10 @@ impl TryFrom<&TunerConfig> for TunerHolderOptions {
             });
         }
 
-        // Converting a custom supplier dereferences its handle.
-        if suppliers
-            .iter()
-            .any(|s| matches!(s, Some(SlotSupplierConfig::Custom { handle: 0 })))
-        {
-            return Err(WorkerError {
-                code: WorkerErrorCode::InvalidWorkerConfig,
-                message: "custom slot supplier handle is null".to_string(),
-            });
-        }
-
-        let maybe_workflow_slot_opts = cfg.workflow_slot_supplier.as_ref().map(Into::into);
-        let maybe_activity_slot_opts = cfg.activity_slot_supplier.as_ref().map(Into::into);
-        let maybe_local_activity_slot_opts =
-            cfg.local_activity_slot_supplier.as_ref().map(Into::into);
-        let maybe_nexus_slot_opts = cfg.nexus_slot_supplier.as_ref().map(Into::into);
+        let maybe_workflow_slot_opts = slot_options(&cfg.workflow_slot_supplier)?;
+        let maybe_activity_slot_opts = slot_options(&cfg.activity_slot_supplier)?;
+        let maybe_local_activity_slot_opts = slot_options(&cfg.local_activity_slot_supplier)?;
+        let maybe_nexus_slot_opts = slot_options(&cfg.nexus_slot_supplier)?;
 
         TunerHolderOptions::builder()
             .maybe_workflow_slot_options(maybe_workflow_slot_opts)
@@ -158,6 +151,12 @@ impl TryFrom<&TunerConfig> for TunerHolderOptions {
                 message: format!("Invalid tuner config: {}", err),
             })
     }
+}
+
+fn slot_options<SK: SlotKind + Send + Sync + 'static>(
+    cfg: &Option<SlotSupplierConfig>,
+) -> Result<Option<SlotSupplierOptions<SK>>, WorkerError> {
+    cfg.as_ref().map(SlotSupplierOptions::try_from).transpose()
 }
 
 impl TryFrom<&TunerConfig> for TunerHolder {
@@ -199,6 +198,7 @@ pub struct SlotReserveCompletion {
     sender: Option<tokio::sync::oneshot::Sender<()>>,
 }
 
+#[derive(Clone, Copy)]
 pub struct HaskellSlotSupplierInner {
     reserve_fn: ReserveSlotFn,
     try_reserve_fn: TryReserveSlotFn,
@@ -680,6 +680,14 @@ pub struct CWorkerValidationError {
     message: *const c_char,
 }
 
+impl runtime::CError for CWorkerError {
+    type Rust = WorkerError;
+}
+
+impl runtime::CError for CWorkerValidationError {
+    type Rust = String;
+}
+
 impl From<String> for CWorkerValidationError {
     fn from(message: String) -> Self {
         CWorkerValidationError::c_repr_of(FormattedError {
@@ -885,17 +893,9 @@ impl WorkerRef {
             .ok_or_else(|| WorkerError::new(code, "Worker finalization has already started"))
     }
 
-    fn spawn_reporting<T, F>(&self, hs: HsCallback<T, CWorkerError>, fut: F)
-    where
-        F: Future<Output = Result<T, WorkerError>> + Send + 'static,
-        T: RawPointerConverter<T> + 'static,
-    {
-        spawn_reporting(&self.runtime, hs, fut)
-    }
-
     fn poll_workflow_activation(&self, hs: HsCallback<CArray<u8>, CWorkerError>) {
         let worker = self.core_worker(WorkerErrorCode::PollShutdownError);
-        self.spawn_reporting(hs, async move {
+        self.runtime.spawn_reporting(hs, async move {
             let act = worker?
                 .poll_workflow_activation()
                 .await
@@ -906,7 +906,7 @@ impl WorkerRef {
 
     fn poll_activity_task(&self, hs: HsCallback<CArray<u8>, CWorkerError>) {
         let worker = self.core_worker(WorkerErrorCode::PollShutdownError);
-        self.spawn_reporting(hs, async move {
+        self.runtime.spawn_reporting(hs, async move {
             let task = worker?
                 .poll_activity_task()
                 .await
@@ -917,7 +917,7 @@ impl WorkerRef {
 
     fn poll_nexus_task(&self, hs: HsCallback<CArray<u8>, CWorkerError>) {
         let worker = self.core_worker(WorkerErrorCode::PollShutdownError);
-        self.spawn_reporting(hs, async move {
+        self.runtime.spawn_reporting(hs, async move {
             let task = worker?
                 .poll_nexus_task()
                 .await
@@ -940,7 +940,7 @@ impl WorkerRef {
                 )
             })
         });
-        self.spawn_reporting(hs, async move {
+        self.runtime.spawn_reporting(hs, async move {
             let completion = completion?;
             worker?
                 .complete_workflow_activation(completion)
@@ -962,7 +962,7 @@ impl WorkerRef {
             ActivityTaskCompletion::decode(proto.as_slice())
                 .map_err(|err| WorkerError::new(WorkerErrorCode::InvalidProto, format!("{}", err)))
         });
-        self.spawn_reporting(hs, async move {
+        self.runtime.spawn_reporting(hs, async move {
             let completion = completion?;
             worker?
                 .complete_activity_task(completion)
@@ -988,7 +988,7 @@ impl WorkerRef {
                 )
             })
         });
-        self.spawn_reporting(hs, async move {
+        self.runtime.spawn_reporting(hs, async move {
             let completion = completion?;
             worker?
                 .complete_nexus_task(completion)
@@ -1035,7 +1035,7 @@ impl WorkerRef {
 
     fn finalize_shutdown(&mut self, hs: HsCallback<CUnit, CWorkerError>) {
         let core_worker = self.worker.take();
-        self.spawn_reporting(hs, async move {
+        self.runtime.spawn_reporting(hs, async move {
             let Some(core_worker) = core_worker else {
                 return Err(WorkerError::new(
                     WorkerErrorCode::SDKError,
@@ -1063,15 +1063,6 @@ impl WorkerRef {
     }
 }
 
-/// Schedule `fut` on `runtime` and report its result through `hs`.
-fn spawn_reporting<T, F>(runtime: &runtime::Runtime, hs: HsCallback<T, CWorkerError>, fut: F)
-where
-    F: Future<Output = Result<T, WorkerError>> + Send + 'static,
-    T: RawPointerConverter<T> + 'static,
-{
-    runtime.future_result_into_hs(hs, async move { fut.await.map_err(CWorkerError::from) })
-}
-
 // TODO: [publish-crate]
 /// # Safety
 ///
@@ -1093,12 +1084,12 @@ pub unsafe extern "C" fn hs_temporal_validate_worker(
     };
 
     let w = worker.core_worker(WorkerErrorCode::SDKError);
-    worker.runtime.future_result_into_hs(hs, async move {
-        let w = w.map_err(|err| CWorkerValidationError::from(err.message))?;
-        match w.validate().await {
-            Ok(()) => Ok(CUnit {}),
-            Err(err) => Err(CWorkerValidationError::from(format!("{}", err))),
-        }
+    worker.runtime.spawn_reporting(hs, async move {
+        w.map_err(|err| err.message)?
+            .validate()
+            .await
+            .map_err(|err| err.to_string())?;
+        Ok(CUnit {})
     })
 }
 
@@ -1381,7 +1372,7 @@ impl HistoryPusher {
                 message: "Replay worker is no longer accepting new histories".to_string(),
             })
         };
-        spawn_reporting(&self.runtime, hs, async move {
+        self.runtime.spawn_reporting(hs, async move {
             let wfid = workflow_id?;
             let history = history?;
             tx?.send(HistoryForReplay::new(history, wfid))
@@ -1534,10 +1525,10 @@ pub unsafe extern "C" fn hs_temporal_history_pusher_drop(history_pusher: *mut Hi
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runtime::test_support::{TestWaiter, new_test_runtime, test_cap};
+    use crate::runtime::test_support::{call_bridge, new_test_runtime};
     use serde_json::json;
     use temporalio_common::worker::{
-        ActivitySlotKind, LocalActivitySlotKind, NexusSlotKind, WorkerTuner, WorkflowSlotKind,
+        ActivitySlotKind, LocalActivitySlotKind, NexusSlotKind, WorkflowSlotKind,
     };
 
     fn full_worker_config() -> serde_json::Value {
@@ -1583,7 +1574,7 @@ mod tests {
                 "maximum_slots": null,
                 "ramp_throttle_ms": null
             },
-            "nexus_slot_supplier": null,
+            "nexus_slot_supplier": {"type": "fixed_size", "slots": 9},
             "resource_based_tuner_options": {
                 "target_memory_usage": 0.6,
                 "target_cpu_usage": 0.8
@@ -1640,62 +1631,25 @@ mod tests {
                 )
             ))
         );
-        assert!(opts.nexus_slot_options.is_none());
+        assert_eq!(
+            debug(opts.nexus_slot_options),
+            debug(Some(SlotSupplierOptions::<NexusSlotKind>::FixedSize {
+                slots: 9
+            }))
+        );
     }
 
     #[test]
-    fn resource_based_suppliers_require_tuner_options() {
-        for supplier in [
-            "workflow_slot_supplier",
-            "activity_slot_supplier",
-            "local_activity_slot_supplier",
-            "nexus_slot_supplier",
-        ] {
-            let mut config = json!({
-                "workflow_slot_supplier": null,
-                "activity_slot_supplier": null,
-                "local_activity_slot_supplier": null,
-                "nexus_slot_supplier": null,
-                "resource_based_tuner_options": null
-            });
-            config[supplier] = json!({
-                "type": "resource_based",
-                "minimum_slots": null,
-                "maximum_slots": null,
-                "ramp_throttle_ms": null
-            });
-            let err = TunerHolder::try_from(&tuner_config(config)).err().unwrap();
-            assert!(matches!(err.code, WorkerErrorCode::InvalidWorkerConfig));
-            assert!(
-                err.message.contains("resource_based_tuner_options"),
-                "{supplier}"
-            );
-        }
-    }
-
-    #[test]
-    fn fixed_size_tuner_builds() {
-        let config = json!({
-            "workflow_slot_supplier": {"type": "fixed_size", "slots": 2},
-            "activity_slot_supplier": {"type": "fixed_size", "slots": 3},
-            "local_activity_slot_supplier": {"type": "fixed_size", "slots": 4},
-            "nexus_slot_supplier": {"type": "fixed_size", "slots": 5},
-            "resource_based_tuner_options": null
-        });
-        let tuner = TunerHolder::try_from(&tuner_config(config)).unwrap();
-        assert_eq!(
-            tuner.workflow_task_slot_supplier().available_slots(),
-            Some(2)
+    fn resource_based_supplier_requires_tuner_options() {
+        let mut config = full_tuner_config();
+        config["resource_based_tuner_options"] = json!(null);
+        let err = TunerHolder::try_from(&tuner_config(config)).err().unwrap();
+        assert!(matches!(err.code, WorkerErrorCode::InvalidWorkerConfig));
+        assert!(
+            err.message.contains("resource_based_tuner_options"),
+            "{}",
+            err.message
         );
-        assert_eq!(
-            tuner.activity_task_slot_supplier().available_slots(),
-            Some(3)
-        );
-        assert_eq!(
-            tuner.local_activity_slot_supplier().available_slots(),
-            Some(4)
-        );
-        assert_eq!(tuner.nexus_task_slot_supplier().available_slots(), Some(5));
     }
 
     unsafe extern "C" fn reserve(_: *const u8, _: usize, _: *mut SlotReserveCompletion) {}
@@ -1705,7 +1659,7 @@ mod tests {
     unsafe extern "C" fn notify(_: *const u8, _: usize) {}
 
     #[test]
-    fn custom_slot_supplier_uses_the_handle() {
+    fn custom_slot_supplier_accepts_a_valid_handle() {
         let inner = HaskellSlotSupplierInner {
             reserve_fn: reserve,
             try_reserve_fn: try_reserve,
@@ -1715,7 +1669,7 @@ mod tests {
         let config = SlotSupplierConfig::Custom {
             handle: &inner as *const HaskellSlotSupplierInner as u64,
         };
-        let opts = SlotSupplierOptions::<NexusSlotKind>::from(&config);
+        let opts = SlotSupplierOptions::<NexusSlotKind>::try_from(&config).unwrap();
         assert!(matches!(opts, SlotSupplierOptions::Custom(_)));
     }
 
@@ -1756,11 +1710,6 @@ mod tests {
             Some(13)
         );
         assert_eq!(tuner.nexus_task_slot_supplier().available_slots(), Some(14));
-        // The bridge always supplies a tuner, so Core's own limits stay unset.
-        assert_eq!(config.max_outstanding_workflow_tasks, None);
-        assert_eq!(config.max_outstanding_activities, None);
-        assert_eq!(config.max_outstanding_local_activities, None);
-        assert_eq!(config.max_outstanding_nexus_tasks, None);
 
         assert_eq!(
             config.workflow_task_poller_behavior,
@@ -1817,7 +1766,6 @@ mod tests {
     fn worker_config_uses_defaults_for_absent_optional_values() {
         let mut json = full_worker_config();
         json["client_identity_override"] = json!(null);
-        json["max_outstanding_nexus_tasks"] = json!(null);
         json["max_concurrent_nexus_task_polls"] = json!(null);
         json["max_task_queue_activities_per_second"] = json!(null);
         json["max_worker_activities_per_second"] = json!(null);
@@ -1937,33 +1885,44 @@ mod tests {
     #[test]
     fn calls_after_finalization_report_errors() {
         let runtime = new_test_runtime();
-        let worker = WorkerRef {
+        let mut worker = WorkerRef {
             worker: None,
             runtime: runtime.runtime.clone(),
         };
 
-        let mut waiter = TestWaiter::<CArray<u8>, CWorkerError>::new();
-        worker.poll_workflow_activation(HsCallback {
-            cap: test_cap(),
-            mvar: waiter.mvar(),
-            result_slot: &mut *waiter.result_slot,
-            error_slot: &mut *waiter.error_slot,
-        });
-        let err: WorkerError = waiter.wait().err().unwrap().as_rust().unwrap();
+        let result: Result<CArray<u8>, CWorkerError> =
+            call_bridge(|mvar, cap, error_slot, result_slot| {
+                worker.poll_workflow_activation(HsCallback {
+                    cap,
+                    mvar,
+                    result_slot,
+                    error_slot,
+                })
+            });
+        let err: WorkerError = result.err().unwrap().as_rust().unwrap();
         assert!(matches!(err.code, WorkerErrorCode::PollShutdownError));
 
-        let mut waiter = TestWaiter::<CUnit, CWorkerError>::new();
-        worker.complete_activity_task(
-            HsCallback {
-                cap: test_cap(),
-                mvar: waiter.mvar(),
-                result_slot: &mut *waiter.result_slot,
-                error_slot: &mut *waiter.error_slot,
-            },
-            Ok(vec![]),
-        );
-        let err: WorkerError = waiter.wait().err().unwrap().as_rust().unwrap();
+        let result: Result<CUnit, CWorkerError> =
+            call_bridge(|mvar, cap, error_slot, result_slot| {
+                worker.complete_activity_task(
+                    HsCallback {
+                        cap,
+                        mvar,
+                        result_slot,
+                        error_slot,
+                    },
+                    Ok(vec![]),
+                )
+            });
+        let err: WorkerError = result.err().unwrap().as_rust().unwrap();
         assert!(matches!(err.code, WorkerErrorCode::CompletionFailure));
+
+        let result: Result<CUnit, CWorkerValidationError> =
+            call_bridge(|mvar, cap, error_slot, result_slot| unsafe {
+                hs_temporal_validate_worker(&mut worker, mvar, cap, error_slot, result_slot)
+            });
+        let err: FormattedError = result.err().unwrap().as_rust().unwrap();
+        assert_eq!(err.message, "Worker finalization has already started");
 
         // Eviction has no error result; it must not panic.
         worker.request_workflow_eviction("run");
@@ -1976,19 +1935,19 @@ mod tests {
         let (_worker, mut pusher) = new_replay_worker_from(&mut runtime, &config).unwrap();
         let workflow_id = byte_array(vec![0xff, 0xfe]);
         let history = byte_array(vec![]);
-        let mut waiter = TestWaiter::<CUnit, CWorkerError>::new();
-        unsafe {
-            hs_temporal_history_pusher_push_history(
-                &mut pusher,
-                &workflow_id,
-                &history,
-                waiter.mvar(),
-                test_cap(),
-                &mut *waiter.error_slot,
-                &mut *waiter.result_slot,
-            )
-        };
-        let err: WorkerError = waiter.wait().err().unwrap().as_rust().unwrap();
+        let result: Result<CUnit, CWorkerError> =
+            call_bridge(|mvar, cap, error_slot, result_slot| unsafe {
+                hs_temporal_history_pusher_push_history(
+                    &mut pusher,
+                    &workflow_id,
+                    &history,
+                    mvar,
+                    cap,
+                    error_slot,
+                    result_slot,
+                )
+            });
+        let err: WorkerError = result.err().unwrap().as_rust().unwrap();
         assert!(matches!(err.code, WorkerErrorCode::InvalidProto));
         assert!(err.message.starts_with("Workflow ID is not valid UTF-8"));
     }

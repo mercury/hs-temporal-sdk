@@ -64,6 +64,7 @@ library
       Temporal.Activity.Types
       Temporal.Workflow.Unsafe.Handle
       Temporal.Workflow.Internal.Instance
+      Temporal.Workflow.Internal.Payload
       Temporal.Workflow.Internal.Monad
       Temporal.Workflow.Signal
       Temporal.Workflow.Query
@@ -159,7 +160,7 @@ test-suite temporal-sdk-tests
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
-      ActivationLoopSpec, Spec, ClientHistorySpec, ContinueAsNewSpec, DurationSpec, IntegrationSpec, IntegrationSpec.HangingWorkflow, IntegrationSpec.NoOpWorkflow, IntegrationSpec.TimeoutsInWorkflows, IntegrationSpec.Updates, LocalActivitySpec, MockActivityEnvironmentSpec, IntegrationSpec.TimeSkipping, Common, RegisterWorkflowsSpec, ReplaySpec, ScheduleSpec, SignalSpec, SignalWithStartDropSpec, TestHelpers, THCompiles, WorkerTunerSpec
+      ActivationLoopSpec, Spec, ClientHistorySpec, ContinueAsNewSpec, DurationSpec, IntegrationSpec, IntegrationSpec.HangingWorkflow, IntegrationSpec.NoOpWorkflow, IntegrationSpec.PayloadProcessing, IntegrationSpec.WorkflowFinalization, IntegrationSpec.TimeoutsInWorkflows, IntegrationSpec.Updates, LocalActivitySpec, MockActivityEnvironmentSpec, IntegrationSpec.TimeSkipping, Common, Control.Concurrent.MVar.Extra, RegisterWorkflowsSpec, ReplaySpec, ScheduleSpec, SignalSpec, SignalWithStartDropSpec, TestHelpers, THCompiles, WorkerTunerSpec
   hs-source-dirs:
       test
   default-extensions:

@@ -2,7 +2,10 @@ module DurationSpec where
 
 import Data.Aeson (eitherDecode, encode)
 import Data.Either (isLeft)
+import Data.Foldable (for_)
+import Data.Ratio ((%))
 import qualified Data.Text as T
+import Data.Time.Clock (picosecondsToDiffTime)
 import Data.Time.Clock.System
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
@@ -44,6 +47,14 @@ genPositiveSafeDuration = do
   pure $ mkDuration secs ns
 
 
+-- | Generate a non-negative time with normalized nanoseconds, leaving room for duration arithmetic.
+genSafeSystemTime :: Gen SystemTime
+genSafeSystemTime =
+  MkSystemTime
+    <$> Gen.integral (Range.linear 0 1000)
+    <*> Gen.word32 (Range.linear 0 999_999_999)
+
+
 bothSignsMatchAssertion :: (MonadTest m, HasCallStack) => Duration -> m ()
 bothSignsMatchAssertion d =
   assert
@@ -64,6 +75,24 @@ spec = describe "Duration" $ do
     it "should parse a duration from a data type" $ do
       let d = Data.Aeson.encode $ mkDuration 2 4
       Data.Aeson.eitherDecode d `shouldBe` Right (mkDuration 2 4)
+  describe "time conversions" $ do
+    for_
+      [ ("negative", -1_500_000_000_000, mkDuration 0 0)
+      , ("negative sub-nanosecond", -1, mkDuration 0 0)
+      , ("zero", 0, mkDuration 0 0)
+      , ("sub-nanosecond", 999, mkDuration 0 0)
+      , ("one nanosecond", 1_000, mkDuration 0 1)
+      , ("fractional nanosecond", 1_999, mkDuration 0 1)
+      , ("below one second", 999_999_999_999, mkDuration 0 999_999_999)
+      , ("one second", 1_000_000_000_000, mkDuration 1 0)
+      , ("seconds and nanoseconds", 1_500_000_001_999, mkDuration 1 500_000_001)
+      ]
+      $ \(label, picos, expected) ->
+        describe label $ do
+          it "converts DiffTime" $
+            diffTimeToDuration (picosecondsToDiffTime picos) `shouldBe` expected
+          it "converts NominalDiffTime" $
+            nominalDiffTimeToDuration (fromRational $ picos % 1_000_000_000_000) `shouldBe` expected
   describe "math" $ do
     it "nanosecond overflow" $ do
       let d1 = mkDuration 1 0
@@ -91,8 +120,8 @@ spec = describe "Duration" $ do
       addDurations d1 d2 `shouldBe` mkDuration (-1) (-100_000_000)
   describe "Semigroup" $ do
     specify "associativity" $ hedgehog $ do
-      ds <- forAll $ (,,) <$> genDuration <*> genDuration <*> genDuration
-      (ds <> (ds <> ds)) === ((ds <> ds) <> ds)
+      (a, b, c) <- forAll $ (,,) <$> genDuration <*> genDuration <*> genDuration
+      (a <> (b <> c)) === ((a <> b) <> c)
   describe "Monoid" $ do
     specify "right identity" $ hedgehog $ do
       d <- forAll genDuration
@@ -141,22 +170,14 @@ spec = describe "Duration" $ do
 
     it "preserves SystemTime invariants" $ hedgehog $ do
       duration <- forAll genPositiveSafeDuration
-      time <-
-        forAll $
-          MkSystemTime
-            <$> Gen.integral (Range.linear 0 1000) -- Keep times positive for this test
-            <*> Gen.word32 (Range.linear 0 999_999_999)
+      time <- forAll genSafeSystemTime
       let result = addDurationToSystemTime duration time
       assert $ systemNanoseconds result < 1_000_000_000
       assert $ systemSeconds result >= 0
 
     it "roundtrips with diffSystemTime" $ hedgehog $ do
       duration <- forAll genPositiveSafeDuration
-      time <-
-        forAll $
-          MkSystemTime
-            <$> Gen.integral (Range.linear 0 1000) -- Keep times positive for this test
-            <*> Gen.word32 (Range.linear 0 999_999_999)
+      time <- forAll genSafeSystemTime
       let newTime = addDurationToSystemTime duration time
       let diff = diffSystemTime time newTime
       diff === duration
@@ -192,36 +213,16 @@ spec = describe "Duration" $ do
       diffSystemTime time newTime `shouldBe` duration
 
     it "is antisymmetric" $ hedgehog $ do
-      t1 <-
-        forAll $
-          MkSystemTime
-            <$> Gen.integral (Range.linear 0 1000)
-            <*> Gen.word32 (Range.linear 0 999_999_999)
-      t2 <-
-        forAll $
-          MkSystemTime
-            <$> Gen.integral (Range.linear 0 1000)
-            <*> Gen.word32 (Range.linear 0 999_999_999)
+      t1 <- forAll genSafeSystemTime
+      t2 <- forAll genSafeSystemTime
       let d1 = diffSystemTime t1 t2
       let d2 = diffSystemTime t2 t1
       d1 === mkDuration (-durationSeconds d2) (-durationNanoseconds d2)
 
     it "obeys triangle inequality" $ hedgehog $ do
-      t1 <-
-        forAll $
-          MkSystemTime
-            <$> Gen.integral (Range.linear 0 1000)
-            <*> Gen.word32 (Range.linear 0 999_999_999)
-      t2 <-
-        forAll $
-          MkSystemTime
-            <$> Gen.integral (Range.linear 0 1000)
-            <*> Gen.word32 (Range.linear 0 999_999_999)
-      t3 <-
-        forAll $
-          MkSystemTime
-            <$> Gen.integral (Range.linear 0 1000)
-            <*> Gen.word32 (Range.linear 0 999_999_999)
+      t1 <- forAll genSafeSystemTime
+      t2 <- forAll genSafeSystemTime
+      t3 <- forAll genSafeSystemTime
       let d1 = diffSystemTime t1 t2
       let d2 = diffSystemTime t2 t3
       let d3 = diffSystemTime t1 t3
