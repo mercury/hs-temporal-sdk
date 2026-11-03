@@ -15,6 +15,7 @@ type Client = RetryClient<ConfiguredClient<TemporalServiceClient>>;
 
 /// Configuration options for [connect_client].
 #[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ClientConfig {
     /// The server to connect to.
     target_url: String,
@@ -43,6 +44,7 @@ pub struct ClientConfig {
 
 /// Configuration options for TLS and, optionally, mTLS.
 #[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ClientTlsConfig {
     /// Bytes representing the root CA certificate used by the server.
     ///
@@ -60,6 +62,7 @@ struct ClientTlsConfig {
 
 /// Configuration for retrying requests to the server.
 #[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ClientRetryConfig {
     /// Initial wait time before the first retry, in milliseconds.
     pub initial_interval_millis: u64,
@@ -601,6 +604,26 @@ mod tests {
         assert!(tls.client_tls_options.is_none());
         assert_eq!(tls.server_root_ca_cert, Some(vec![1, 2, 3]));
         assert_eq!(tls.domain.as_deref(), Some("tls.example"));
+    }
+
+    #[test]
+    fn client_config_rejects_unknown_fields() {
+        for pointer in ["", "/tls_config", "/retry_config"] {
+            let mut config = full_client_config();
+            config
+                .pointer_mut(pointer)
+                .unwrap()
+                .as_object_mut()
+                .unwrap()
+                .insert("unexpected".into(), json!(1));
+            let err = parse_client_config(config.to_string().as_bytes())
+                .err()
+                .unwrap();
+            assert!(
+                err.contains("unknown field `unexpected`"),
+                "{pointer}: {err}"
+            );
+        }
     }
 
     fn connect_with_raw_config(config: Option<&CStr>) -> Result<ClientRef, CArray<u8>> {

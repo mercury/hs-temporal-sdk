@@ -9,6 +9,8 @@
   value now makes `connectClient` fail with `ClientConnectionError`.
 * The resource-based tuner now uses `targetCpuUsage` as its CPU target.
   Before, it used `targetMemoryUsage` for both the memory and the CPU target.
+* `CachedDownload`'s TTL (its third argument, in seconds) is now applied.
+  Before, it was encoded in the wrong place and the bridge ignored it.
 * Invalid input from the caller now returns an error instead of aborting the
   process:
   * `initializeRuntime` throws `RuntimeInitializationError` for invalid
@@ -25,6 +27,8 @@
     (`PollShutdown` for polls, `CompletionFailure` for completions) instead of
     aborting. `requestWorkflowEviction` does nothing in that case.
   * Error messages that contain a NUL byte no longer abort the process.
+* The bridge now rejects configuration JSON with unknown fields. The Haskell
+  encoders send only known fields, so this affects only hand-written JSON.
 
 ### New API
 

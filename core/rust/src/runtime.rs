@@ -112,7 +112,7 @@ impl TryFrom<HsTelemetryOptions> for MeterOptions {
 
     fn try_from(options: HsTelemetryOptions) -> Result<Self, String> {
         match options {
-            HsTelemetryOptions::NoTelemetry => Ok(MeterOptions::NoOp),
+            HsTelemetryOptions::NoTelemetry {} => Ok(MeterOptions::NoOp),
             HsTelemetryOptions::OtelTelemetryOptions {
                 url,
                 headers,
@@ -219,7 +219,7 @@ pub(crate) unsafe fn write_error_slot(slot: *mut *mut CArray<u8>, message: impl 
 }
 
 #[derive(Serialize, Deserialize)]
-#[serde(tag = "tag")]
+#[serde(tag = "tag", deny_unknown_fields)]
 pub enum HsTelemetryOptions {
     OtelTelemetryOptions {
         url: String,
@@ -233,7 +233,9 @@ pub enum HsTelemetryOptions {
         counters_total_suffix: bool,
         unit_suffix: bool,
     },
-    NoTelemetry,
+    // A struct variant, because serde does not apply `deny_unknown_fields` to
+    // unit variants of internally tagged enums.
+    NoTelemetry {},
 }
 
 // TODO: [publish-crate]
@@ -549,9 +551,12 @@ mod tests {
     #[test]
     fn telemetry_options_reject_invalid_input() {
         for json in [
-            &br#"{"tag":"Unknown"}"#[..],
+            &br#"{"tag":"NoTelemetry","extra":1}"#[..],
+            br#"{"tag":"Unknown"}"#,
             br#"{"tag":"PrometheusTelemetryOptions","socket_addr":"not an address",
                  "global_tags":{},"counters_total_suffix":false,"unit_suffix":false}"#,
+            br#"{"tag":"OtelTelemetryOptions","url":"http://c","headers":{},
+                 "global_tags":{},"metric_periodicity":null,"extra":1}"#,
             b"not json",
         ] {
             let err = parse_telemetry_options(json).err().unwrap_or_else(|| {
