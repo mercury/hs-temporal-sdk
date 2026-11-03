@@ -1,11 +1,12 @@
 {-# LANGUAGE EmptyDataDecls #-}
 
-{- | Test-only bindings for exercising the Tokio FFI bridge.
+{- | Test-only bindings for exercising the FFI bridge.
 
 These wrap tiny bridge fixtures (prefixed @hs_temporal_test_@ on the Rust
-side) that exist purely so test suites can observe cross-language resource
-management, e.g. that a Rust result produced after the Haskell waiter was
-interrupted is still reclaimed by the cleanup thread. They are compiled into
+side). Some let test suites observe cross-language resource management, e.g.
+that a Rust result produced after the Haskell waiter was interrupted is still
+reclaimed by the cleanup thread. Others run the bridge's config parsers
+without starting a runtime, client, worker or server. They are compiled into
 the production bridge library because the test suites link the same artifact,
 but nothing outside of tests should call them.
 -}
@@ -57,18 +58,15 @@ acquireDelayedTestResource r delayMillis = withRuntime r $ \rp ->
     (\_ -> pure ())
 
 
--- | A configuration type that the bridge decodes from JSON.
+{- | The bridge parser that 'echoBridgeConfig' runs, named after the Haskell
+config type whose JSON it accepts.
+-}
 data BridgeConfigType
-  = -- | @Temporal.Core.Worker.WorkerConfig@
-    WorkerConfigType
-  | -- | @Temporal.Core.Client.ClientConfig@
-    ClientConfigType
-  | -- | @Temporal.Runtime.TelemetryOptions@
-    TelemetryOptionsType
-  | -- | @Temporal.Core.EphemeralServer.TemporalDevServerConfig@
-    DevServerConfigType
-  | -- | @Temporal.Core.EphemeralServer.TemporalTestServerConfig@
-    TestServerConfigType
+  = WorkerConfigType
+  | ClientConfigType
+  | TelemetryOptionsType
+  | DevServerConfigType
+  | TestServerConfigType
   deriving stock (Show, Eq, Enum, Bounded)
 
 
@@ -90,12 +88,9 @@ foreign import ccall "hs_temporal_test_echo_dev_server_config" raw_echoDevServer
 foreign import ccall "hs_temporal_test_echo_test_server_config" raw_echoTestServerConfig :: EchoConfig
 
 
-{- | Decode JSON with the bridge's decoder for a configuration type, then
-encode the decoded value back to JSON.
-
-Returns the bridge's error message if it rejects the input. Tests compare the
-result with the input to check that the Haskell encoder and the Rust type
-agree on every field.
+{- | Decode JSON with the bridge's parser for a config type, then serialize
+the parsed value back to JSON with the bridge's serializer. Returns 'Left'
+with the bridge's error message if the parser rejects the input.
 -}
 echoBridgeConfig :: BridgeConfigType -> ByteString -> IO (Either Text ByteString)
 echoBridgeConfig configType json = withCArrayBS json $ \jsonPtr ->

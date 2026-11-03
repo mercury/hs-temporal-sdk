@@ -2,17 +2,14 @@
 {-# OPTIONS_GHC -Werror=missing-fields #-}
 
 {- | The Haskell config types and the Rust bridge types are hand-written
-mirrors that meet as JSON. These tests send each Haskell config through the
-bridge's own decoder and encoder and check that nothing is lost or added.
+mirrors that meet as JSON. Each test encodes a Haskell config, decodes it with
+the bridge's parser, serializes the result with the bridge's serializer, and
+compares the two JSON values. A key that only one side knows, or a value that
+the two sides encode differently, fails the test.
 
-* A Haskell field that Rust does not know fails the bridge's
-  @deny_unknown_fields@ check.
-* A Rust field that Haskell does not send comes back as an extra key.
-* A field whose encoding differs comes back with a different value.
-
-Every config below sets each field to a value different from its default, so
-a field that a side ignores cannot pass by accident. @-Werror=missing-fields@
-makes a new Haskell field fail to compile here until it is covered.
+Each 'Maybe' field is 'Just' in at least one test, so every nested encoding
+reaches the bridge. @-Werror=missing-fields@ makes a new Haskell field fail to
+compile here until a test sets it.
 -}
 module ConfigContractSpec (spec) where
 
@@ -93,7 +90,6 @@ spec = describe "Haskell and Rust config mirrors" $ do
         testServerConfig existingPath
 
 
--- | Check that the bridge decodes and re-encodes @config@ without change.
 assertRoundTrip :: (HasCallStack, ToJSON a) => BridgeConfigType -> a -> Expectation
 assertRoundTrip configType config = do
   let sent = encode config
@@ -115,7 +111,6 @@ withCustomSlotSupplierHandle :: (CustomSlotSupplierHandle -> IO a) -> IO a
 withCustomSlotSupplierHandle =
   bracket (newCustomSlotSupplierHandle unusedSlotSupplier) freeCustomSlotSupplierHandle
   where
-    -- The bridge only decodes the handle here; it never calls the supplier.
     unusedSlotSupplier :: CustomSlotSupplier
     unusedSlotSupplier =
       CustomSlotSupplier
@@ -234,7 +229,6 @@ minimalTlsConfig =
     }
 
 
--- | OpenTelemetry options with every field set except the periodicity.
 otelOptions :: Maybe Periodicity -> TelemetryOptions
 otelOptions metricPeriodicity =
   OtelTelemetryOptions
@@ -255,7 +249,6 @@ fullPrometheusOptions =
     }
 
 
--- | A dev server config with every field set except the executable.
 devServerConfig :: EphemeralExe -> TemporalDevServerConfig
 devServerConfig exe =
   TemporalDevServerConfig
@@ -287,7 +280,6 @@ existingPath :: EphemeralExe
 existingPath = ExistingPath "/opt/temporal-test-server"
 
 
--- | A test server config with every field set except the executable.
 testServerConfig :: EphemeralExe -> TemporalTestServerConfig
 testServerConfig exe =
   TemporalTestServerConfig

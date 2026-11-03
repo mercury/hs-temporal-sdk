@@ -98,11 +98,8 @@ pub extern "C" fn hs_temporal_test_resource_drop_count() -> u64 {
     TEST_RESOURCE_DROPS.load(Ordering::SeqCst)
 }
 
-/// Parse `json` with the bridge's parser for a config type, then serialize the
-/// parsed value back to JSON.
-///
-/// The Haskell test suite uses these to check that each Haskell config encoder
-/// and the matching bridge type agree on every field.
+/// Parse `json` with a bridge config parser and serialize the parsed value back
+/// to JSON, so that a Haskell test can compare it with the JSON it sent.
 ///
 /// # Safety
 ///
@@ -129,7 +126,8 @@ fn to_json<T: Serialize>(value: &T) -> Result<Vec<u8>, String> {
     serde_json::to_vec(value).map_err(|err| err.to_string())
 }
 
-/// Serialize with a `serde(remote)` definition's `serialize` function.
+/// `serde(remote)` types do not implement `Serialize`, so serialize them with
+/// their definition's `serialize` function.
 fn to_json_with<T>(
     value: &T,
     serialize: impl FnOnce(&T, &mut serde_json::Serializer<&mut Vec<u8>>) -> serde_json::Result<()>,
