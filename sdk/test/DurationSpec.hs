@@ -2,7 +2,10 @@ module DurationSpec where
 
 import Data.Aeson (eitherDecode, encode)
 import Data.Either (isLeft)
+import Data.Foldable (for_)
+import Data.Ratio ((%))
 import qualified Data.Text as T
+import Data.Time.Clock (picosecondsToDiffTime)
 import Data.Time.Clock.System
 import Hedgehog
 import qualified Hedgehog.Gen as Gen
@@ -72,6 +75,24 @@ spec = describe "Duration" $ do
     it "should parse a duration from a data type" $ do
       let d = Data.Aeson.encode $ mkDuration 2 4
       Data.Aeson.eitherDecode d `shouldBe` Right (mkDuration 2 4)
+  describe "time conversions" $ do
+    for_
+      [ ("negative", -1_500_000_000_000, mkDuration 0 0)
+      , ("negative sub-nanosecond", -1, mkDuration 0 0)
+      , ("zero", 0, mkDuration 0 0)
+      , ("sub-nanosecond", 999, mkDuration 0 0)
+      , ("one nanosecond", 1_000, mkDuration 0 1)
+      , ("fractional nanosecond", 1_999, mkDuration 0 1)
+      , ("below one second", 999_999_999_999, mkDuration 0 999_999_999)
+      , ("one second", 1_000_000_000_000, mkDuration 1 0)
+      , ("seconds and nanoseconds", 1_500_000_001_999, mkDuration 1 500_000_001)
+      ]
+      $ \(label, picos, expected) ->
+        describe label $ do
+          it "converts DiffTime" $
+            diffTimeToDuration (picosecondsToDiffTime picos) `shouldBe` expected
+          it "converts NominalDiffTime" $
+            nominalDiffTimeToDuration (fromRational $ picos % 1_000_000_000_000) `shouldBe` expected
   describe "math" $ do
     it "nanosecond overflow" $ do
       let d1 = mkDuration 1 0
