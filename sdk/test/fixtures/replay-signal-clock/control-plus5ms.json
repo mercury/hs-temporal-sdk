@@ -1,0 +1,590 @@
+{
+  "events": [
+    {
+      "eventId": "1",
+      "eventTime": "2027-08-28T06:17:36.108Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_EXECUTION_STARTED",
+      "workflowExecutionStartedEventAttributes": {
+        "workflowType": {
+          "name": "SignalClockWorkflow"
+        },
+        "taskQueue": {
+          "name": "signal-clock-repro"
+        },
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "e30="
+            }
+          ]
+        },
+        "workflowTaskTimeout": "3s",
+        "originalExecutionRunId": "11111111-1111-4111-8111-111111111111",
+        "firstExecutionRunId": "11111111-1111-4111-8111-111111111111",
+        "identity": "repro",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "2",
+      "eventTime": "2027-08-28T06:17:36.108Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "signal-clock-repro"
+        },
+        "startToCloseTimeout": "3s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "3",
+      "eventTime": "2027-08-28T06:17:36.109Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "2",
+        "identity": "repro"
+      }
+    },
+    {
+      "eventId": "4",
+      "eventTime": "2027-08-28T06:17:36.173Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "2",
+        "startedEventId": "3",
+        "identity": "repro",
+        "sdkMetadata": {}
+      }
+    },
+    {
+      "eventId": "5",
+      "eventTime": "2027-08-28T06:17:36.173Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "1",
+        "activityType": {
+          "name": "io"
+        },
+        "taskQueue": {
+          "name": "signal-clock-repro",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJvcCI6ImVuYWJsZWQifQ=="
+            }
+          ]
+        },
+        "startToCloseTimeout": "60s",
+        "scheduleToCloseTimeout": "900s",
+        "workflowTaskCompletedEventId": "4"
+      }
+    },
+    {
+      "eventId": "6",
+      "eventTime": "2027-08-28T06:17:36.173Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "signal-clock-repro"
+        },
+        "startToCloseTimeout": "3s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "7",
+      "eventTime": "2027-08-28T06:17:36.173Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "6",
+        "identity": "repro"
+      }
+    },
+    {
+      "eventId": "8",
+      "eventTime": "2027-08-28T06:17:36.181Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "6",
+        "startedEventId": "7",
+        "identity": "repro",
+        "sdkMetadata": {}
+      }
+    },
+    {
+      "eventId": "9",
+      "eventTime": "2027-08-28T06:17:36.182Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED",
+      "workflowExecutionSignaledEventAttributes": {
+        "signalName": "inbound",
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "e30="
+            }
+          ]
+        },
+        "identity": "repro"
+      }
+    },
+    {
+      "eventId": "10",
+      "eventTime": "2027-08-28T06:17:36.182Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "signal-clock-repro"
+        },
+        "startToCloseTimeout": "3s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "11",
+      "eventTime": "2027-08-28T06:17:36.183Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "10",
+        "identity": "repro"
+      }
+    },
+    {
+      "eventId": "12",
+      "eventTime": "2027-08-28T06:17:36.184Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "10",
+        "startedEventId": "11",
+        "identity": "repro",
+        "sdkMetadata": {}
+      }
+    },
+    {
+      "eventId": "13",
+      "eventTime": "2027-08-28T06:17:36.184Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "signal-clock-repro"
+        },
+        "startToCloseTimeout": "3s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "14",
+      "eventTime": "2027-08-28T06:17:36.184Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "13",
+        "identity": "repro"
+      }
+    },
+    {
+      "eventId": "15",
+      "eventTime": "2027-08-28T06:17:36.188Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "13",
+        "startedEventId": "14",
+        "identity": "repro",
+        "sdkMetadata": {}
+      }
+    },
+    {
+      "eventId": "16",
+      "eventTime": "2027-08-28T06:17:36.188Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "signal-clock-repro"
+        },
+        "startToCloseTimeout": "3s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "17",
+      "eventTime": "2027-08-28T06:17:36.185Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "5",
+        "identity": "repro",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "18",
+      "eventTime": "2027-08-28T06:17:36.188Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "scheduledEventId": "5",
+        "startedEventId": "17",
+        "identity": "repro",
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "dHJ1ZQ=="
+            }
+          ]
+        }
+      }
+    },
+    {
+      "eventId": "19",
+      "eventTime": "2027-08-28T06:17:36.188Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "16",
+        "identity": "repro"
+      }
+    },
+    {
+      "eventId": "20",
+      "eventTime": "2027-08-28T06:17:36.190Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "16",
+        "startedEventId": "19",
+        "identity": "repro",
+        "sdkMetadata": {}
+      }
+    },
+    {
+      "eventId": "21",
+      "eventTime": "2027-08-28T06:17:36.190Z",
+      "eventType": "EVENT_TYPE_TIMER_STARTED",
+      "timerStartedEventAttributes": {
+        "timerId": "1",
+        "startToFireTimeout": "1209599.995s",
+        "workflowTaskCompletedEventId": "20"
+      }
+    },
+    {
+      "eventId": "22",
+      "eventTime": "2027-09-11T06:17:36.190Z",
+      "eventType": "EVENT_TYPE_TIMER_FIRED",
+      "timerFiredEventAttributes": {
+        "timerId": "1",
+        "startedEventId": "21"
+      }
+    },
+    {
+      "eventId": "23",
+      "eventTime": "2027-09-11T06:17:36.190Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "signal-clock-repro"
+        },
+        "startToCloseTimeout": "3s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "24",
+      "eventTime": "2027-09-11T06:17:36.190Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "23",
+        "identity": "repro"
+      }
+    },
+    {
+      "eventId": "25",
+      "eventTime": "2027-09-11T06:17:36.192Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "23",
+        "startedEventId": "24",
+        "identity": "repro",
+        "sdkMetadata": {}
+      }
+    },
+    {
+      "eventId": "26",
+      "eventTime": "2027-09-11T06:17:36.192Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "2",
+        "activityType": {
+          "name": "io"
+        },
+        "taskQueue": {
+          "name": "signal-clock-repro",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJvcCI6ImVuYWJsZWQifQ=="
+            }
+          ]
+        },
+        "startToCloseTimeout": "60s",
+        "scheduleToCloseTimeout": "900s",
+        "workflowTaskCompletedEventId": "25"
+      }
+    },
+    {
+      "eventId": "27",
+      "eventTime": "2027-09-11T06:17:36.193Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "26",
+        "identity": "repro",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "28",
+      "eventTime": "2027-09-11T06:17:36.194Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "scheduledEventId": "26",
+        "startedEventId": "27",
+        "identity": "repro",
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "dHJ1ZQ=="
+            }
+          ]
+        }
+      }
+    },
+    {
+      "eventId": "29",
+      "eventTime": "2027-09-11T06:17:36.194Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "signal-clock-repro"
+        },
+        "startToCloseTimeout": "3s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "30",
+      "eventTime": "2027-09-11T06:17:36.194Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "29",
+        "identity": "repro"
+      }
+    },
+    {
+      "eventId": "31",
+      "eventTime": "2027-09-11T06:17:36.196Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "29",
+        "startedEventId": "30",
+        "identity": "repro",
+        "sdkMetadata": {}
+      }
+    },
+    {
+      "eventId": "32",
+      "eventTime": "2027-09-11T06:17:36.196Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "3",
+        "activityType": {
+          "name": "io"
+        },
+        "taskQueue": {
+          "name": "signal-clock-repro",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJvcCI6ImxvYWRfY29udGV4dCJ9"
+            }
+          ]
+        },
+        "startToCloseTimeout": "60s",
+        "scheduleToCloseTimeout": "900s",
+        "workflowTaskCompletedEventId": "31"
+      }
+    },
+    {
+      "eventId": "33",
+      "eventTime": "2027-09-11T06:17:36.197Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "32",
+        "identity": "repro",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "34",
+      "eventTime": "2027-09-11T06:17:36.198Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "scheduledEventId": "32",
+        "startedEventId": "33",
+        "identity": "repro",
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJ0aW1lem9uZSI6IlVUQyJ9"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "eventId": "35",
+      "eventTime": "2027-09-11T06:17:36.198Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "signal-clock-repro"
+        },
+        "startToCloseTimeout": "3s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "36",
+      "eventTime": "2027-09-11T06:17:36.198Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "35",
+        "identity": "repro"
+      }
+    },
+    {
+      "eventId": "37",
+      "eventTime": "2027-09-11T06:17:36.199Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "35",
+        "startedEventId": "36",
+        "identity": "repro",
+        "sdkMetadata": {}
+      }
+    },
+    {
+      "eventId": "38",
+      "eventTime": "2027-09-11T06:17:36.199Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "4",
+        "activityType": {
+          "name": "io"
+        },
+        "taskQueue": {
+          "name": "signal-clock-repro",
+          "kind": "TASK_QUEUE_KIND_NORMAL"
+        },
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "eyJvcCI6ImVuYWJsZWQifQ=="
+            }
+          ]
+        },
+        "startToCloseTimeout": "60s",
+        "scheduleToCloseTimeout": "900s",
+        "workflowTaskCompletedEventId": "37"
+      }
+    },
+    {
+      "eventId": "39",
+      "eventTime": "2027-09-11T06:17:36.200Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "38",
+        "identity": "repro",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "40",
+      "eventTime": "2027-09-11T06:17:36.201Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "scheduledEventId": "38",
+        "startedEventId": "39",
+        "identity": "repro",
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg=="
+              },
+              "data": "dHJ1ZQ=="
+            }
+          ]
+        }
+      }
+    },
+    {
+      "eventId": "41",
+      "eventTime": "2027-09-11T06:17:36.201Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "signal-clock-repro"
+        },
+        "startToCloseTimeout": "3s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "42",
+      "eventTime": "2027-09-11T06:17:36.201Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "41",
+        "identity": "repro"
+      }
+    },
+    {
+      "eventId": "43",
+      "eventTime": "2027-09-11T06:17:36.202Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "41",
+        "startedEventId": "42",
+        "identity": "repro",
+        "sdkMetadata": {}
+      }
+    }
+  ]
+}

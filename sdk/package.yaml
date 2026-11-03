@@ -2,6 +2,13 @@
 
 name:         temporal-sdk
 build-type:   Simple
+
+data-files:
+- test/fixtures/replay-signal-clock/*.bin
+
+extra-source-files:
+- test/fixtures/replay-signal-clock/*.json
+- test/fixtures/replay-signal-clock/README.md
 description:  Temporal is a durable execution system that transparently makes your code durable, fault-tolerant, and simple. This is the high-level Temporal SDK that provides a higher-level API for building Temporal workflows and activities.
 
 dependencies:
@@ -170,6 +177,7 @@ tests:
       Control.Concurrent.MVar.Extra,
       RegisterWorkflowsSpec,
       ReplaySpec,
+      ReplaySignalClockSpec,
       ScheduleSpec,
       SignalSpec,
       SignalWithStartDropSpec,
