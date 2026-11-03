@@ -120,6 +120,7 @@ test-suite temporal-sdk-core-tests
   other-modules:
       BridgeErrorSpec
       ConfigContractSpec
+      OutputContractSpec
   hs-source-dirs:
       test
   default-extensions:
