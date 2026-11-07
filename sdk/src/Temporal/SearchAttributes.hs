@@ -145,6 +145,9 @@ import Data.Scientific (floatingOrInteger)
 import Data.String (IsString)
 import Data.Text (Text)
 import Data.Time
+#if !MIN_VERSION_time(1,14,0) && MIN_VERSION_time_compat(1,9,8)
+import Data.Time.Compat ()
+#endif
 import Data.Vector (Vector)
 import Data.Word
 import GHC.TypeLits
@@ -246,7 +249,10 @@ data SearchAttributeType
   | KeywordList (Vector Text)
   deriving stock (Show, Eq, Ord, Lift, Data)
 
-#if MIN_VERSION_time(1,14,0)
+-- Lift instances for time's types: time has them from 1.14, and
+-- time-compat from 1.9.8 (through Data.Time.Compat, imported above), so
+-- define them only when neither does, or they are duplicates.
+#if MIN_VERSION_time(1,14,0) || MIN_VERSION_time_compat(1,9,8)
 #else
 deriving stock instance Lift UTCTime
 instance Lift DiffTime where

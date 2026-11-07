@@ -31,6 +31,7 @@ dependencies:
 - focus
 - list-t
 - time
+- time-compat
 - containers
 - hashable
 - monad-logger
