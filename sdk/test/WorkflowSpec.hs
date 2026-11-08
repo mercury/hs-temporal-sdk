@@ -364,8 +364,7 @@ tests = do
         useClient (C.execute wf.reference "localYield" opts) `shouldReturn` [1, 2, 3]
 
   describe "Concurrent combinators" $ do
-    -- Each branch records 's', yields, then records 'e'. Two concurrent
-    -- branches interleave as "ssee"; two sequential branches give "sese".
+    -- Two concurrent branches interleave as "ssee"; two sequential branches give "sese".
     let runsBothBranchesConcurrently :: Text -> (W.Workflow () -> W.Workflow ()) -> SpecWith TestEnv
         runsBothBranchesConcurrently name runTwice = specify (Text.unpack name) $ \TestEnv {..} -> do
           let workflow :: MyWorkflow String

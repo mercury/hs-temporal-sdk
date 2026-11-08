@@ -5,6 +5,7 @@ import qualified Control.Concurrent.Async as Async
 import Control.Exception (IOException, bracket, catch, fromException, try)
 import Control.Monad (unless, void, when)
 import Data.Either (isLeft, isRight)
+import Data.Foldable (fold)
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import Data.ProtoLens.Encoding (encodeMessage)
 import qualified Data.Text as Text
@@ -243,6 +244,26 @@ replayActivityDef :: ProvidedActivity () (Activity () Int)
 replayActivityDef = provideActivity JSON "replayAct" replayActivity
 
 
+{- | Record @copies@ activities run one after another by 'fold' on plain
+'W.Workflow', then replay that history against 'W.replicateConcurrently_'.
+-}
+replaySequentialCopies :: TestEnv -> Int -> IO (Either ReplayHistoryFailure ())
+replaySequentialCopies TestEnv {baseConf, taskQueue, withWorker, useClient} copies = do
+  let name = "replay-replicate-" <> Text.pack (show copies)
+      copy :: W.Workflow ()
+      copy = provideCallStack $ void $ W.executeActivity replayActivityDef.reference (W.defaultStartActivityOptions $ W.StartToClose $ seconds 3)
+      sequentialWorkflow = W.provideWorkflow JSON name $ fold (replicate copies copy)
+      concurrentWorkflow = W.provideWorkflow JSON name $ W.replicateConcurrently_ copies copy
+  history <- withWorker (configure () (replayActivityDef, sequentialWorkflow) baseConf) $ do
+    uuid <- uuidText
+    let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
+    useClient $ do
+      wfHandle <- C.start sequentialWorkflow (W.WorkflowId uuid) opts
+      C.waitWorkflowResult wfHandle
+      C.fetchHistory wfHandle
+  runReplayHistory globalRuntime (configure () (replayActivityDef, concurrentWorkflow) baseConf) history
+
+
 tests :: SpecWith TestEnv
 tests = describe "Workflow Replay" $ do
   specify "compatible replay succeeds" $ \TestEnv {..} -> do
@@ -476,6 +497,15 @@ tests = describe "Workflow Replay" $ do
     case result of
       Left err -> err.message `shouldSatisfy` (not . Text.null)
       Right () -> expectationFailure "Expected replay failure"
+
+  describe "replicateConcurrently_ replaying copies that ran one after another" $ do
+    specify "one copy replays" $ \env -> do
+      result <- replaySequentialCopies env 1
+      result `shouldSatisfy` isRight
+
+    specify "two copies replay" $ \env -> do
+      result <- replaySequentialCopies env 2
+      result `shouldSatisfy` isRight
 
   describe "Replay from raw protobuf bytes" $ do
     specify "replays a simple workflow" $ \TestEnv {..} -> do
