@@ -244,14 +244,16 @@ replayActivityDef :: ProvidedActivity () (Activity () Int)
 replayActivityDef = provideActivity JSON "replayAct" replayActivity
 
 
-{- | Record @copies@ activities run one after another by 'fold' on plain
+replayCopyActivity :: W.Workflow ()
+replayCopyActivity = provideCallStack $ void $ W.executeActivity replayActivityDef.reference (W.defaultStartActivityOptions $ W.StartToClose $ seconds 3)
+
+
+{- | Record @copies@ runs of @copy@ one after another by 'fold' on plain
 'W.Workflow', then replay that history against 'W.replicateConcurrently_'.
 -}
-replaySequentialCopies :: TestEnv -> Int -> IO (Either ReplayHistoryFailure ())
-replaySequentialCopies TestEnv {baseConf, taskQueue, withWorker, useClient} copies = do
-  let name = "replay-replicate-" <> Text.pack (show copies)
-      copy :: W.Workflow ()
-      copy = provideCallStack $ void $ W.executeActivity replayActivityDef.reference (W.defaultStartActivityOptions $ W.StartToClose $ seconds 3)
+replaySequentialCopies :: TestEnv -> Text.Text -> Int -> W.Workflow () -> IO (Either ReplayHistoryFailure ())
+replaySequentialCopies TestEnv {baseConf, taskQueue, withWorker, useClient} label copies copy = do
+  let name = "replay-replicate-" <> label <> "-" <> Text.pack (show copies)
       sequentialWorkflow = W.provideWorkflow JSON name $ fold (replicate copies copy)
       concurrentWorkflow = W.provideWorkflow JSON name $ W.replicateConcurrently_ copies copy
   history <- withWorker (configure () (replayActivityDef, sequentialWorkflow) baseConf) $ do
@@ -500,12 +502,16 @@ tests = describe "Workflow Replay" $ do
 
   describe "replicateConcurrently_ replaying copies that ran one after another" $ do
     specify "one copy replays" $ \env -> do
-      result <- replaySequentialCopies env 1
+      result <- replaySequentialCopies env "activity" 1 replayCopyActivity
       result `shouldSatisfy` isRight
 
-    specify "two copies replay" $ \env -> do
-      result <- replaySequentialCopies env 2
+    specify "two copies of an activity replay" $ \env -> do
+      result <- replaySequentialCopies env "activity" 2 replayCopyActivity
       result `shouldSatisfy` isRight
+
+    specify "two copies of an activity then a timer fail to replay" $ \env -> do
+      result <- replaySequentialCopies env "activity-timer" 2 $ replayCopyActivity *> provideCallStack (W.sleep (milliseconds 10))
+      result `shouldSatisfy` isLeft
 
   describe "Replay from raw protobuf bytes" $ do
     specify "replays a simple workflow" $ \TestEnv {..} -> do

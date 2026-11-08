@@ -7,6 +7,8 @@ module ChildWorkflowSpec where
 
 import Control.Exception (SomeException)
 import qualified Control.Monad.Catch as Catch
+import Data.Foldable (fold)
+import Data.Maybe (isJust)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Lens.Family2
@@ -219,6 +221,37 @@ tests = describe "Child Workflows" $ do
       case startTaskIds of
         first : _ -> startTaskIds `shouldBe` replicate 3 first
         [] -> expectationFailure "parent started no child workflows"
+
+  specify "replicateConcurrently_ starts the missing children of a parent whose copies ran one after another" $ \TestEnv {..} -> do
+    let child :: W.Workflow ()
+        child = provideCallStack $ W.waitCondition (pure False)
+        childWf = W.provideWorkflow defaultCodec "neverEndingChild" child
+        copy = provideCallStack $ W.executeChildWorkflow childWf.reference W.defaultChildWorkflowOptions
+        sequentialParent = W.provideWorkflow defaultCodec "upgradedParent" (fold (replicate 2 copy) :: W.Workflow ())
+        concurrentParent = W.provideWorkflow defaultCodec "upgradedParent" (W.replicateConcurrently_ 2 copy)
+        childStarts hist = length $ do
+          ev <- hist ^. History.events
+          Just _ <- pure (ev ^. History.maybe'childWorkflowExecutionStartedEventAttributes)
+          pure ()
+        settled hist = case reverse (hist ^. History.events) of
+          ev : _ -> isJust (ev ^. History.maybe'workflowTaskCompletedEventAttributes)
+          [] -> False
+        -- Bounded so a parent that never starts the expected children fails the assertion instead of hanging.
+        awaitHistory p h = go (1000 :: Int)
+          where
+            go n = do
+              hist <- C.fetchHistory h
+              if p hist || n == 0 then pure hist else go (n - 1)
+    wfId <- uuidText
+    (h, recorded) <- withWorker (configure () (childWf, sequentialParent) baseConf) $ useClient $ do
+      h <- C.start sequentialParent.reference (W.WorkflowId wfId) (defaultStartOptsWithTimeout taskQueue (seconds 30))
+      recorded <- awaitHistory (\hist -> childStarts hist == 1 && settled hist) h
+      pure (h, recorded)
+    childStarts recorded `shouldBe` 1
+    upgraded <- withWorker (configure () (childWf, concurrentParent) baseConf) $ useClient $ do
+      C.signal h (W.KnownSignal @'[] "wake" defaultCodec) C.defaultSignalOptions
+      awaitHistory (\hist -> childStarts hist == 2) h
+    childStarts upgraded `shouldBe` 2
 
   specify "executeChildWorkflow convenience" $ \TestEnv {..} -> do
     let child :: W.Workflow Int
