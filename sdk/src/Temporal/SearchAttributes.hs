@@ -145,6 +145,7 @@ import Data.Scientific (floatingOrInteger)
 import Data.String (IsString)
 import Data.Text (Text)
 import Data.Time
+import Data.Time.Compat ()
 import Data.Vector (Vector)
 import Data.Word
 import GHC.TypeLits
@@ -246,8 +247,9 @@ data SearchAttributeType
   | KeywordList (Vector Text)
   deriving stock (Show, Eq, Ord, Lift, Data)
 
-#if MIN_VERSION_time(1,14,0)
-#else
+-- time >= 1.14 defines these instances, and time-compat >= 1.9.8 defines them
+-- as orphans for older time.
+#if !(MIN_VERSION_time(1,14,0) || MIN_VERSION_time_compat(1,9,8))
 deriving stock instance Lift UTCTime
 instance Lift DiffTime where
   lift t = let t' = toRational t in [| fromRational t' |]

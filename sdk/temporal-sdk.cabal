@@ -140,6 +140,7 @@ library
     , th-lift-instances
     , these
     , time
+    , time-compat
     , transformers
     , unliftio
     , unordered-containers
@@ -238,6 +239,7 @@ test-suite temporal-sdk-tests
     , th-lift-instances
     , these
     , time
+    , time-compat
     , transformers
     , unliftio
     , unordered-containers
