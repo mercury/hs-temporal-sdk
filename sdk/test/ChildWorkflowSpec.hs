@@ -197,6 +197,29 @@ tests = describe "Child Workflows" $ do
             pure (attrs ^. History.priority . Common.priorityKey)
       initiatedPriorityKeys `shouldBe` [1]
 
+  specify "replicateConcurrently_ starts every child in the same workflow task" $ \TestEnv {..} -> do
+    let child :: W.Workflow ()
+        child = pure ()
+        childWf = W.provideWorkflow defaultCodec "replicatedChild" child
+        parent :: MyWorkflow ()
+        parent = W.replicateConcurrently_ 3 $ W.executeChildWorkflow childWf.reference W.defaultChildWorkflowOptions
+        parentWf = W.provideWorkflow defaultCodec "replicatedChildParent" parent
+        conf = configure () (childWf, parentWf) $ do baseConf
+    withWorker conf $ do
+      wfId <- uuidText
+      let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
+      hist <- useClient $ do
+        h <- C.start parentWf.reference (W.WorkflowId wfId) opts
+        C.waitWorkflowResult h
+        C.fetchHistory h
+      let startTaskIds = do
+            ev <- hist ^. History.events
+            Just attrs <- pure (ev ^. History.maybe'startChildWorkflowExecutionInitiatedEventAttributes)
+            pure (attrs ^. History.workflowTaskCompletedEventId)
+      case startTaskIds of
+        first : _ -> startTaskIds `shouldBe` replicate 3 first
+        [] -> expectationFailure "parent started no child workflows"
+
   specify "executeChildWorkflow convenience" $ \TestEnv {..} -> do
     let child :: W.Workflow Int
         child = pure 99

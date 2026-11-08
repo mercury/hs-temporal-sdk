@@ -9,6 +9,7 @@ import Conduit
 import Control.Concurrent (threadDelay)
 import Control.Exception (SomeException, bracket)
 import Control.Exception.Annotated (checkpoint)
+import Control.Monad (void)
 import qualified Control.Monad.Catch as Catch
 import Control.Monad.Logger (logInfoN)
 import Data.Aeson (toJSON)
@@ -361,6 +362,29 @@ tests = do
       withWorker conf $ do
         let opts = defaultStartOpts taskQueue
         useClient (C.execute wf.reference "localYield" opts) `shouldReturn` [1, 2, 3]
+
+  describe "Concurrent combinators" $ do
+    -- Each branch records 's', yields, then records 'e'. Two concurrent
+    -- branches interleave as "ssee"; two sequential branches give "sese".
+    let runsBothBranchesConcurrently :: Text -> (W.Workflow () -> W.Workflow ()) -> SpecWith TestEnv
+        runsBothBranchesConcurrently name runTwice = specify (Text.unpack name) $ \TestEnv {..} -> do
+          let workflow :: MyWorkflow String
+              workflow = do
+                st <- W.newStateVar ("" :: String)
+                runTwice $ W.modifyStateVar st ('s' :) *> W.yield *> W.modifyStateVar st ('e' :)
+                reverse <$> W.readStateVar st
+              wf = W.provideWorkflow defaultCodec name workflow
+              conf = configure () wf $ do baseConf
+          withWorker conf $ do
+            let opts = defaultStartOpts taskQueue
+            useClient (C.execute wf.reference (W.WorkflowId name) opts) `shouldReturn` "ssee"
+    runsBothBranchesConcurrently "replicateConcurrently_" (W.replicateConcurrently_ 2)
+    runsBothBranchesConcurrently "ConcurrentWorkflow <>" $ \branch ->
+      W.runConcurrentWorkflowActions (W.ConcurrentWorkflow branch <> W.ConcurrentWorkflow branch)
+    runsBothBranchesConcurrently "replicateConcurrently" $ \branch ->
+      void $ W.replicateConcurrently 2 branch
+    runsBothBranchesConcurrently "sequenceConcurrently_" $ \branch ->
+      W.sequenceConcurrently_ (replicate 2 branch)
 
   describe "WorkflowIdConflictPolicy" $ do
     specify "Fail policy prevents duplicate workflows" $ \TestEnv {..} -> do
