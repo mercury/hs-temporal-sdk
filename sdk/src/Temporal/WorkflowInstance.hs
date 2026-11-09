@@ -50,7 +50,6 @@ import qualified Data.Vault.Strict as Vault
 import Data.Vector (Vector)
 import qualified Data.Vector as V
 import Data.Version (showVersion)
-import Data.Word (Word32)
 import GHC.IO (unsafePerformIO)
 import GHC.Stack (HasCallStack, emptyCallStack, getCallStack)
 import qualified GHC.Stack
@@ -128,7 +127,7 @@ create
   :: (HasCallStack, MonadLoggerIO m)
   => (Core.WorkflowActivationCompletion -> IO (Either Core.WorkerError ()))
   -> (Vector Payload -> IO (Either String (Workflow Payload)))
-  -> Set Word32
+  -> Set SdkFlag
   -> Maybe Int
   -- ^ Deadlock timeout, in microseconds.
   -> [ApplicationFailureHandler]
@@ -455,7 +454,7 @@ activate act suspension = do
 copyActivationState :: WorkflowActivation -> WorkflowInstance -> IO ()
 copyActivationState act inst = do
   writeIORef inst.workflowIsReplaying (act ^. Activation.isReplaying)
-  let available = Set.fromList (act ^. Activation.availableInternalFlags)
+  let available = Set.fromList (mapMaybe sdkFlagFromId (act ^. Activation.availableInternalFlags))
   modifyIORef' inst.workflowKnownSdkFlags (Set.union available)
 
 

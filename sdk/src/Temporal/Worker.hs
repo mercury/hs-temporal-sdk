@@ -170,7 +170,7 @@ import Temporal.Runtime
 import Temporal.Worker.Types
 import Temporal.Workflow.Definition
 import qualified Temporal.Workflow.Internal.ActivationLoop as ActivationLoop
-import Temporal.Workflow.Internal.Monad (SdkFlag (ConcurrentWorkflowSemigroup), sdkFlagId)
+import Temporal.Workflow.Internal.Monad (SdkFlag (ConcurrentWorkflowSemigroup))
 import Temporal.Workflow.Types (NexusClient (..), makeNexusClient)
 import qualified Temporal.Workflow.Worker as Workflow
 import UnliftIO
@@ -816,7 +816,7 @@ startWorker client conf = provideCallStack $ runWorkerContext conf $ inSpan "sta
           case result of
             Right info
               | info ^. WorkflowService.capabilities . WorkflowService.sdkMetadata ->
-                  pure $ Set.singleton (sdkFlagId ConcurrentWorkflowSemigroup)
+                  pure $ Set.singleton ConcurrentWorkflowSemigroup
             Right _ -> pure Set.empty
             Left err -> do
               Logging.logWarn $ "Could not check SDK metadata support: " <> T.pack (show err)

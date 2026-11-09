@@ -65,7 +65,7 @@ prepareCompletion = do
       completionSuccessful =
         defMessage
           & Completion.commands .~ encoded
-          & Completion.usedInternalFlags .~ Set.toAscList usedFlags
+          & Completion.usedInternalFlags .~ map sdkFlagId (Set.toAscList usedFlags)
       completionMessage :: Core.WorkflowActivationCompletion
       completionMessage =
         defMessage

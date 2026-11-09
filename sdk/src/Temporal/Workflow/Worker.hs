@@ -36,7 +36,6 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Vault.Strict (Vault)
 import qualified Data.Vector as V
-import Data.Word (Word32)
 import qualified Focus
 import Lens.Family2
 import qualified ListT
@@ -87,7 +86,7 @@ data WorkflowWorker
   , workerCore :: Core.Worker ty
   , workerInboundInterceptors :: {-# UNPACK #-} !WorkflowInboundInterceptor
   , workerOutboundInterceptors :: {-# UNPACK #-} !WorkflowOutboundInterceptor
-  , workerEnabledSdkFlags :: !(Set Word32)
+  , workerEnabledSdkFlags :: !(Set SdkFlag)
   , workerDeadlockTimeout :: Maybe Int
   , workerTaskQueue :: TaskQueue
   , workerErrorConverters :: [Err.ApplicationFailureHandler]

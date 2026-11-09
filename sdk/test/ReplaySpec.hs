@@ -8,6 +8,7 @@ import Data.Either (isLeft, isRight)
 import Data.Foldable (fold)
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import Data.List (nub)
+import Data.Maybe (isJust)
 import Data.ProtoLens.Encoding (encodeMessage)
 import qualified Data.Text as Text
 import qualified GHC.Conc.Sync as Conc
@@ -546,10 +547,19 @@ tests = describe "Workflow Replay" $ do
         length (nub activityTasks) `shouldBe` if enabled then 1 else 2
         case taskFlags of
           first : rest -> do
-            first `shouldBe` if enabled then [1] else []
+            first `shouldBe` if enabled then [2] else []
             concat rest `shouldBe` []
           [] -> expectationFailure "history contains no completed workflow task"
         runReplayHistory globalRuntime replayConf history `shouldReturn` Right ()
+
+        -- A workflow that recorded only #401's flag must still run sequentially.
+        unless enabled $
+          case break (isJust . (^. History.maybe'workflowTaskCompletedEventAttributes)) (history ^. History.events) of
+            (prefix, first : rest) -> do
+              let withRaceLoserFlag = first & History.workflowTaskCompletedEventAttributes . History.sdkMetadata . Metadata.langUsedFlags .~ [1]
+                  raceLoserHistory = history & History.events .~ (prefix <> (withRaceLoserFlag : rest))
+              runReplayHistory globalRuntime replayConf raceLoserHistory `shouldReturn` Right ()
+            (_, []) -> expectationFailure "history contains no completed workflow task"
 
   describe "Replay from raw protobuf bytes" $ do
     specify "replays a simple workflow" $ \TestEnv {..} -> do

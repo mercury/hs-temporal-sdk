@@ -84,25 +84,33 @@ ilift :: RequireCallStack => InstanceM a -> Workflow a
 ilift m = Workflow $ \_ -> Done <$> m
 
 
--- Flag IDs are persisted in workflow history. Keep them stable across releases.
-data SdkFlag = ConcurrentWorkflowSemigroup
+-- Wire IDs are one-based constructor positions. Only append new flags.
+data SdkFlag
+  = RaceLoserCancellation -- Reserved for #401.
+  | ConcurrentWorkflowSemigroup
+  deriving stock (Eq, Ord, Enum, Bounded)
 
 
 sdkFlagId :: SdkFlag -> Word32
-sdkFlagId ConcurrentWorkflowSemigroup = 1
+sdkFlagId flag = fromIntegral (fromEnum flag + 1)
+
+
+sdkFlagFromId :: Word32 -> Maybe SdkFlag
+sdkFlagFromId flagId
+  | flagId < sdkFlagId minBound || flagId > sdkFlagId maxBound = Nothing
+  | otherwise = Just (toEnum (fromIntegral flagId - 1))
 
 
 tryUseSdkFlag :: SdkFlag -> Workflow Bool
 tryUseSdkFlag flag = Workflow $ \_ -> do
   inst <- ask
   replaying <- readIORef inst.workflowIsReplaying
-  let flagId = sdkFlagId flag
-      mayRecord = not replaying && Set.member flagId inst.workflowEnabledSdkFlags
+  let mayRecord = not replaying && Set.member flag inst.workflowEnabledSdkFlags
   Done <$> atomicModifyIORef' inst.workflowKnownSdkFlags (\known ->
-    if Set.member flagId known
+    if Set.member flag known
       then (known, True)
       else if mayRecord
-        then (Set.insert flagId known, True)
+        then (Set.insert flag known, True)
         else (known, False)
     )
 
@@ -796,8 +804,8 @@ data WorkflowInstance = WorkflowInstance
   , workflowSequences :: {-# UNPACK #-} !(IORef Sequences)
   , workflowTime :: {-# UNPACK #-} !(IORef SystemTime)
   , workflowIsReplaying :: {-# UNPACK #-} !(IORef Bool)
-  , workflowEnabledSdkFlags :: !(Set Word32)
-  , workflowKnownSdkFlags :: {-# UNPACK #-} !(IORef (Set Word32))
+  , workflowEnabledSdkFlags :: !(Set SdkFlag)
+  , workflowKnownSdkFlags :: {-# UNPACK #-} !(IORef (Set SdkFlag))
   , workflowCommands :: {-# UNPACK #-} !(TVar (Reversed WorkflowCommand))
   , workflowSequenceMaps :: {-# UNPACK #-} !(TVar SequenceMaps)
   , workflowSignalHandlers :: {-# UNPACK #-} !(IORef (HashMap (Maybe Text) (Vector Payload -> Workflow ())))
