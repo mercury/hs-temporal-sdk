@@ -3,10 +3,11 @@ module ReplaySpec where
 import Control.Concurrent (ThreadId, myThreadId, threadDelay, yield)
 import qualified Control.Concurrent.Async as Async
 import Control.Exception (IOException, bracket, catch, fromException, try)
-import Control.Monad (unless, void, when)
+import Control.Monad (forM_, unless, void, when)
 import Data.Either (isLeft, isRight)
 import Data.Foldable (fold)
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
+import Data.List (nub)
 import Data.ProtoLens.Encoding (encodeMessage)
 import qualified Data.Text as Text
 import qualified GHC.Conc.Sync as Conc
@@ -516,31 +517,39 @@ tests = describe "Workflow Replay" $ do
       result <- replaySequentialCopies env "activity-timer" 2 $ replayCopyActivity *> provideCallStack (W.sleep (milliseconds 10))
       result `shouldSatisfy` isRight
 
-    specify "records the concurrent composition flag and honors it on replay with recording disabled" $ \TestEnv {..} -> do
-      let workflow =
-            W.provideWorkflow JSON "replay-concurrent-flag" $
-              W.replicateConcurrently_ 2 (replayCopyActivity *> provideCallStack (W.sleep (milliseconds 10)))
-          defs = (replayActivityDef, workflow)
-          liveConf = configure () defs $ do
-            baseConf
-            setConcurrentWorkflowSemigroupEnabled True
-          replayConf = configure () defs baseConf
-      history <- withWorker liveConf $ do
-        uuid <- uuidText
-        useClient $ do
-          handle <- C.start workflow (W.WorkflowId uuid) (defaultStartOptsWithTimeout taskQueue (seconds 10))
-          C.waitWorkflowResult handle
-          C.fetchHistory handle
-      let taskFlags = do
-            event <- history ^. History.events
-            Just completed <- pure (event ^. History.maybe'workflowTaskCompletedEventAttributes)
-            pure (completed ^. History.sdkMetadata . Metadata.langUsedFlags)
-      case taskFlags of
-        first : rest -> do
-          first `shouldBe` [1]
-          concat rest `shouldBe` []
-        [] -> expectationFailure "history contains no completed workflow task"
-      runReplayHistory globalRuntime replayConf history `shouldReturn` Right ()
+  describe "replicateConcurrently_ SDK flag" $ do
+    forM_ [(False, "runs sequentially by default"), (True, "runs concurrently and records the flag when enabled")] $ \(enabled, label) ->
+      specify (label <> " and replays with recording disabled") $ \TestEnv {..} -> do
+        let workflow =
+              W.provideWorkflow JSON "replay-concurrent-flag" $
+                W.replicateConcurrently_ 2 (replayCopyActivity *> provideCallStack (W.sleep (milliseconds 10)))
+            defs = (replayActivityDef, workflow)
+            liveConf = configure () defs $ do
+              baseConf
+              when enabled $ setConcurrentWorkflowSemigroupEnabled True
+            replayConf = configure () defs baseConf
+        history <- withWorker liveConf $ do
+          uuid <- uuidText
+          useClient $ do
+            handle <- C.start workflow (W.WorkflowId uuid) (defaultStartOptsWithTimeout taskQueue (seconds 10))
+            C.waitWorkflowResult handle
+            C.fetchHistory handle
+        let taskFlags = do
+              event <- history ^. History.events
+              Just completed <- pure (event ^. History.maybe'workflowTaskCompletedEventAttributes)
+              pure (completed ^. History.sdkMetadata . Metadata.langUsedFlags)
+            activityTasks = do
+              event <- history ^. History.events
+              Just scheduled <- pure (event ^. History.maybe'activityTaskScheduledEventAttributes)
+              pure (scheduled ^. History.workflowTaskCompletedEventId)
+        length activityTasks `shouldBe` 2
+        length (nub activityTasks) `shouldBe` if enabled then 1 else 2
+        case taskFlags of
+          first : rest -> do
+            first `shouldBe` if enabled then [1] else []
+            concat rest `shouldBe` []
+          [] -> expectationFailure "history contains no completed workflow task"
+        runReplayHistory globalRuntime replayConf history `shouldReturn` Right ()
 
   describe "Replay from raw protobuf bytes" $ do
     specify "replays a simple workflow" $ \TestEnv {..} -> do
