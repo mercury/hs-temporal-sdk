@@ -8,7 +8,7 @@ module ChildWorkflowSpec where
 import Control.Exception (SomeException)
 import qualified Control.Monad.Catch as Catch
 import Data.Foldable (fold)
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, isNothing)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Lens.Family2
@@ -206,7 +206,9 @@ tests = describe "Child Workflows" $ do
         parent :: MyWorkflow ()
         parent = W.replicateConcurrently_ 3 $ W.executeChildWorkflow childWf.reference W.defaultChildWorkflowOptions
         parentWf = W.provideWorkflow defaultCodec "replicatedChildParent" parent
-        conf = configure () (childWf, parentWf) $ do baseConf
+        conf = configure () (childWf, parentWf) $ do
+          baseConf
+          setConcurrentWorkflowSemigroupEnabled True
     withWorker conf $ do
       wfId <- uuidText
       let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
@@ -222,7 +224,7 @@ tests = describe "Child Workflows" $ do
         first : _ -> startTaskIds `shouldBe` replicate 3 first
         [] -> expectationFailure "parent started no child workflows"
 
-  specify "replicateConcurrently_ starts the missing children of a parent whose copies ran one after another" $ \TestEnv {..} -> do
+  specify "replicateConcurrently_ preserves a sequential parent when the SDK flag is enabled" $ \TestEnv {..} -> do
     let child :: W.Workflow ()
         child = provideCallStack $ W.waitCondition (pure False)
         childWf = W.provideWorkflow defaultCodec "neverEndingChild" child
@@ -236,7 +238,10 @@ tests = describe "Child Workflows" $ do
         settled hist = case reverse (hist ^. History.events) of
           ev : _ -> isJust (ev ^. History.maybe'workflowTaskCompletedEventAttributes)
           [] -> False
-        -- Bounded so a parent that never starts the expected children fails the assertion instead of hanging.
+        completedAfterSignal hist =
+          any (isJust . (^. History.maybe'workflowTaskCompletedEventAttributes)) $
+            dropWhile (isNothing . (^. History.maybe'workflowExecutionSignaledEventAttributes)) (hist ^. History.events)
+        -- Bound the history queries so a stalled task fails the assertion.
         awaitHistory p h = go (1000 :: Int)
           where
             go n = do
@@ -248,10 +253,14 @@ tests = describe "Child Workflows" $ do
       recorded <- awaitHistory (\hist -> childStarts hist == 1 && settled hist) h
       pure (h, recorded)
     childStarts recorded `shouldBe` 1
-    upgraded <- withWorker (configure () (childWf, concurrentParent) baseConf) $ useClient $ do
+    let upgradedConf = configure () (childWf, concurrentParent) $ do
+          baseConf
+          setConcurrentWorkflowSemigroupEnabled True
+    upgraded <- withWorker upgradedConf $ useClient $ do
       C.signal h (W.KnownSignal @'[] "wake" defaultCodec) C.defaultSignalOptions
-      awaitHistory (\hist -> childStarts hist == 2) h
-    childStarts upgraded `shouldBe` 2
+      awaitHistory completedAfterSignal h
+    completedAfterSignal upgraded `shouldBe` True
+    childStarts upgraded `shouldBe` 1
 
   specify "executeChildWorkflow convenience" $ \TestEnv {..} -> do
     let child :: W.Workflow Int

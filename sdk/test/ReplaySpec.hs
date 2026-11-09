@@ -10,7 +10,10 @@ import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import Data.ProtoLens.Encoding (encodeMessage)
 import qualified Data.Text as Text
 import qualified GHC.Conc.Sync as Conc
+import Lens.Family2
 import qualified Network.Socket as N
+import qualified Proto.Temporal.Api.History.V1.Message_Fields as History
+import qualified Proto.Temporal.Api.Sdk.V1.TaskCompleteMetadata_Fields as Metadata
 import RequireCallStack (provideCallStack)
 import System.Directory (findExecutable, getTemporaryDirectory, removeFile)
 import System.IO.Unsafe (unsafePerformIO)
@@ -509,9 +512,35 @@ tests = describe "Workflow Replay" $ do
       result <- replaySequentialCopies env "activity" 2 replayCopyActivity
       result `shouldSatisfy` isRight
 
-    specify "two copies of an activity then a timer fail to replay" $ \env -> do
+    specify "two copies of an activity then a timer replay" $ \env -> do
       result <- replaySequentialCopies env "activity-timer" 2 $ replayCopyActivity *> provideCallStack (W.sleep (milliseconds 10))
-      result `shouldSatisfy` isLeft
+      result `shouldSatisfy` isRight
+
+    specify "records the concurrent composition flag and honors it on replay with recording disabled" $ \TestEnv {..} -> do
+      let workflow =
+            W.provideWorkflow JSON "replay-concurrent-flag" $
+              W.replicateConcurrently_ 2 (replayCopyActivity *> provideCallStack (W.sleep (milliseconds 10)))
+          defs = (replayActivityDef, workflow)
+          liveConf = configure () defs $ do
+            baseConf
+            setConcurrentWorkflowSemigroupEnabled True
+          replayConf = configure () defs baseConf
+      history <- withWorker liveConf $ do
+        uuid <- uuidText
+        useClient $ do
+          handle <- C.start workflow (W.WorkflowId uuid) (defaultStartOptsWithTimeout taskQueue (seconds 10))
+          C.waitWorkflowResult handle
+          C.fetchHistory handle
+      let taskFlags = do
+            event <- history ^. History.events
+            Just completed <- pure (event ^. History.maybe'workflowTaskCompletedEventAttributes)
+            pure (completed ^. History.sdkMetadata . Metadata.langUsedFlags)
+      case taskFlags of
+        first : rest -> do
+          first `shouldBe` [1]
+          concat rest `shouldBe` []
+        [] -> expectationFailure "history contains no completed workflow task"
+      runReplayHistory globalRuntime replayConf history `shouldReturn` Right ()
 
   describe "Replay from raw protobuf bytes" $ do
     specify "replays a simple workflow" $ \TestEnv {..} -> do

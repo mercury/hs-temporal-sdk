@@ -84,6 +84,29 @@ ilift :: RequireCallStack => InstanceM a -> Workflow a
 ilift m = Workflow $ \_ -> Done <$> m
 
 
+-- Flag IDs are persisted in workflow history. Keep them stable across releases.
+data SdkFlag = ConcurrentWorkflowSemigroup
+
+
+sdkFlagId :: SdkFlag -> Word32
+sdkFlagId ConcurrentWorkflowSemigroup = 1
+
+
+tryUseSdkFlag :: SdkFlag -> Workflow Bool
+tryUseSdkFlag flag = Workflow $ \_ -> do
+  inst <- ask
+  replaying <- readIORef inst.workflowIsReplaying
+  let flagId = sdkFlagId flag
+      mayRecord = not replaying && Set.member flagId inst.workflowEnabledSdkFlags
+  Done <$> atomicModifyIORef' inst.workflowKnownSdkFlags (\known ->
+    if Set.member flagId known
+      then (known, True)
+      else if mayRecord
+        then (Set.insert flagId known, True)
+        else (known, False)
+    )
+
+
 askInstance :: Workflow WorkflowInstance
 askInstance = Workflow $ \_ -> asks Done
 
@@ -773,6 +796,8 @@ data WorkflowInstance = WorkflowInstance
   , workflowSequences :: {-# UNPACK #-} !(IORef Sequences)
   , workflowTime :: {-# UNPACK #-} !(IORef SystemTime)
   , workflowIsReplaying :: {-# UNPACK #-} !(IORef Bool)
+  , workflowEnabledSdkFlags :: !(Set Word32)
+  , workflowKnownSdkFlags :: {-# UNPACK #-} !(IORef (Set Word32))
   , workflowCommands :: {-# UNPACK #-} !(TVar (Reversed WorkflowCommand))
   , workflowSequenceMaps :: {-# UNPACK #-} !(TVar SequenceMaps)
   , workflowSignalHandlers :: {-# UNPACK #-} !(IORef (HashMap (Maybe Text) (Vector Payload -> Workflow ())))

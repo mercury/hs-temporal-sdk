@@ -9,6 +9,7 @@ module Temporal.WorkflowInstance (
   workflowExecutionContextKey,
   create,
   activate,
+  copyActivationState,
   addCommand,
   nextActivitySequence,
   nextChildWorkflowSequence,
@@ -49,6 +50,7 @@ import qualified Data.Vault.Strict as Vault
 import Data.Vector (Vector)
 import qualified Data.Vector as V
 import Data.Version (showVersion)
+import Data.Word (Word32)
 import GHC.IO (unsafePerformIO)
 import GHC.Stack (HasCallStack, emptyCallStack, getCallStack)
 import qualified GHC.Stack
@@ -126,6 +128,7 @@ create
   :: (HasCallStack, MonadLoggerIO m)
   => (Core.WorkflowActivationCompletion -> IO (Either Core.WorkerError ()))
   -> (Vector Payload -> IO (Either String (Workflow Payload)))
+  -> Set Word32
   -> Maybe Int
   -- ^ Deadlock timeout, in microseconds.
   -> [ApplicationFailureHandler]
@@ -141,6 +144,7 @@ create
 create
   workflowCompleteActivation
   workflowFn
+  workflowEnabledSdkFlags
   workflowDeadlockTimeout
   errorConverters
   inboundInterceptor
@@ -169,6 +173,7 @@ create
           }
     workflowTime <- newIORef $ MkSystemTime 0 0
     workflowIsReplaying <- newIORef False
+    workflowKnownSdkFlags <- newIORef Set.empty
     workflowSequenceMaps <- newTVarIO $ SequenceMaps mempty mempty mempty mempty mempty mempty mempty
     workflowCommands <- newTVarIO $ Reversed []
     workflowSignalHandlers <- newIORef mempty
@@ -441,9 +446,17 @@ activate act suspension = do
             }
     in (info', info')
   writeIORef inst.workflowTime (act ^. Activation.timestamp . to timespecFromTimestamp)
-  writeIORef inst.workflowIsReplaying (act ^. Activation.isReplaying)
+  liftIO $ copyActivationState act inst
   eResult <- withWatchdog inst $ applyJobs (act ^. Activation.vec'jobs) suspension
   either throwIO pure eResult
+
+
+-- | Apply replay metadata before the executor runs or resumes workflow code.
+copyActivationState :: WorkflowActivation -> WorkflowInstance -> IO ()
+copyActivationState act inst = do
+  writeIORef inst.workflowIsReplaying (act ^. Activation.isReplaying)
+  let available = Set.fromList (act ^. Activation.availableInternalFlags)
+  modifyIORef' inst.workflowKnownSdkFlags (Set.union available)
 
 
 -- | Initialize workflow state from inputs that have already been decoded.

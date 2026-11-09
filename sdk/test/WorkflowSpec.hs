@@ -373,7 +373,9 @@ tests = do
                 runTwice $ W.modifyStateVar st ('s' :) *> W.yield *> W.modifyStateVar st ('e' :)
                 reverse <$> W.readStateVar st
               wf = W.provideWorkflow defaultCodec name workflow
-              conf = configure () wf $ do baseConf
+              conf = configure () wf $ do
+                baseConf
+                setConcurrentWorkflowSemigroupEnabled True
           withWorker conf $ do
             let opts = defaultStartOpts taskQueue
             useClient (C.execute wf.reference (W.WorkflowId name) opts) `shouldReturn` "ssee"

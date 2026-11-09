@@ -30,11 +30,13 @@ import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
 import Data.Maybe
 import Data.ProtoLens
+import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Vault.Strict (Vault)
 import qualified Data.Vector as V
+import Data.Word (Word32)
 import qualified Focus
 import Lens.Family2
 import qualified ListT
@@ -85,6 +87,7 @@ data WorkflowWorker
   , workerCore :: Core.Worker ty
   , workerInboundInterceptors :: {-# UNPACK #-} !WorkflowInboundInterceptor
   , workerOutboundInterceptors :: {-# UNPACK #-} !WorkflowOutboundInterceptor
+  , workerEnabledSdkFlags :: !(Set Word32)
   , workerDeadlockTimeout :: Maybe Int
   , workerTaskQueue :: TaskQueue
   , workerErrorConverters :: [Err.ApplicationFailureHandler]
@@ -138,7 +141,7 @@ publishWorkflowInstance runId_ inst startWorker = do
 -- new instance first. A later activation still updates them in 'activate'.
 copyInitialPatchState :: WorkflowActivation -> WorkflowInstance -> IO ()
 copyInitialPatchState act inst = do
-  writeIORef inst.workflowIsReplaying (act ^. Activation.isReplaying)
+  copyActivationState act inst
   forM_ (act ^. Activation.vec'jobs) $ \job ->
     forM_ (job ^. Activation.maybe'notifyHasPatch) $ \notifyHasPatch ->
       atomicModifyIORef' inst.workflowNotifiedPatches $ \patchSet ->
@@ -451,6 +454,7 @@ handleActivation activation = inSpan' "handleActivation" (defaultSpanArguments {
                         create
                           (Core.completeWorkflowActivation workerCore)
                           f
+                          worker.workerEnabledSdkFlags
                           worker.workerDeadlockTimeout
                           worker.workerErrorConverters
                           worker.workerInboundInterceptors

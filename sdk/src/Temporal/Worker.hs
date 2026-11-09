@@ -71,6 +71,7 @@ module Temporal.Worker (
   setTracerProvider,
   setNamespace,
   setTaskQueue,
+  setConcurrentWorkflowSemigroupEnabled,
   setBuildId,
   setIdentity,
   setMaxCachedWorkflows,
@@ -129,7 +130,8 @@ import Data.Either (lefts)
 import Data.Foldable
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
-import Data.ProtoLens (encodeMessage)
+import Data.ProtoLens (defMessage, encodeMessage)
+import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -145,6 +147,7 @@ import qualified OpenTelemetry.Trace.Core as OT
 import OpenTelemetry.Trace.Monad
 import Proto.Temporal.Api.History.V1.Message (History)
 import Proto.Temporal.Api.History.V1.Message_Fields (maybe'workflowExecutionStartedEventAttributes, vec'events, workflowId)
+import qualified Proto.Temporal.Api.Workflowservice.V1.RequestResponse_Fields as WorkflowService
 import Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation
 import qualified Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields as Activation
 import RequireCallStack
@@ -156,6 +159,7 @@ import Temporal.Common
 import Temporal.Common.Async
 import qualified Temporal.Common.Logging as Logging
 import Temporal.Core.Client
+import qualified Temporal.Core.Client.WorkflowService as WorkflowService
 import Temporal.Core.Worker (InactiveForReplay)
 import qualified Temporal.Core.Worker as Core
 import Temporal.Exception
@@ -166,6 +170,7 @@ import Temporal.Runtime
 import Temporal.Worker.Types
 import Temporal.Workflow.Definition
 import qualified Temporal.Workflow.Internal.ActivationLoop as ActivationLoop
+import Temporal.Workflow.Internal.Monad (SdkFlag (ConcurrentWorkflowSemigroup), sdkFlagId)
 import Temporal.Workflow.Types (NexusClient (..), makeNexusClient)
 import qualified Temporal.Workflow.Worker as Workflow
 import UnliftIO
@@ -201,6 +206,7 @@ configure actEnv defs = flip execState defaultConfig . unConfigM
       in WorkerConfig
           { coreConfig = Core.defaultWorkerConfig
           , deadlockTimeout = Just 1000000
+          , concurrentWorkflowSemigroupEnabled = False
           , interceptorConfig = mempty
           , applicationErrorConverters = standardApplicationFailureHandlers
           , logger = \_ _ _ _ -> pure ()
@@ -321,6 +327,17 @@ setTaskQueue (TaskQueue tq) = modifyCore $ \conf ->
   conf
     { Core.taskQueue = tq
     }
+
+
+{- | Allow 'Temporal.Workflow.ConcurrentWorkflow' compositions to start running
+their operands concurrently. Disabled by default. A workflow task that first
+uses the new behavior records an SDK flag in history, which replay honors even
+if this option is subsequently disabled. Enable this only once all workers
+that can receive these workflow tasks understand the flag.
+-}
+setConcurrentWorkflowSemigroupEnabled :: Bool -> ConfigM actEnv ()
+setConcurrentWorkflowSemigroupEnabled enabled =
+  ConfigM $ modify' $ \conf -> conf {concurrentWorkflowSemigroupEnabled = enabled}
 
 
 {- | A string that should be unique to the exact worker code/binary being executed.
@@ -636,6 +653,7 @@ startReplayWorker rt conf = provideCallStack $ runWorkerContext conf $ do
         workerOutboundInterceptors = conf.interceptorConfig.workflowOutboundInterceptors
         workerDeadlockTimeout = conf.deadlockTimeout
         workerClient = ()
+        workerEnabledSdkFlags = Set.empty
         workerErrorConverters = conf.applicationErrorConverters
         processor = conf.payloadProcessor
         workerVault = conf.interceptorConfig.interceptorVault
@@ -791,6 +809,19 @@ startWorker client conf = provideCallStack $ runWorkerContext conf $ inSpan "sta
   -- worker here or it leaks.
   (`UnliftIO.onException` liftIO (destroyUnstartedCoreWorker (pure ()) workerCore)) $ do
     liftIO (Core.validateWorker workerCore) >>= either throwIO pure
+    workerEnabledSdkFlags <-
+      if conf.concurrentWorkflowSemigroupEnabled
+        then do
+          result <- liftIO $ WorkflowService.getSystemInfo client defMessage
+          case result of
+            Right info
+              | info ^. WorkflowService.capabilities . WorkflowService.sdkMetadata ->
+                  pure $ Set.singleton (sdkFlagId ConcurrentWorkflowSemigroup)
+            Right _ -> pure Set.empty
+            Left err -> do
+              Logging.logWarn $ "Could not check SDK metadata support: " <> T.pack (show err)
+              pure Set.empty
+        else pure Set.empty
     -- Evaluate the parts of the config that the poll loops and 'shutdown'
     -- read through strict record fields before any of those threads exist.
     -- Otherwise the workflow loop, the activity loop and later the shutdown
