@@ -260,7 +260,9 @@ tests = describe "Child Workflows" $ do
       C.signal h (W.KnownSignal @'[] "wake" defaultCodec) C.defaultSignalOptions
       awaitHistory completedAfterSignal h
     completedAfterSignal upgraded `shouldBe` True
-    childStarts upgraded `shouldBe` 1
+    -- The parent records initiations before it receives child-start acknowledgements.
+    let initiated = filter (isJust . (^. History.maybe'startChildWorkflowExecutionInitiatedEventAttributes)) (upgraded ^. History.events)
+    length initiated `shouldBe` 1
 
   specify "executeChildWorkflow convenience" $ \TestEnv {..} -> do
     let child :: W.Workflow Int
