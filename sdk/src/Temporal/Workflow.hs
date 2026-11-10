@@ -1809,7 +1809,10 @@ replicateConcurrently :: Int -> Workflow a -> Workflow [a]
 replicateConcurrently n = runConcurrentWorkflowActions . sequenceA . replicate n . ConcurrentWorkflow
 
 
--- | Perform the action in the given number of evaluation branches, discarding the results
+{- | Perform the action the given number of times, discarding the results.
+The copies run concurrently when the worker's concurrent composition flag is
+enabled for the current workflow task. Replay follows the recorded behavior.
+-}
 replicateConcurrently_ :: Int -> Workflow a -> Workflow ()
 replicateConcurrently_ n = runConcurrentWorkflowActions . fold . replicate n . ConcurrentWorkflow . void
 
@@ -1930,14 +1933,30 @@ Once that happens, it submits all commands that it has accumulated to the Tempor
 computation on one or more branches. This is repeated until the computation completes. When 'Applicative' is used, that means that each computation branch doesn't depend on the
 result of the others, so they can all explore as far as possible and get blocked. If we use 'Monad', then that means that the result of the previous computation has to become
 unblocked in order to provide the result to the subsequent computation.
+
+With concurrent composition enabled in the worker, '<>' and 'fold' combine
+operands through the 'Applicative' instance. Workflow tasks replay the
+composition behavior recorded in their history.
 -}
 newtype ConcurrentWorkflow a = ConcurrentWorkflow {runConcurrentWorkflowActions :: Workflow a}
-  deriving newtype (Functor, MonadLogger, Semigroup, Monoid, Alternative, MonadCatch, MonadThrow)
+  deriving newtype (Functor, MonadLogger, Alternative, MonadCatch, MonadThrow)
 
 
 instance Applicative ConcurrentWorkflow where
   pure = ConcurrentWorkflow . pure
   ConcurrentWorkflow f <*> ConcurrentWorkflow a = ConcurrentWorkflow (parallelAp f a)
+
+
+instance Semigroup a => Semigroup (ConcurrentWorkflow a) where
+  ConcurrentWorkflow left <> ConcurrentWorkflow right = ConcurrentWorkflow $ do
+    concurrent <- tryUseSdkFlag ConcurrentWorkflowSemigroup
+    if concurrent
+      then parallelAp ((<>) <$> left) right
+      else left <> right
+
+
+instance Monoid a => Monoid (ConcurrentWorkflow a) where
+  mempty = pure mempty
 
 
 instance Monad ConcurrentWorkflow where
