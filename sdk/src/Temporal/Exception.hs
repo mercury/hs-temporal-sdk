@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# OPTIONS_GHC -Wno-partial-fields #-}
 
@@ -612,16 +613,38 @@ standardApplicationFailureHandlers :: [ApplicationFailureHandler]
 standardApplicationFailureHandlers =
   [ ApplicationFailureHandler $ \h@ApplicationFailure {} -> h
   , ApplicationFailureHandler $ \(SomeApplicationFailure e) -> toApplicationFailure e
-  , ApplicationFailureHandler $ \(ErrorCallWithLocation msg loc) ->
-      ApplicationFailure
-        { type' = "ErrorCallWithLocation"
-        , message = pack msg
-        , nonRetryable = False
-        , details = []
-        , stack = pack loc
-        , nextRetryDelay = Nothing
-        }
+  , ApplicationFailureHandler errorCallFailure
   ]
+
+
+-- | An 'ErrorCall' as an application failure.
+errorCallFailure :: ErrorCall -> ApplicationFailure
+#if MIN_VERSION_base(4,21,0)
+-- Since base 4.21, an ErrorCall carries no location: the location of the
+-- deprecated ErrorCallWithLocation pattern is an error thunk, and forcing it
+-- when encoding the failure would throw, so that the activity never reports
+-- its failure. The call stack is in the exception's backtrace instead, which
+-- this handler does not see.
+errorCallFailure (ErrorCall msg) =
+  ApplicationFailure
+    { type' = "ErrorCallWithLocation"
+    , message = pack msg
+    , nonRetryable = False
+    , details = []
+    , stack = ""
+    , nextRetryDelay = Nothing
+    }
+#else
+errorCallFailure (ErrorCallWithLocation msg loc) =
+  ApplicationFailure
+    { type' = "ErrorCallWithLocation"
+    , message = pack msg
+    , nonRetryable = False
+    , details = []
+    , stack = pack loc
+    , nextRetryDelay = Nothing
+    }
+#endif
 
 
 data ActivityFailure = ActivityFailure
