@@ -5,13 +5,10 @@ use std::collections::HashMap;
 use std::ffi::CStr;
 use std::str::{FromStr, Utf8Error};
 use std::time::Duration;
-use temporalio_client::{
-    ClientOptions, ConfiguredClient, RetryClient, RetryOptions, TemporalServiceClient, TlsOptions,
-};
+use temporalio_client::request_extensions::RetryConfigForCall;
+use temporalio_client::{Connection, ConnectionOptions, RetryOptions, TlsOptions};
 use tonic::metadata::{MetadataKey, errors::InvalidMetadataValue};
 use url::Url;
-
-type Client = RetryClient<ConfiguredClient<TemporalServiceClient>>;
 
 /// Configuration options for [connect_client].
 #[derive(Serialize, Deserialize)]
@@ -82,7 +79,7 @@ struct ClientRetryConfig {
     pub max_retries: usize,
 }
 
-impl TryFrom<ClientConfig> for ClientOptions {
+impl TryFrom<ClientConfig> for ConnectionOptions {
     type Error = anyhow::Error;
 
     fn try_from(cfg: ClientConfig) -> anyhow::Result<Self> {
@@ -90,8 +87,7 @@ impl TryFrom<ClientConfig> for ClientOptions {
         let retry_cfg = cfg
             .retry_config
             .map_or(RetryOptions::default(), |c| c.into());
-        Ok(ClientOptions::builder()
-            .target_url(Url::parse(&cfg.target_url)?)
+        Ok(ConnectionOptions::new(Url::parse(&cfg.target_url)?)
             .client_name(cfg.client_name)
             .client_version(cfg.client_version)
             .identity(cfg.identity)
@@ -107,37 +103,38 @@ impl TryFrom<ClientTlsConfig> for TlsOptions {
     type Error = anyhow::Error;
 
     fn try_from(cfg: ClientTlsConfig) -> anyhow::Result<Self> {
-        Ok(TlsOptions {
-            server_root_ca_cert: cfg.server_root_ca_cert,
-            domain: cfg.domain,
-            client_tls_options: match (cfg.client_cert, cfg.client_private_key) {
-                (None, None) => None,
-                (Some(client_cert), Some(client_private_key)) => {
-                    Some(temporalio_client::ClientTlsOptions {
-                        client_cert,
-                        client_private_key,
-                    })
-                }
-                _ => {
-                    return Err(anyhow::anyhow!(
-                        "Must have both client cert and private key or neither"
-                    ));
-                }
-            },
-        })
+        let client_tls_options = match (cfg.client_cert, cfg.client_private_key) {
+            (None, None) => None,
+            (Some(client_cert), Some(client_private_key)) => Some(
+                temporalio_client::ClientTlsOptions::builder()
+                    .client_cert(client_cert)
+                    .client_private_key(client_private_key)
+                    .build(),
+            ),
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Must have both client cert and private key or neither"
+                ));
+            }
+        };
+        Ok(TlsOptions::builder()
+            .maybe_server_root_ca_cert(cfg.server_root_ca_cert)
+            .maybe_domain(cfg.domain)
+            .maybe_client_tls_options(client_tls_options)
+            .build())
     }
 }
 
 impl From<ClientRetryConfig> for RetryOptions {
     fn from(cfg: ClientRetryConfig) -> Self {
-        RetryOptions {
-            initial_interval: Duration::from_millis(cfg.initial_interval_millis),
-            randomization_factor: cfg.randomization_factor,
-            multiplier: cfg.multiplier,
-            max_interval: Duration::from_millis(cfg.max_interval_millis),
-            max_elapsed_time: cfg.max_elapsed_time_millis.map(Duration::from_millis),
-            max_retries: cfg.max_retries,
-        }
+        RetryOptions::builder()
+            .initial_interval(Duration::from_millis(cfg.initial_interval_millis))
+            .randomization_factor(cfg.randomization_factor)
+            .multiplier(cfg.multiplier)
+            .max_interval(Duration::from_millis(cfg.max_interval_millis))
+            .max_elapsed_time(cfg.max_elapsed_time_millis.map(Duration::from_millis))
+            .max_retries(cfg.max_retries)
+            .build()
     }
 }
 
@@ -221,7 +218,7 @@ impl From<&RpcCall> for TemporalCall {
 }
 
 pub struct ClientRef {
-    pub(crate) retry_client: Client,
+    pub(crate) retry_client: Connection,
     pub(crate) runtime: runtime::Runtime,
 }
 
@@ -252,7 +249,7 @@ pub fn connect_client(
     config: Result<ClientConfig, String>,
     hs_callback: HsCallback<ClientRef, CArray<u8>>,
 ) {
-    let opts: Result<ClientOptions, String> = config.and_then(|config| {
+    let opts: Result<ConnectionOptions, String> = config.and_then(|config| {
         config
             .try_into()
             .map_err(|err| format!("Invalid client config: {err:#}"))
@@ -261,10 +258,9 @@ pub fn connect_client(
     runtime_ref
         .runtime
         .future_result_into_hs(hs_callback, async move {
-            let opts = opts.map_err(error_bytes)?;
-            let retry_client_result = opts
-                .connect_no_namespace(runtime.core.as_ref().telemetry().get_metric_meter())
-                .await;
+            let mut opts = opts.map_err(error_bytes)?;
+            opts.metrics_meter = runtime.core.as_ref().telemetry().get_metric_meter();
+            let retry_client_result = Connection::connect(opts).await;
 
             match retry_client_result {
                 Ok(retry_client) => Ok(ClientRef {
@@ -321,6 +317,10 @@ pub(crate) fn rpc_req<P: prost::Message + Default>(
     let buf = call.req.as_slice();
     let proto = P::decode(buf).map_err(|err| err.to_string())?;
     let mut req = tonic::Request::new(proto);
+    if !call.retry {
+        req.extensions_mut()
+            .insert(RetryConfigForCall(RetryOptions::no_retries()));
+    }
     let metadata = call.metadata?;
     for (k, v) in &metadata {
         req.metadata_mut().insert(
@@ -539,7 +539,7 @@ mod tests {
         })
     }
 
-    fn client_options(config: serde_json::Value) -> anyhow::Result<ClientOptions> {
+    fn client_options(config: serde_json::Value) -> anyhow::Result<ConnectionOptions> {
         parse_client_config(config.to_string().as_bytes())
             .map_err(anyhow::Error::msg)?
             .try_into()
@@ -548,9 +548,9 @@ mod tests {
     #[test]
     fn client_options_receive_every_field() {
         let opts = client_options(full_client_config()).unwrap();
-        assert_eq!(opts.target_url.as_str(), "https://temporal.example:7233/");
-        assert_eq!(opts.client_name, "client-name");
-        assert_eq!(opts.client_version, "1.2.3");
+        assert_eq!(opts.target.as_str(), "https://temporal.example:7233/");
+        assert_eq!(opts.get_client_name(), "client-name");
+        assert_eq!(opts.get_client_version(), "1.2.3");
         assert_eq!(opts.identity, "worker@host");
         assert_eq!(
             opts.headers,
@@ -567,14 +567,14 @@ mod tests {
 
         assert_eq!(
             opts.retry_options,
-            RetryOptions {
-                initial_interval: Duration::from_millis(11),
-                randomization_factor: 0.25,
-                multiplier: 1.5,
-                max_interval: Duration::from_millis(22),
-                max_elapsed_time: Some(Duration::from_millis(33)),
-                max_retries: 4,
-            }
+            RetryOptions::builder()
+                .initial_interval(Duration::from_millis(11))
+                .randomization_factor(0.25)
+                .multiplier(1.5)
+                .max_interval(Duration::from_millis(22))
+                .max_elapsed_time(Some(Duration::from_millis(33)))
+                .max_retries(4)
+                .build()
         );
     }
 
@@ -688,6 +688,7 @@ mod tests {
     #[derive(Clone, Default)]
     struct HeaderRecorder {
         requests: Arc<Mutex<Vec<HeaderMap>>>,
+        response_code: Arc<Mutex<Option<tonic::Code>>>,
     }
 
     impl NamedService for HeaderRecorder {
@@ -708,7 +709,16 @@ mod tests {
                 .lock()
                 .unwrap()
                 .push(request.headers().clone());
-            std::future::ready(Ok(tonic::Status::unimplemented("recorded").into_http()))
+            let code = self
+                .response_code
+                .lock()
+                .unwrap()
+                .unwrap_or(tonic::Code::Unimplemented);
+            std::future::ready(Ok(tonic::Status::new(
+                code,
+                "unknown method GetSystemInfo (recorded)",
+            )
+            .into_http()))
         }
     }
 
@@ -773,11 +783,12 @@ mod tests {
     fn get_system_info(
         client: &mut ClientRef,
         metadata: *const HaskellHashMapEntries,
+        retry: bool,
     ) -> Result<CArray<u8>, CRPCError> {
         let request = runtime::byte_array(vec![]);
         let call = RpcCall {
             req: &request,
-            retry: false,
+            retry,
             metadata,
             timeout_millis: std::ptr::null(),
         };
@@ -793,7 +804,7 @@ mod tests {
 
         let metadata =
             HashMapEntries::new(&[("x-call-a", "1"), ("x-call-b", "2"), ("x-call-c", "3")]);
-        let err: RPCError = get_system_info(&mut client, metadata.head())
+        let err: RPCError = get_system_info(&mut client, metadata.head(), false)
             .expect_err("the local server answers Unimplemented")
             .as_rust()
             .unwrap();
@@ -821,7 +832,7 @@ mod tests {
             value_len: 0,
             next: std::ptr::null(),
         };
-        let err: RPCError = get_system_info(&mut client, &metadata)
+        let err: RPCError = get_system_info(&mut client, &metadata, false)
             .expect_err("invalid metadata fails the call")
             .as_rust()
             .unwrap();
@@ -832,6 +843,29 @@ mod tests {
             err.message
         );
         assert_eq!(recorder.request_count(), requests_before);
+    }
+
+    #[test]
+    fn rpc_call_retries_only_when_requested() {
+        let (_server, addr, recorder) = HeaderRecorder::start();
+        let mut client = connect_to_recorder(addr);
+        *client.retry_client.retry_options_mut() = RetryOptions::builder()
+            .initial_interval(Duration::ZERO)
+            .randomization_factor(0.0)
+            .max_interval(Duration::ZERO)
+            .max_retries(3)
+            .build();
+        *recorder.response_code.lock().unwrap() = Some(tonic::Code::Unavailable);
+
+        for (retry, expected_requests) in [(false, 1), (true, 3)] {
+            let before = recorder.request_count();
+            let err: RPCError = get_system_info(&mut client, std::ptr::null(), retry)
+                .expect_err("the local server answers Unavailable")
+                .as_rust()
+                .unwrap();
+            assert_eq!(err.code, tonic::Code::Unavailable as u32);
+            assert_eq!(recorder.request_count() - before, expected_requests);
+        }
     }
 
     #[test]

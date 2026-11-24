@@ -715,7 +715,7 @@ startChildWorkflowFromPayloads (workflowRef -> k@(KnownWorkflow codec _)) opts p
                 & Command.cronSchedule .~ fromMaybe "" opts'.cronSchedule
                 & Command.headers .~ fmap convertToProtoPayload opts'.headers
                 & Command.memo .~ fmap convertToProtoPayload opts'.initialMemo
-                & Command.searchAttributes .~ searchAttrs
+                & Command.searchAttributes . Payloads.indexedFields .~ searchAttrs
                 & Command.cancellationType .~ childWorkflowCancellationTypeToProto opts'.cancellationType
                 & Command.maybe'priority .~ fmap priorityToProto opts'.priority
 
@@ -977,7 +977,7 @@ upsertSearchAttributes values = ilift $ do
         defMessage
           & Command.upsertWorkflowSearchAttributes
             .~ ( defMessage
-                  & Command.searchAttributes .~ attrs
+                  & Command.searchAttributes . Payloads.indexedFields .~ attrs
                )
   addCommand cmd
   inst <- ask

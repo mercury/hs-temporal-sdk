@@ -29,6 +29,12 @@ import qualified Data.ProtoLens.Runtime.Data.Vector.Unboxed as Data.Vector.Unbox
 import qualified Data.ProtoLens.Runtime.Text.Read as Text.Read
 import qualified Proto.Google.Protobuf.Duration
 import qualified Proto.Google.Protobuf.Timestamp
+activationIndex ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "activationIndex" a) =>
+  Lens.Family2.LensLike' f s a
+activationIndex = Data.ProtoLens.Field.field @"activationIndex"
 activityId ::
   forall f s a.
   (Prelude.Functor f,
@@ -68,6 +74,13 @@ id ::
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "id" a) =>
   Lens.Family2.LensLike' f s a
 id = Data.ProtoLens.Field.field @"id"
+maybe'activationIndex ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'activationIndex" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'activationIndex
+  = Data.ProtoLens.Field.field @"maybe'activationIndex"
 maybe'backoff ::
   forall f s a.
   (Prelude.Functor f,

@@ -9,11 +9,12 @@ module Proto.Temporal.Api.Enums.V1.TaskQueue (
         DescribeTaskQueueMode(..), DescribeTaskQueueMode(),
         DescribeTaskQueueMode'UnrecognizedValue, RateLimitSource(..),
         RateLimitSource(), RateLimitSource'UnrecognizedValue,
-        TaskQueueKind(..), TaskQueueKind(),
-        TaskQueueKind'UnrecognizedValue, TaskQueueType(..),
-        TaskQueueType(), TaskQueueType'UnrecognizedValue,
-        TaskReachability(..), TaskReachability(),
-        TaskReachability'UnrecognizedValue
+        RoutingConfigUpdateState(..), RoutingConfigUpdateState(),
+        RoutingConfigUpdateState'UnrecognizedValue, TaskQueueKind(..),
+        TaskQueueKind(), TaskQueueKind'UnrecognizedValue,
+        TaskQueueType(..), TaskQueueType(),
+        TaskQueueType'UnrecognizedValue, TaskReachability(..),
+        TaskReachability(), TaskReachability'UnrecognizedValue
     ) where
 import qualified Data.ProtoLens.Runtime.Control.DeepSeq as Control.DeepSeq
 import qualified Data.ProtoLens.Runtime.Data.ProtoLens.Prism as Data.ProtoLens.Prism
@@ -284,6 +285,89 @@ instance Data.ProtoLens.FieldDefault RateLimitSource where
   fieldDefault = RATE_LIMIT_SOURCE_UNSPECIFIED
 instance Control.DeepSeq.NFData RateLimitSource where
   rnf x__ = Prelude.seq x__ ()
+newtype RoutingConfigUpdateState'UnrecognizedValue
+  = RoutingConfigUpdateState'UnrecognizedValue Data.Int.Int32
+  deriving stock (Prelude.Eq, Prelude.Ord, Prelude.Show)
+data RoutingConfigUpdateState
+  = ROUTING_CONFIG_UPDATE_STATE_UNSPECIFIED |
+    ROUTING_CONFIG_UPDATE_STATE_IN_PROGRESS |
+    ROUTING_CONFIG_UPDATE_STATE_COMPLETED |
+    RoutingConfigUpdateState'Unrecognized !RoutingConfigUpdateState'UnrecognizedValue
+  deriving stock (Prelude.Show, Prelude.Eq, Prelude.Ord)
+instance Data.ProtoLens.MessageEnum RoutingConfigUpdateState where
+  maybeToEnum 0
+    = Prelude.Just ROUTING_CONFIG_UPDATE_STATE_UNSPECIFIED
+  maybeToEnum 1
+    = Prelude.Just ROUTING_CONFIG_UPDATE_STATE_IN_PROGRESS
+  maybeToEnum 2 = Prelude.Just ROUTING_CONFIG_UPDATE_STATE_COMPLETED
+  maybeToEnum k
+    = Prelude.Just
+        (RoutingConfigUpdateState'Unrecognized
+           (RoutingConfigUpdateState'UnrecognizedValue
+              (Prelude.fromIntegral k)))
+  showEnum ROUTING_CONFIG_UPDATE_STATE_UNSPECIFIED
+    = "ROUTING_CONFIG_UPDATE_STATE_UNSPECIFIED"
+  showEnum ROUTING_CONFIG_UPDATE_STATE_IN_PROGRESS
+    = "ROUTING_CONFIG_UPDATE_STATE_IN_PROGRESS"
+  showEnum ROUTING_CONFIG_UPDATE_STATE_COMPLETED
+    = "ROUTING_CONFIG_UPDATE_STATE_COMPLETED"
+  showEnum
+    (RoutingConfigUpdateState'Unrecognized (RoutingConfigUpdateState'UnrecognizedValue k))
+    = Prelude.show k
+  readEnum k
+    | (Prelude.==) k "ROUTING_CONFIG_UPDATE_STATE_UNSPECIFIED"
+    = Prelude.Just ROUTING_CONFIG_UPDATE_STATE_UNSPECIFIED
+    | (Prelude.==) k "ROUTING_CONFIG_UPDATE_STATE_IN_PROGRESS"
+    = Prelude.Just ROUTING_CONFIG_UPDATE_STATE_IN_PROGRESS
+    | (Prelude.==) k "ROUTING_CONFIG_UPDATE_STATE_COMPLETED"
+    = Prelude.Just ROUTING_CONFIG_UPDATE_STATE_COMPLETED
+    | Prelude.otherwise
+    = (Prelude.>>=) (Text.Read.readMaybe k) Data.ProtoLens.maybeToEnum
+instance Prelude.Bounded RoutingConfigUpdateState where
+  minBound = ROUTING_CONFIG_UPDATE_STATE_UNSPECIFIED
+  maxBound = ROUTING_CONFIG_UPDATE_STATE_COMPLETED
+instance Prelude.Enum RoutingConfigUpdateState where
+  toEnum k__
+    = Prelude.maybe
+        (Prelude.error
+           ((Prelude.++)
+              "toEnum: unknown value for enum RoutingConfigUpdateState: "
+              (Prelude.show k__)))
+        Prelude.id (Data.ProtoLens.maybeToEnum k__)
+  fromEnum ROUTING_CONFIG_UPDATE_STATE_UNSPECIFIED = 0
+  fromEnum ROUTING_CONFIG_UPDATE_STATE_IN_PROGRESS = 1
+  fromEnum ROUTING_CONFIG_UPDATE_STATE_COMPLETED = 2
+  fromEnum
+    (RoutingConfigUpdateState'Unrecognized (RoutingConfigUpdateState'UnrecognizedValue k))
+    = Prelude.fromIntegral k
+  succ ROUTING_CONFIG_UPDATE_STATE_COMPLETED
+    = Prelude.error
+        "RoutingConfigUpdateState.succ: bad argument ROUTING_CONFIG_UPDATE_STATE_COMPLETED. This value would be out of bounds."
+  succ ROUTING_CONFIG_UPDATE_STATE_UNSPECIFIED
+    = ROUTING_CONFIG_UPDATE_STATE_IN_PROGRESS
+  succ ROUTING_CONFIG_UPDATE_STATE_IN_PROGRESS
+    = ROUTING_CONFIG_UPDATE_STATE_COMPLETED
+  succ (RoutingConfigUpdateState'Unrecognized _)
+    = Prelude.error
+        "RoutingConfigUpdateState.succ: bad argument: unrecognized value"
+  pred ROUTING_CONFIG_UPDATE_STATE_UNSPECIFIED
+    = Prelude.error
+        "RoutingConfigUpdateState.pred: bad argument ROUTING_CONFIG_UPDATE_STATE_UNSPECIFIED. This value would be out of bounds."
+  pred ROUTING_CONFIG_UPDATE_STATE_IN_PROGRESS
+    = ROUTING_CONFIG_UPDATE_STATE_UNSPECIFIED
+  pred ROUTING_CONFIG_UPDATE_STATE_COMPLETED
+    = ROUTING_CONFIG_UPDATE_STATE_IN_PROGRESS
+  pred (RoutingConfigUpdateState'Unrecognized _)
+    = Prelude.error
+        "RoutingConfigUpdateState.pred: bad argument: unrecognized value"
+  enumFrom = Data.ProtoLens.Message.Enum.messageEnumFrom
+  enumFromTo = Data.ProtoLens.Message.Enum.messageEnumFromTo
+  enumFromThen = Data.ProtoLens.Message.Enum.messageEnumFromThen
+  enumFromThenTo = Data.ProtoLens.Message.Enum.messageEnumFromThenTo
+instance Data.ProtoLens.FieldDefault RoutingConfigUpdateState where
+  fieldDefault = ROUTING_CONFIG_UPDATE_STATE_UNSPECIFIED
+instance Control.DeepSeq.NFData RoutingConfigUpdateState where
+  rnf x__ = Prelude.seq x__ ()
 newtype TaskQueueKind'UnrecognizedValue
   = TaskQueueKind'UnrecognizedValue Data.Int.Int32
   deriving stock (Prelude.Eq, Prelude.Ord, Prelude.Show)
@@ -291,12 +375,14 @@ data TaskQueueKind
   = TASK_QUEUE_KIND_UNSPECIFIED |
     TASK_QUEUE_KIND_NORMAL |
     TASK_QUEUE_KIND_STICKY |
+    TASK_QUEUE_KIND_WORKER_COMMANDS |
     TaskQueueKind'Unrecognized !TaskQueueKind'UnrecognizedValue
   deriving stock (Prelude.Show, Prelude.Eq, Prelude.Ord)
 instance Data.ProtoLens.MessageEnum TaskQueueKind where
   maybeToEnum 0 = Prelude.Just TASK_QUEUE_KIND_UNSPECIFIED
   maybeToEnum 1 = Prelude.Just TASK_QUEUE_KIND_NORMAL
   maybeToEnum 2 = Prelude.Just TASK_QUEUE_KIND_STICKY
+  maybeToEnum 3 = Prelude.Just TASK_QUEUE_KIND_WORKER_COMMANDS
   maybeToEnum k
     = Prelude.Just
         (TaskQueueKind'Unrecognized
@@ -305,6 +391,8 @@ instance Data.ProtoLens.MessageEnum TaskQueueKind where
     = "TASK_QUEUE_KIND_UNSPECIFIED"
   showEnum TASK_QUEUE_KIND_NORMAL = "TASK_QUEUE_KIND_NORMAL"
   showEnum TASK_QUEUE_KIND_STICKY = "TASK_QUEUE_KIND_STICKY"
+  showEnum TASK_QUEUE_KIND_WORKER_COMMANDS
+    = "TASK_QUEUE_KIND_WORKER_COMMANDS"
   showEnum
     (TaskQueueKind'Unrecognized (TaskQueueKind'UnrecognizedValue k))
     = Prelude.show k
@@ -315,11 +403,13 @@ instance Data.ProtoLens.MessageEnum TaskQueueKind where
     = Prelude.Just TASK_QUEUE_KIND_NORMAL
     | (Prelude.==) k "TASK_QUEUE_KIND_STICKY"
     = Prelude.Just TASK_QUEUE_KIND_STICKY
+    | (Prelude.==) k "TASK_QUEUE_KIND_WORKER_COMMANDS"
+    = Prelude.Just TASK_QUEUE_KIND_WORKER_COMMANDS
     | Prelude.otherwise
     = (Prelude.>>=) (Text.Read.readMaybe k) Data.ProtoLens.maybeToEnum
 instance Prelude.Bounded TaskQueueKind where
   minBound = TASK_QUEUE_KIND_UNSPECIFIED
-  maxBound = TASK_QUEUE_KIND_STICKY
+  maxBound = TASK_QUEUE_KIND_WORKER_COMMANDS
 instance Prelude.Enum TaskQueueKind where
   toEnum k__
     = Prelude.maybe
@@ -331,14 +421,16 @@ instance Prelude.Enum TaskQueueKind where
   fromEnum TASK_QUEUE_KIND_UNSPECIFIED = 0
   fromEnum TASK_QUEUE_KIND_NORMAL = 1
   fromEnum TASK_QUEUE_KIND_STICKY = 2
+  fromEnum TASK_QUEUE_KIND_WORKER_COMMANDS = 3
   fromEnum
     (TaskQueueKind'Unrecognized (TaskQueueKind'UnrecognizedValue k))
     = Prelude.fromIntegral k
-  succ TASK_QUEUE_KIND_STICKY
+  succ TASK_QUEUE_KIND_WORKER_COMMANDS
     = Prelude.error
-        "TaskQueueKind.succ: bad argument TASK_QUEUE_KIND_STICKY. This value would be out of bounds."
+        "TaskQueueKind.succ: bad argument TASK_QUEUE_KIND_WORKER_COMMANDS. This value would be out of bounds."
   succ TASK_QUEUE_KIND_UNSPECIFIED = TASK_QUEUE_KIND_NORMAL
   succ TASK_QUEUE_KIND_NORMAL = TASK_QUEUE_KIND_STICKY
+  succ TASK_QUEUE_KIND_STICKY = TASK_QUEUE_KIND_WORKER_COMMANDS
   succ (TaskQueueKind'Unrecognized _)
     = Prelude.error
         "TaskQueueKind.succ: bad argument: unrecognized value"
@@ -347,6 +439,7 @@ instance Prelude.Enum TaskQueueKind where
         "TaskQueueKind.pred: bad argument TASK_QUEUE_KIND_UNSPECIFIED. This value would be out of bounds."
   pred TASK_QUEUE_KIND_NORMAL = TASK_QUEUE_KIND_UNSPECIFIED
   pred TASK_QUEUE_KIND_STICKY = TASK_QUEUE_KIND_NORMAL
+  pred TASK_QUEUE_KIND_WORKER_COMMANDS = TASK_QUEUE_KIND_STICKY
   pred (TaskQueueKind'Unrecognized _)
     = Prelude.error
         "TaskQueueKind.pred: bad argument: unrecognized value"

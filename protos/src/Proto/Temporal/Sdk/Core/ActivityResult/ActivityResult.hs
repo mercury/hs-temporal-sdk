@@ -42,6 +42,7 @@ import qualified Data.ProtoLens.Runtime.Text.Read as Text.Read
 import qualified Proto.Google.Protobuf.Duration
 import qualified Proto.Google.Protobuf.Timestamp
 import qualified Proto.Temporal.Api.Common.V1.Message
+import qualified Proto.Temporal.Api.Enums.V1.FailedCause
 import qualified Proto.Temporal.Api.Failure.V1.Message
 {- | Fields :
      
@@ -1117,9 +1118,11 @@ instance Control.DeepSeq.NFData DoBackoff where
 {- | Fields :
      
          * 'Proto.Temporal.Sdk.Core.ActivityResult.ActivityResult_Fields.failure' @:: Lens' Failure Proto.Temporal.Api.Failure.V1.Message.Failure@
-         * 'Proto.Temporal.Sdk.Core.ActivityResult.ActivityResult_Fields.maybe'failure' @:: Lens' Failure (Prelude.Maybe Proto.Temporal.Api.Failure.V1.Message.Failure)@ -}
+         * 'Proto.Temporal.Sdk.Core.ActivityResult.ActivityResult_Fields.maybe'failure' @:: Lens' Failure (Prelude.Maybe Proto.Temporal.Api.Failure.V1.Message.Failure)@
+         * 'Proto.Temporal.Sdk.Core.ActivityResult.ActivityResult_Fields.cause' @:: Lens' Failure Proto.Temporal.Api.Enums.V1.FailedCause.ActivityTaskFailedCause@ -}
 data Failure
   = Failure'_constructor {_Failure'failure :: !(Prelude.Maybe Proto.Temporal.Api.Failure.V1.Message.Failure),
+                          _Failure'cause :: !Proto.Temporal.Api.Enums.V1.FailedCause.ActivityTaskFailedCause,
                           _Failure'_unknownFields :: !Data.ProtoLens.FieldSet}
   deriving stock (Prelude.Eq, Prelude.Ord)
 instance Prelude.Show Failure where
@@ -1140,12 +1143,19 @@ instance Data.ProtoLens.Field.HasField Failure "maybe'failure" (Prelude.Maybe Pr
         (Lens.Family2.Unchecked.lens
            _Failure'failure (\ x__ y__ -> x__ {_Failure'failure = y__}))
         Prelude.id
+instance Data.ProtoLens.Field.HasField Failure "cause" Proto.Temporal.Api.Enums.V1.FailedCause.ActivityTaskFailedCause where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _Failure'cause (\ x__ y__ -> x__ {_Failure'cause = y__}))
+        Prelude.id
 instance Data.ProtoLens.Message Failure where
   messageName _ = Data.Text.pack "coresdk.activity_result.Failure"
   packedMessageDescriptor _
     = "\n\
       \\aFailure\DC2:\n\
-      \\afailure\CAN\SOH \SOH(\v2 .temporal.api.failure.v1.FailureR\afailure"
+      \\afailure\CAN\SOH \SOH(\v2 .temporal.api.failure.v1.FailureR\afailure\DC2D\n\
+      \\ENQcause\CAN\STX \SOH(\SO2..temporal.api.enums.v1.ActivityTaskFailedCauseR\ENQcause"
   packedFileDescriptor _ = packedFileDescriptor
   fieldsByTag
     = let
@@ -1157,16 +1167,27 @@ instance Data.ProtoLens.Message Failure where
               (Data.ProtoLens.OptionalField
                  (Data.ProtoLens.Field.field @"maybe'failure")) ::
               Data.ProtoLens.FieldDescriptor Failure
+        cause__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "cause"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.EnumField ::
+                 Data.ProtoLens.FieldTypeDescriptor Proto.Temporal.Api.Enums.V1.FailedCause.ActivityTaskFailedCause)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional (Data.ProtoLens.Field.field @"cause")) ::
+              Data.ProtoLens.FieldDescriptor Failure
       in
         Data.Map.fromList
-          [(Data.ProtoLens.Tag 1, failure__field_descriptor)]
+          [(Data.ProtoLens.Tag 1, failure__field_descriptor),
+           (Data.ProtoLens.Tag 2, cause__field_descriptor)]
   unknownFields
     = Lens.Family2.Unchecked.lens
         _Failure'_unknownFields
         (\ x__ y__ -> x__ {_Failure'_unknownFields = y__})
   defMessage
     = Failure'_constructor
-        {_Failure'failure = Prelude.Nothing, _Failure'_unknownFields = []}
+        {_Failure'failure = Prelude.Nothing,
+         _Failure'cause = Data.ProtoLens.fieldDefault,
+         _Failure'_unknownFields = []}
   parseMessage
     = let
         loop :: Failure -> Data.ProtoLens.Encoding.Bytes.Parser Failure
@@ -1195,6 +1216,15 @@ instance Data.ProtoLens.Message Failure where
                                              (Prelude.fromIntegral len) Data.ProtoLens.parseMessage)
                                        "failure"
                                 loop (Lens.Family2.set (Data.ProtoLens.Field.field @"failure") y x)
+                        16
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (Prelude.fmap
+                                          Prelude.toEnum
+                                          (Prelude.fmap
+                                             Prelude.fromIntegral
+                                             Data.ProtoLens.Encoding.Bytes.getVarInt))
+                                       "cause"
+                                loop (Lens.Family2.set (Data.ProtoLens.Field.field @"cause") y x)
                         wire
                           -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
                                         wire
@@ -1221,14 +1251,29 @@ instance Data.ProtoLens.Message Failure where
                                      (Prelude.fromIntegral (Data.ByteString.length bs)))
                                   (Data.ProtoLens.Encoding.Bytes.putBytes bs))
                           Data.ProtoLens.encodeMessage _v))
-             (Data.ProtoLens.Encoding.Wire.buildFieldSet
-                (Lens.Family2.view Data.ProtoLens.unknownFields _x))
+             ((Data.Monoid.<>)
+                (let
+                   _v = Lens.Family2.view (Data.ProtoLens.Field.field @"cause") _x
+                 in
+                   if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                       Data.Monoid.mempty
+                   else
+                       (Data.Monoid.<>)
+                         (Data.ProtoLens.Encoding.Bytes.putVarInt 16)
+                         ((Prelude..)
+                            ((Prelude..)
+                               Data.ProtoLens.Encoding.Bytes.putVarInt Prelude.fromIntegral)
+                            Prelude.fromEnum _v))
+                (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                   (Lens.Family2.view Data.ProtoLens.unknownFields _x)))
 instance Control.DeepSeq.NFData Failure where
   rnf
     = \ x__
         -> Control.DeepSeq.deepseq
              (_Failure'_unknownFields x__)
-             (Control.DeepSeq.deepseq (_Failure'failure x__) ())
+             (Control.DeepSeq.deepseq
+                (_Failure'failure x__)
+                (Control.DeepSeq.deepseq (_Failure'cause x__) ()))
 {- | Fields :
      
          * 'Proto.Temporal.Sdk.Core.ActivityResult.ActivityResult_Fields.result' @:: Lens' Success Proto.Temporal.Api.Common.V1.Message.Payload@
@@ -1414,7 +1459,7 @@ instance Control.DeepSeq.NFData WillCompleteAsync where
 packedFileDescriptor :: Data.ByteString.ByteString
 packedFileDescriptor
   = "\n\
-    \7temporal/sdk/core/activity_result/activity_result.proto\DC2\ETBcoresdk.activity_result\SUB\RSgoogle/protobuf/duration.proto\SUB\USgoogle/protobuf/timestamp.proto\SUB$temporal/api/common/v1/message.proto\SUB%temporal/api/failure/v1/message.proto\"\198\STX\n\
+    \7temporal/sdk/core/activity_result/activity_result.proto\DC2\ETBcoresdk.activity_result\SUB\RSgoogle/protobuf/duration.proto\SUB\USgoogle/protobuf/timestamp.proto\SUB$temporal/api/common/v1/message.proto\SUB(temporal/api/enums/v1/failed_cause.proto\SUB%temporal/api/failure/v1/message.proto\"\198\STX\n\
     \\ETBActivityExecutionResult\DC2@\n\
     \\tcompleted\CAN\SOH \SOH(\v2 .coresdk.activity_result.SuccessH\NULR\tcompleted\DC2:\n\
     \\ACKfailed\CAN\STX \SOH(\v2 .coresdk.activity_result.FailureH\NULR\ACKfailed\DC2E\n\
@@ -1428,17 +1473,18 @@ packedFileDescriptor
     \\abackoff\CAN\EOT \SOH(\v2\".coresdk.activity_result.DoBackoffH\NULR\abackoffB\b\n\
     \\ACKstatus\"B\n\
     \\aSuccess\DC27\n\
-    \\ACKresult\CAN\SOH \SOH(\v2\US.temporal.api.common.v1.PayloadR\ACKresult\"E\n\
+    \\ACKresult\CAN\SOH \SOH(\v2\US.temporal.api.common.v1.PayloadR\ACKresult\"\139\SOH\n\
     \\aFailure\DC2:\n\
-    \\afailure\CAN\SOH \SOH(\v2 .temporal.api.failure.v1.FailureR\afailure\"J\n\
+    \\afailure\CAN\SOH \SOH(\v2 .temporal.api.failure.v1.FailureR\afailure\DC2D\n\
+    \\ENQcause\CAN\STX \SOH(\SO2..temporal.api.enums.v1.ActivityTaskFailedCauseR\ENQcause\"J\n\
     \\fCancellation\DC2:\n\
     \\afailure\CAN\SOH \SOH(\v2 .temporal.api.failure.v1.FailureR\afailure\"\DC3\n\
     \\DC1WillCompleteAsync\"\189\SOH\n\
     \\tDoBackoff\DC2\CAN\n\
     \\aattempt\CAN\SOH \SOH(\rR\aattempt\DC2D\n\
     \\DLEbackoff_duration\CAN\STX \SOH(\v2\EM.google.protobuf.DurationR\SIbackoffDuration\DC2P\n\
-    \\SYNoriginal_schedule_time\CAN\ETX \SOH(\v2\SUB.google.protobuf.TimestampR\DC4originalScheduleTimeB4\234\STX1Temporalio::Internal::Bridge::Api::ActivityResultJ\230\DC4\n\
-    \\ACK\DC2\EOT\NUL\NULK\SOH\n\
+    \\SYNoriginal_schedule_time\CAN\ETX \SOH(\v2\SUB.google.protobuf.TimestampR\DC4originalScheduleTimeB4\234\STX1Temporalio::Internal::Bridge::Api::ActivityResultJ\162\SYN\n\
+    \\ACK\DC2\EOT\NUL\NULO\SOH\n\
     \\b\n\
     \\SOH\f\DC2\ETX\NUL\NUL\DC2\n\
     \\b\n\
@@ -1454,124 +1500,136 @@ packedFileDescriptor
     \\t\n\
     \\STX\ETX\STX\DC2\ETX\a\NUL.\n\
     \\t\n\
-    \\STX\ETX\ETX\DC2\ETX\b\NUL/\n\
+    \\STX\ETX\ETX\DC2\ETX\b\NUL2\n\
+    \\t\n\
+    \\STX\ETX\EOT\DC2\ETX\t\NUL/\n\
     \9\n\
-    \\STX\EOT\NUL\DC2\EOT\v\NUL\DC2\SOH\SUB- Used to report activity completions to core\n\
+    \\STX\EOT\NUL\DC2\EOT\f\NUL\DC3\SOH\SUB- Used to report activity completions to core\n\
     \\n\
     \\n\
     \\n\
-    \\ETX\EOT\NUL\SOH\DC2\ETX\v\b\US\n\
+    \\ETX\EOT\NUL\SOH\DC2\ETX\f\b\US\n\
     \\f\n\
-    \\EOT\EOT\NUL\b\NUL\DC2\EOT\f\EOT\DC1\ENQ\n\
+    \\EOT\EOT\NUL\b\NUL\DC2\EOT\r\EOT\DC2\ENQ\n\
     \\f\n\
-    \\ENQ\EOT\NUL\b\NUL\SOH\DC2\ETX\f\n\
+    \\ENQ\EOT\NUL\b\NUL\SOH\DC2\ETX\r\n\
     \\DLE\n\
     \\v\n\
-    \\EOT\EOT\NUL\STX\NUL\DC2\ETX\r\b\RS\n\
+    \\EOT\EOT\NUL\STX\NUL\DC2\ETX\SO\b\RS\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\NUL\ACK\DC2\ETX\r\b\SI\n\
+    \\ENQ\EOT\NUL\STX\NUL\ACK\DC2\ETX\SO\b\SI\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\NUL\SOH\DC2\ETX\r\DLE\EM\n\
+    \\ENQ\EOT\NUL\STX\NUL\SOH\DC2\ETX\SO\DLE\EM\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\NUL\ETX\DC2\ETX\r\FS\GS\n\
+    \\ENQ\EOT\NUL\STX\NUL\ETX\DC2\ETX\SO\FS\GS\n\
     \\v\n\
-    \\EOT\EOT\NUL\STX\SOH\DC2\ETX\SO\b\ESC\n\
+    \\EOT\EOT\NUL\STX\SOH\DC2\ETX\SI\b\ESC\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\SOH\ACK\DC2\ETX\SO\b\SI\n\
+    \\ENQ\EOT\NUL\STX\SOH\ACK\DC2\ETX\SI\b\SI\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\SOH\SOH\DC2\ETX\SO\DLE\SYN\n\
+    \\ENQ\EOT\NUL\STX\SOH\SOH\DC2\ETX\SI\DLE\SYN\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\SOH\ETX\DC2\ETX\SO\EM\SUB\n\
+    \\ENQ\EOT\NUL\STX\SOH\ETX\DC2\ETX\SI\EM\SUB\n\
     \\v\n\
-    \\EOT\EOT\NUL\STX\STX\DC2\ETX\SI\b#\n\
+    \\EOT\EOT\NUL\STX\STX\DC2\ETX\DLE\b#\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\STX\ACK\DC2\ETX\SI\b\DC4\n\
+    \\ENQ\EOT\NUL\STX\STX\ACK\DC2\ETX\DLE\b\DC4\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\STX\SOH\DC2\ETX\SI\NAK\RS\n\
+    \\ENQ\EOT\NUL\STX\STX\SOH\DC2\ETX\DLE\NAK\RS\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\STX\ETX\DC2\ETX\SI!\"\n\
+    \\ENQ\EOT\NUL\STX\STX\ETX\DC2\ETX\DLE!\"\n\
     \\v\n\
-    \\EOT\EOT\NUL\STX\ETX\DC2\ETX\DLE\b2\n\
+    \\EOT\EOT\NUL\STX\ETX\DC2\ETX\DC1\b2\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\ETX\ACK\DC2\ETX\DLE\b\EM\n\
+    \\ENQ\EOT\NUL\STX\ETX\ACK\DC2\ETX\DC1\b\EM\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\ETX\SOH\DC2\ETX\DLE\SUB-\n\
+    \\ENQ\EOT\NUL\STX\ETX\SOH\DC2\ETX\DC1\SUB-\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\ETX\ETX\DC2\ETX\DLE01\n\
+    \\ENQ\EOT\NUL\STX\ETX\ETX\DC2\ETX\DC101\n\
     \~\n\
-    \\STX\EOT\SOH\DC2\EOT\SYN\NUL\GS\SOH\SUBr Used to report activity resolutions to lang. IE: This is what the activities are resolved with\n\
+    \\STX\EOT\SOH\DC2\EOT\ETB\NUL\RS\SOH\SUBr Used to report activity resolutions to lang. IE: This is what the activities are resolved with\n\
     \ in the workflow.\n\
     \\n\
     \\n\
     \\n\
-    \\ETX\EOT\SOH\SOH\DC2\ETX\SYN\b\SUB\n\
+    \\ETX\EOT\SOH\SOH\DC2\ETX\ETB\b\SUB\n\
     \\f\n\
-    \\EOT\EOT\SOH\b\NUL\DC2\EOT\ETB\EOT\FS\ENQ\n\
+    \\EOT\EOT\SOH\b\NUL\DC2\EOT\CAN\EOT\GS\ENQ\n\
     \\f\n\
-    \\ENQ\EOT\SOH\b\NUL\SOH\DC2\ETX\ETB\n\
+    \\ENQ\EOT\SOH\b\NUL\SOH\DC2\ETX\CAN\n\
     \\DLE\n\
     \\v\n\
-    \\EOT\EOT\SOH\STX\NUL\DC2\ETX\CAN\b\RS\n\
+    \\EOT\EOT\SOH\STX\NUL\DC2\ETX\EM\b\RS\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\NUL\ACK\DC2\ETX\CAN\b\SI\n\
+    \\ENQ\EOT\SOH\STX\NUL\ACK\DC2\ETX\EM\b\SI\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\NUL\SOH\DC2\ETX\CAN\DLE\EM\n\
+    \\ENQ\EOT\SOH\STX\NUL\SOH\DC2\ETX\EM\DLE\EM\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\NUL\ETX\DC2\ETX\CAN\FS\GS\n\
+    \\ENQ\EOT\SOH\STX\NUL\ETX\DC2\ETX\EM\FS\GS\n\
     \\v\n\
-    \\EOT\EOT\SOH\STX\SOH\DC2\ETX\EM\b\ESC\n\
+    \\EOT\EOT\SOH\STX\SOH\DC2\ETX\SUB\b\ESC\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\SOH\ACK\DC2\ETX\EM\b\SI\n\
+    \\ENQ\EOT\SOH\STX\SOH\ACK\DC2\ETX\SUB\b\SI\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\SOH\SOH\DC2\ETX\EM\DLE\SYN\n\
+    \\ENQ\EOT\SOH\STX\SOH\SOH\DC2\ETX\SUB\DLE\SYN\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\SOH\ETX\DC2\ETX\EM\EM\SUB\n\
+    \\ENQ\EOT\SOH\STX\SOH\ETX\DC2\ETX\SUB\EM\SUB\n\
     \\v\n\
-    \\EOT\EOT\SOH\STX\STX\DC2\ETX\SUB\b#\n\
+    \\EOT\EOT\SOH\STX\STX\DC2\ETX\ESC\b#\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\STX\ACK\DC2\ETX\SUB\b\DC4\n\
+    \\ENQ\EOT\SOH\STX\STX\ACK\DC2\ETX\ESC\b\DC4\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\STX\SOH\DC2\ETX\SUB\NAK\RS\n\
+    \\ENQ\EOT\SOH\STX\STX\SOH\DC2\ETX\ESC\NAK\RS\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\STX\ETX\DC2\ETX\SUB!\"\n\
+    \\ENQ\EOT\SOH\STX\STX\ETX\DC2\ETX\ESC!\"\n\
     \\v\n\
-    \\EOT\EOT\SOH\STX\ETX\DC2\ETX\ESC\b\RS\n\
+    \\EOT\EOT\SOH\STX\ETX\DC2\ETX\FS\b\RS\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\ETX\ACK\DC2\ETX\ESC\b\DC1\n\
+    \\ENQ\EOT\SOH\STX\ETX\ACK\DC2\ETX\FS\b\DC1\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\ETX\SOH\DC2\ETX\ESC\DC2\EM\n\
+    \\ENQ\EOT\SOH\STX\ETX\SOH\DC2\ETX\FS\DC2\EM\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\ETX\ETX\DC2\ETX\ESC\FS\GS\n\
+    \\ENQ\EOT\SOH\STX\ETX\ETX\DC2\ETX\FS\FS\GS\n\
     \U\n\
-    \\STX\EOT\STX\DC2\EOT \NUL\"\SOH\SUBI Used to report successful completion either when executing or resolving\n\
+    \\STX\EOT\STX\DC2\EOT!\NUL#\SOH\SUBI Used to report successful completion either when executing or resolving\n\
     \\n\
     \\n\
     \\n\
-    \\ETX\EOT\STX\SOH\DC2\ETX \b\SI\n\
+    \\ETX\EOT\STX\SOH\DC2\ETX!\b\SI\n\
     \\v\n\
-    \\EOT\EOT\STX\STX\NUL\DC2\ETX!\EOT.\n\
+    \\EOT\EOT\STX\STX\NUL\DC2\ETX\"\EOT.\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\NUL\ACK\DC2\ETX!\EOT\"\n\
+    \\ENQ\EOT\STX\STX\NUL\ACK\DC2\ETX\"\EOT\"\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\NUL\SOH\DC2\ETX!#)\n\
+    \\ENQ\EOT\STX\STX\NUL\SOH\DC2\ETX\"#)\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\NUL\ETX\DC2\ETX!,-\n\
+    \\ENQ\EOT\STX\STX\NUL\ETX\DC2\ETX\",-\n\
     \P\n\
-    \\STX\EOT\ETX\DC2\EOT%\NUL'\SOH\SUBD Used to report activity failure either when executing or resolving\n\
+    \\STX\EOT\ETX\DC2\EOT&\NUL+\SOH\SUBD Used to report activity failure either when executing or resolving\n\
     \\n\
     \\n\
     \\n\
-    \\ETX\EOT\ETX\SOH\DC2\ETX%\b\SI\n\
+    \\ETX\EOT\ETX\SOH\DC2\ETX&\b\SI\n\
     \\v\n\
-    \\EOT\EOT\ETX\STX\NUL\DC2\ETX&\EOT0\n\
+    \\EOT\EOT\ETX\STX\NUL\DC2\ETX'\EOT0\n\
     \\f\n\
-    \\ENQ\EOT\ETX\STX\NUL\ACK\DC2\ETX&\EOT#\n\
+    \\ENQ\EOT\ETX\STX\NUL\ACK\DC2\ETX'\EOT#\n\
     \\f\n\
-    \\ENQ\EOT\ETX\STX\NUL\SOH\DC2\ETX&$+\n\
+    \\ENQ\EOT\ETX\STX\NUL\SOH\DC2\ETX'$+\n\
     \\f\n\
-    \\ENQ\EOT\ETX\STX\NUL\ETX\DC2\ETX&./\n\
+    \\ENQ\EOT\ETX\STX\NUL\ETX\DC2\ETX'./\n\
+    \\132\SOH\n\
+    \\EOT\EOT\ETX\STX\SOH\DC2\ETX*\EOT<\SUBw Only meaningful on ActivityExecutionResult (lang -> core); ignored on ActivityResolution,\n\
+    \ which reuses this message.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\ETX\STX\SOH\ACK\DC2\ETX*\EOT1\n\
+    \\f\n\
+    \\ENQ\EOT\ETX\STX\SOH\SOH\DC2\ETX*27\n\
+    \\f\n\
+    \\ENQ\EOT\ETX\STX\SOH\ETX\DC2\ETX*:;\n\
     \\164\STX\n\
-    \\STX\EOT\EOT\DC2\EOT/\NUL1\SOH\SUB\151\STX\n\
+    \\STX\EOT\EOT\DC2\EOT3\NUL5\SOH\SUB\151\STX\n\
     \ Used to report cancellation from both Core and Lang.\n\
     \ When Lang reports a cancelled activity, it must put a CancelledFailure in the failure field.\n\
     \ When Core reports a cancelled activity, it must put an ActivityFailure with CancelledFailure\n\
@@ -1579,25 +1637,25 @@ packedFileDescriptor
     \\n\
     \\n\
     \\n\
-    \\ETX\EOT\EOT\SOH\DC2\ETX/\b\DC4\n\
+    \\ETX\EOT\EOT\SOH\DC2\ETX3\b\DC4\n\
     \\v\n\
-    \\EOT\EOT\EOT\STX\NUL\DC2\ETX0\EOT0\n\
+    \\EOT\EOT\EOT\STX\NUL\DC2\ETX4\EOT0\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\NUL\ACK\DC2\ETX0\EOT#\n\
+    \\ENQ\EOT\EOT\STX\NUL\ACK\DC2\ETX4\EOT#\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\NUL\SOH\DC2\ETX0$+\n\
+    \\ENQ\EOT\EOT\STX\NUL\SOH\DC2\ETX4$+\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\NUL\ETX\DC2\ETX0./\n\
+    \\ENQ\EOT\EOT\STX\NUL\ETX\DC2\ETX4./\n\
     \\200\SOH\n\
-    \\STX\EOT\ENQ\DC2\EOT7\NUL8\SOH\SUB\187\SOH\n\
+    \\STX\EOT\ENQ\DC2\EOT;\NUL<\SOH\SUB\187\SOH\n\
     \ Used in ActivityExecutionResult to notify Core that this Activity will complete asynchronously.\n\
     \ Core will forget about this Activity and free up resources used to track this Activity.\n\
     \\n\
     \\n\
     \\n\
-    \\ETX\EOT\ENQ\SOH\DC2\ETX7\b\EM\n\
+    \\ETX\EOT\ENQ\SOH\DC2\ETX;\b\EM\n\
     \\131\EOT\n\
-    \\STX\EOT\ACK\DC2\EOTC\NULK\SOH\SUB\246\ETX\n\
+    \\STX\EOT\ACK\DC2\EOTG\NULO\SOH\SUB\246\ETX\n\
     \ Issued when a local activity needs to retry but also wants to back off more than would be\n\
     \ reasonable to WFT heartbeat for. Lang is expected to schedule a timer for the duration\n\
     \ and then start a local activity of the same type & same inputs with the provided attempt number\n\
@@ -1608,33 +1666,33 @@ packedFileDescriptor
     \\n\
     \\n\
     \\n\
-    \\ETX\EOT\ACK\SOH\DC2\ETXC\b\DC1\n\
+    \\ETX\EOT\ACK\SOH\DC2\ETXG\b\DC1\n\
     \\183\SOH\n\
-    \\EOT\EOT\ACK\STX\NUL\DC2\ETXF\EOT\ETB\SUB\169\SOH The attempt number that lang should provide when scheduling the retry. If the LA failed\n\
+    \\EOT\EOT\ACK\STX\NUL\DC2\ETXJ\EOT\ETB\SUB\169\SOH The attempt number that lang should provide when scheduling the retry. If the LA failed\n\
     \ on attempt 4 and we told lang to back off with a timer, this number will be 5.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\NUL\ENQ\DC2\ETXF\EOT\n\
+    \\ENQ\EOT\ACK\STX\NUL\ENQ\DC2\ETXJ\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\NUL\SOH\DC2\ETXF\v\DC2\n\
+    \\ENQ\EOT\ACK\STX\NUL\SOH\DC2\ETXJ\v\DC2\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\NUL\ETX\DC2\ETXF\NAK\SYN\n\
+    \\ENQ\EOT\ACK\STX\NUL\ETX\DC2\ETXJ\NAK\SYN\n\
     \\v\n\
-    \\EOT\EOT\ACK\STX\SOH\DC2\ETXG\EOT2\n\
+    \\EOT\EOT\ACK\STX\SOH\DC2\ETXK\EOT2\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\SOH\ACK\DC2\ETXG\EOT\FS\n\
+    \\ENQ\EOT\ACK\STX\SOH\ACK\DC2\ETXK\EOT\FS\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\SOH\SOH\DC2\ETXG\GS-\n\
+    \\ENQ\EOT\ACK\STX\SOH\SOH\DC2\ETXK\GS-\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\SOH\ETX\DC2\ETXG01\n\
+    \\ENQ\EOT\ACK\STX\SOH\ETX\DC2\ETXK01\n\
     \}\n\
-    \\EOT\EOT\ACK\STX\STX\DC2\ETXJ\EOT9\SUBp The time the first attempt of this local activity was scheduled. Must be passed with attempt\n\
+    \\EOT\EOT\ACK\STX\STX\DC2\ETXN\EOT9\SUBp The time the first attempt of this local activity was scheduled. Must be passed with attempt\n\
     \ to the retry LA.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\STX\ACK\DC2\ETXJ\EOT\GS\n\
+    \\ENQ\EOT\ACK\STX\STX\ACK\DC2\ETXN\EOT\GS\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\STX\SOH\DC2\ETXJ\RS4\n\
+    \\ENQ\EOT\ACK\STX\STX\SOH\DC2\ETXN\RS4\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\STX\ETX\DC2\ETXJ78b\ACKproto3"
+    \\ENQ\EOT\ACK\STX\STX\ETX\DC2\ETXN78b\ACKproto3"

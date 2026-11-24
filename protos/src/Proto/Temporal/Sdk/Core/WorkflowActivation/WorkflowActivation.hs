@@ -75,8 +75,10 @@ import qualified Proto.Google.Protobuf.Duration
 import qualified Proto.Google.Protobuf.Empty
 import qualified Proto.Google.Protobuf.Timestamp
 import qualified Proto.Temporal.Api.Common.V1.Message
+import qualified Proto.Temporal.Api.Enums.V1.FailedCause
 import qualified Proto.Temporal.Api.Enums.V1.Workflow
 import qualified Proto.Temporal.Api.Failure.V1.Message
+import qualified Proto.Temporal.Api.Nexus.V1.Message
 import qualified Proto.Temporal.Api.Update.V1.Message
 import qualified Proto.Temporal.Sdk.Core.ActivityResult.ActivityResult
 import qualified Proto.Temporal.Sdk.Core.ChildWorkflow.ChildWorkflow
@@ -206,7 +208,9 @@ instance Control.DeepSeq.NFData CancelWorkflow where
          * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.headers' @:: Lens' DoUpdate (Data.Map.Map Data.Text.Text Proto.Temporal.Api.Common.V1.Message.Payload)@
          * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.meta' @:: Lens' DoUpdate Proto.Temporal.Api.Update.V1.Message.Meta@
          * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.maybe'meta' @:: Lens' DoUpdate (Prelude.Maybe Proto.Temporal.Api.Update.V1.Message.Meta)@
-         * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.runValidator' @:: Lens' DoUpdate Prelude.Bool@ -}
+         * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.runValidator' @:: Lens' DoUpdate Prelude.Bool@
+         * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.propagatedNexusSerializationContext' @:: Lens' DoUpdate Proto.Temporal.Api.Nexus.V1.Message.PropagatedSerializationContext@
+         * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.maybe'propagatedNexusSerializationContext' @:: Lens' DoUpdate (Prelude.Maybe Proto.Temporal.Api.Nexus.V1.Message.PropagatedSerializationContext)@ -}
 data DoUpdate
   = DoUpdate'_constructor {_DoUpdate'id :: !Data.Text.Text,
                            _DoUpdate'protocolInstanceId :: !Data.Text.Text,
@@ -215,6 +219,7 @@ data DoUpdate
                            _DoUpdate'headers :: !(Data.Map.Map Data.Text.Text Proto.Temporal.Api.Common.V1.Message.Payload),
                            _DoUpdate'meta :: !(Prelude.Maybe Proto.Temporal.Api.Update.V1.Message.Meta),
                            _DoUpdate'runValidator :: !Prelude.Bool,
+                           _DoUpdate'propagatedNexusSerializationContext :: !(Prelude.Maybe Proto.Temporal.Api.Nexus.V1.Message.PropagatedSerializationContext),
                            _DoUpdate'_unknownFields :: !Data.ProtoLens.FieldSet}
   deriving stock (Prelude.Eq, Prelude.Ord)
 instance Prelude.Show DoUpdate where
@@ -281,6 +286,22 @@ instance Data.ProtoLens.Field.HasField DoUpdate "runValidator" Prelude.Bool wher
            _DoUpdate'runValidator
            (\ x__ y__ -> x__ {_DoUpdate'runValidator = y__}))
         Prelude.id
+instance Data.ProtoLens.Field.HasField DoUpdate "propagatedNexusSerializationContext" Proto.Temporal.Api.Nexus.V1.Message.PropagatedSerializationContext where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _DoUpdate'propagatedNexusSerializationContext
+           (\ x__ y__
+              -> x__ {_DoUpdate'propagatedNexusSerializationContext = y__}))
+        (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
+instance Data.ProtoLens.Field.HasField DoUpdate "maybe'propagatedNexusSerializationContext" (Prelude.Maybe Proto.Temporal.Api.Nexus.V1.Message.PropagatedSerializationContext) where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _DoUpdate'propagatedNexusSerializationContext
+           (\ x__ y__
+              -> x__ {_DoUpdate'propagatedNexusSerializationContext = y__}))
+        Prelude.id
 instance Data.ProtoLens.Message DoUpdate where
   messageName _
     = Data.Text.pack "coresdk.workflow_activation.DoUpdate"
@@ -293,7 +314,8 @@ instance Data.ProtoLens.Message DoUpdate where
       \\ENQinput\CAN\EOT \ETX(\v2\US.temporal.api.common.v1.PayloadR\ENQinput\DC2L\n\
       \\aheaders\CAN\ENQ \ETX(\v22.coresdk.workflow_activation.DoUpdate.HeadersEntryR\aheaders\DC20\n\
       \\EOTmeta\CAN\ACK \SOH(\v2\FS.temporal.api.update.v1.MetaR\EOTmeta\DC2#\n\
-      \\rrun_validator\CAN\a \SOH(\bR\frunValidator\SUB[\n\
+      \\rrun_validator\CAN\a \SOH(\bR\frunValidator\DC2\138\SOH\n\
+      \&propagated_nexus_serialization_context\CAN\b \SOH(\v25.temporal.api.nexus.v1.PropagatedSerializationContextR#propagatedNexusSerializationContext\SUB[\n\
       \\fHeadersEntry\DC2\DLE\n\
       \\ETXkey\CAN\SOH \SOH(\tR\ETXkey\DC25\n\
       \\ENQvalue\CAN\STX \SOH(\v2\US.temporal.api.common.v1.PayloadR\ENQvalue:\STX8\SOH"
@@ -360,6 +382,15 @@ instance Data.ProtoLens.Message DoUpdate where
                  Data.ProtoLens.Optional
                  (Data.ProtoLens.Field.field @"runValidator")) ::
               Data.ProtoLens.FieldDescriptor DoUpdate
+        propagatedNexusSerializationContext__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "propagated_nexus_serialization_context"
+              (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                 Data.ProtoLens.FieldTypeDescriptor Proto.Temporal.Api.Nexus.V1.Message.PropagatedSerializationContext)
+              (Data.ProtoLens.OptionalField
+                 (Data.ProtoLens.Field.field
+                    @"maybe'propagatedNexusSerializationContext")) ::
+              Data.ProtoLens.FieldDescriptor DoUpdate
       in
         Data.Map.fromList
           [(Data.ProtoLens.Tag 1, id__field_descriptor),
@@ -368,7 +399,9 @@ instance Data.ProtoLens.Message DoUpdate where
            (Data.ProtoLens.Tag 4, input__field_descriptor),
            (Data.ProtoLens.Tag 5, headers__field_descriptor),
            (Data.ProtoLens.Tag 6, meta__field_descriptor),
-           (Data.ProtoLens.Tag 7, runValidator__field_descriptor)]
+           (Data.ProtoLens.Tag 7, runValidator__field_descriptor),
+           (Data.ProtoLens.Tag 8, 
+            propagatedNexusSerializationContext__field_descriptor)]
   unknownFields
     = Lens.Family2.Unchecked.lens
         _DoUpdate'_unknownFields
@@ -382,6 +415,7 @@ instance Data.ProtoLens.Message DoUpdate where
          _DoUpdate'headers = Data.Map.empty,
          _DoUpdate'meta = Prelude.Nothing,
          _DoUpdate'runValidator = Data.ProtoLens.fieldDefault,
+         _DoUpdate'propagatedNexusSerializationContext = Prelude.Nothing,
          _DoUpdate'_unknownFields = []}
   parseMessage
     = let
@@ -484,6 +518,18 @@ instance Data.ProtoLens.Message DoUpdate where
                                 loop
                                   (Lens.Family2.set
                                      (Data.ProtoLens.Field.field @"runValidator") y x)
+                                  mutable'input
+                        66
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.isolate
+                                             (Prelude.fromIntegral len) Data.ProtoLens.parseMessage)
+                                       "propagated_nexus_serialization_context"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field
+                                        @"propagatedNexusSerializationContext")
+                                     y x)
                                   mutable'input
                         wire
                           -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
@@ -614,8 +660,27 @@ instance Data.ProtoLens.Message DoUpdate where
                                         ((Prelude..)
                                            Data.ProtoLens.Encoding.Bytes.putVarInt
                                            (\ b -> if b then 1 else 0) _v))
-                               (Data.ProtoLens.Encoding.Wire.buildFieldSet
-                                  (Lens.Family2.view Data.ProtoLens.unknownFields _x))))))))
+                               ((Data.Monoid.<>)
+                                  (case
+                                       Lens.Family2.view
+                                         (Data.ProtoLens.Field.field
+                                            @"maybe'propagatedNexusSerializationContext")
+                                         _x
+                                   of
+                                     Prelude.Nothing -> Data.Monoid.mempty
+                                     (Prelude.Just _v)
+                                       -> (Data.Monoid.<>)
+                                            (Data.ProtoLens.Encoding.Bytes.putVarInt 66)
+                                            ((Prelude..)
+                                               (\ bs
+                                                  -> (Data.Monoid.<>)
+                                                       (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                                          (Prelude.fromIntegral
+                                                             (Data.ByteString.length bs)))
+                                                       (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                                               Data.ProtoLens.encodeMessage _v))
+                                  (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                                     (Lens.Family2.view Data.ProtoLens.unknownFields _x)))))))))
 instance Control.DeepSeq.NFData DoUpdate where
   rnf
     = \ x__
@@ -633,7 +698,10 @@ instance Control.DeepSeq.NFData DoUpdate where
                             (_DoUpdate'headers x__)
                             (Control.DeepSeq.deepseq
                                (_DoUpdate'meta x__)
-                               (Control.DeepSeq.deepseq (_DoUpdate'runValidator x__) ())))))))
+                               (Control.DeepSeq.deepseq
+                                  (_DoUpdate'runValidator x__)
+                                  (Control.DeepSeq.deepseq
+                                     (_DoUpdate'propagatedNexusSerializationContext x__) ()))))))))
 {- | Fields :
      
          * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.key' @:: Lens' DoUpdate'HeadersEntry Data.Text.Text@
@@ -944,7 +1012,10 @@ instance Control.DeepSeq.NFData FireTimer where
          * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.rootWorkflow' @:: Lens' InitializeWorkflow Proto.Temporal.Api.Common.V1.Message.WorkflowExecution@
          * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.maybe'rootWorkflow' @:: Lens' InitializeWorkflow (Prelude.Maybe Proto.Temporal.Api.Common.V1.Message.WorkflowExecution)@
          * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.priority' @:: Lens' InitializeWorkflow Proto.Temporal.Api.Common.V1.Message.Priority@
-         * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.maybe'priority' @:: Lens' InitializeWorkflow (Prelude.Maybe Proto.Temporal.Api.Common.V1.Message.Priority)@ -}
+         * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.maybe'priority' @:: Lens' InitializeWorkflow (Prelude.Maybe Proto.Temporal.Api.Common.V1.Message.Priority)@
+         * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.originalExecutionRunId' @:: Lens' InitializeWorkflow Data.Text.Text@
+         * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.propagatedNexusSerializationContext' @:: Lens' InitializeWorkflow Proto.Temporal.Api.Nexus.V1.Message.PropagatedSerializationContext@
+         * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.maybe'propagatedNexusSerializationContext' @:: Lens' InitializeWorkflow (Prelude.Maybe Proto.Temporal.Api.Nexus.V1.Message.PropagatedSerializationContext)@ -}
 data InitializeWorkflow
   = InitializeWorkflow'_constructor {_InitializeWorkflow'workflowType :: !Data.Text.Text,
                                      _InitializeWorkflow'workflowId :: !Data.Text.Text,
@@ -971,6 +1042,8 @@ data InitializeWorkflow
                                      _InitializeWorkflow'startTime :: !(Prelude.Maybe Proto.Google.Protobuf.Timestamp.Timestamp),
                                      _InitializeWorkflow'rootWorkflow :: !(Prelude.Maybe Proto.Temporal.Api.Common.V1.Message.WorkflowExecution),
                                      _InitializeWorkflow'priority :: !(Prelude.Maybe Proto.Temporal.Api.Common.V1.Message.Priority),
+                                     _InitializeWorkflow'originalExecutionRunId :: !Data.Text.Text,
+                                     _InitializeWorkflow'propagatedNexusSerializationContext :: !(Prelude.Maybe Proto.Temporal.Api.Nexus.V1.Message.PropagatedSerializationContext),
                                      _InitializeWorkflow'_unknownFields :: !Data.ProtoLens.FieldSet}
   deriving stock (Prelude.Eq, Prelude.Ord)
 instance Prelude.Show InitializeWorkflow where
@@ -1272,6 +1345,32 @@ instance Data.ProtoLens.Field.HasField InitializeWorkflow "maybe'priority" (Prel
            _InitializeWorkflow'priority
            (\ x__ y__ -> x__ {_InitializeWorkflow'priority = y__}))
         Prelude.id
+instance Data.ProtoLens.Field.HasField InitializeWorkflow "originalExecutionRunId" Data.Text.Text where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _InitializeWorkflow'originalExecutionRunId
+           (\ x__ y__
+              -> x__ {_InitializeWorkflow'originalExecutionRunId = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField InitializeWorkflow "propagatedNexusSerializationContext" Proto.Temporal.Api.Nexus.V1.Message.PropagatedSerializationContext where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _InitializeWorkflow'propagatedNexusSerializationContext
+           (\ x__ y__
+              -> x__
+                   {_InitializeWorkflow'propagatedNexusSerializationContext = y__}))
+        (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
+instance Data.ProtoLens.Field.HasField InitializeWorkflow "maybe'propagatedNexusSerializationContext" (Prelude.Maybe Proto.Temporal.Api.Nexus.V1.Message.PropagatedSerializationContext) where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _InitializeWorkflow'propagatedNexusSerializationContext
+           (\ x__ y__
+              -> x__
+                   {_InitializeWorkflow'propagatedNexusSerializationContext = y__}))
+        Prelude.id
 instance Data.ProtoLens.Message InitializeWorkflow where
   messageName _
     = Data.Text.pack "coresdk.workflow_activation.InitializeWorkflow"
@@ -1305,7 +1404,9 @@ instance Data.ProtoLens.Message InitializeWorkflow where
       \\n\
       \start_time\CAN\ETB \SOH(\v2\SUB.google.protobuf.TimestampR\tstartTime\DC2N\n\
       \\rroot_workflow\CAN\CAN \SOH(\v2).temporal.api.common.v1.WorkflowExecutionR\frootWorkflow\DC2<\n\
-      \\bpriority\CAN\EM \SOH(\v2 .temporal.api.common.v1.PriorityR\bpriority\SUB[\n\
+      \\bpriority\CAN\EM \SOH(\v2 .temporal.api.common.v1.PriorityR\bpriority\DC29\n\
+      \\EMoriginal_execution_run_id\CAN\SUB \SOH(\tR\SYNoriginalExecutionRunId\DC2\138\SOH\n\
+      \&propagated_nexus_serialization_context\CAN\ESC \SOH(\v25.temporal.api.nexus.v1.PropagatedSerializationContextR#propagatedNexusSerializationContext\SUB[\n\
       \\fHeadersEntry\DC2\DLE\n\
       \\ETXkey\CAN\SOH \SOH(\tR\ETXkey\DC25\n\
       \\ENQvalue\CAN\STX \SOH(\v2\US.temporal.api.common.v1.PayloadR\ENQvalue:\STX8\SOH"
@@ -1525,6 +1626,24 @@ instance Data.ProtoLens.Message InitializeWorkflow where
               (Data.ProtoLens.OptionalField
                  (Data.ProtoLens.Field.field @"maybe'priority")) ::
               Data.ProtoLens.FieldDescriptor InitializeWorkflow
+        originalExecutionRunId__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "original_execution_run_id"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.StringField ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Text.Text)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"originalExecutionRunId")) ::
+              Data.ProtoLens.FieldDescriptor InitializeWorkflow
+        propagatedNexusSerializationContext__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "propagated_nexus_serialization_context"
+              (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                 Data.ProtoLens.FieldTypeDescriptor Proto.Temporal.Api.Nexus.V1.Message.PropagatedSerializationContext)
+              (Data.ProtoLens.OptionalField
+                 (Data.ProtoLens.Field.field
+                    @"maybe'propagatedNexusSerializationContext")) ::
+              Data.ProtoLens.FieldDescriptor InitializeWorkflow
       in
         Data.Map.fromList
           [(Data.ProtoLens.Tag 1, workflowType__field_descriptor),
@@ -1554,7 +1673,10 @@ instance Data.ProtoLens.Message InitializeWorkflow where
            (Data.ProtoLens.Tag 22, searchAttributes__field_descriptor),
            (Data.ProtoLens.Tag 23, startTime__field_descriptor),
            (Data.ProtoLens.Tag 24, rootWorkflow__field_descriptor),
-           (Data.ProtoLens.Tag 25, priority__field_descriptor)]
+           (Data.ProtoLens.Tag 25, priority__field_descriptor),
+           (Data.ProtoLens.Tag 26, originalExecutionRunId__field_descriptor),
+           (Data.ProtoLens.Tag 27, 
+            propagatedNexusSerializationContext__field_descriptor)]
   unknownFields
     = Lens.Family2.Unchecked.lens
         _InitializeWorkflow'_unknownFields
@@ -1586,6 +1708,8 @@ instance Data.ProtoLens.Message InitializeWorkflow where
          _InitializeWorkflow'startTime = Prelude.Nothing,
          _InitializeWorkflow'rootWorkflow = Prelude.Nothing,
          _InitializeWorkflow'priority = Prelude.Nothing,
+         _InitializeWorkflow'originalExecutionRunId = Data.ProtoLens.fieldDefault,
+         _InitializeWorkflow'propagatedNexusSerializationContext = Prelude.Nothing,
          _InitializeWorkflow'_unknownFields = []}
   parseMessage
     = let
@@ -1868,6 +1992,28 @@ instance Data.ProtoLens.Message InitializeWorkflow where
                                        "priority"
                                 loop
                                   (Lens.Family2.set (Data.ProtoLens.Field.field @"priority") y x)
+                                  mutable'arguments
+                        210
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.getText
+                                             (Prelude.fromIntegral len))
+                                       "original_execution_run_id"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field @"originalExecutionRunId") y x)
+                                  mutable'arguments
+                        218
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.isolate
+                                             (Prelude.fromIntegral len) Data.ProtoLens.parseMessage)
+                                       "propagated_nexus_serialization_context"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field
+                                        @"propagatedNexusSerializationContext")
+                                     y x)
                                   mutable'arguments
                         wire
                           -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
@@ -2406,10 +2552,61 @@ instance Data.ProtoLens.Message InitializeWorkflow where
                                                                                                              bs))
                                                                                                   Data.ProtoLens.encodeMessage
                                                                                                   _v))
-                                                                                     (Data.ProtoLens.Encoding.Wire.buildFieldSet
-                                                                                        (Lens.Family2.view
-                                                                                           Data.ProtoLens.unknownFields
-                                                                                           _x))))))))))))))))))))))))))
+                                                                                     ((Data.Monoid.<>)
+                                                                                        (let
+                                                                                           _v
+                                                                                             = Lens.Family2.view
+                                                                                                 (Data.ProtoLens.Field.field
+                                                                                                    @"originalExecutionRunId")
+                                                                                                 _x
+                                                                                         in
+                                                                                           if (Prelude.==)
+                                                                                                _v
+                                                                                                Data.ProtoLens.fieldDefault then
+                                                                                               Data.Monoid.mempty
+                                                                                           else
+                                                                                               (Data.Monoid.<>)
+                                                                                                 (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                                                                                    210)
+                                                                                                 ((Prelude..)
+                                                                                                    (\ bs
+                                                                                                       -> (Data.Monoid.<>)
+                                                                                                            (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                                                                                               (Prelude.fromIntegral
+                                                                                                                  (Data.ByteString.length
+                                                                                                                     bs)))
+                                                                                                            (Data.ProtoLens.Encoding.Bytes.putBytes
+                                                                                                               bs))
+                                                                                                    Data.Text.Encoding.encodeUtf8
+                                                                                                    _v))
+                                                                                        ((Data.Monoid.<>)
+                                                                                           (case
+                                                                                                Lens.Family2.view
+                                                                                                  (Data.ProtoLens.Field.field
+                                                                                                     @"maybe'propagatedNexusSerializationContext")
+                                                                                                  _x
+                                                                                            of
+                                                                                              Prelude.Nothing
+                                                                                                -> Data.Monoid.mempty
+                                                                                              (Prelude.Just _v)
+                                                                                                -> (Data.Monoid.<>)
+                                                                                                     (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                                                                                        218)
+                                                                                                     ((Prelude..)
+                                                                                                        (\ bs
+                                                                                                           -> (Data.Monoid.<>)
+                                                                                                                (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                                                                                                   (Prelude.fromIntegral
+                                                                                                                      (Data.ByteString.length
+                                                                                                                         bs)))
+                                                                                                                (Data.ProtoLens.Encoding.Bytes.putBytes
+                                                                                                                   bs))
+                                                                                                        Data.ProtoLens.encodeMessage
+                                                                                                        _v))
+                                                                                           (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                                                                                              (Lens.Family2.view
+                                                                                                 Data.ProtoLens.unknownFields
+                                                                                                 _x))))))))))))))))))))))))))))
 instance Control.DeepSeq.NFData InitializeWorkflow where
   rnf
     = \ x__
@@ -2475,7 +2672,13 @@ instance Control.DeepSeq.NFData InitializeWorkflow where
                                                                                      (Control.DeepSeq.deepseq
                                                                                         (_InitializeWorkflow'priority
                                                                                            x__)
-                                                                                        ())))))))))))))))))))))))))
+                                                                                        (Control.DeepSeq.deepseq
+                                                                                           (_InitializeWorkflow'originalExecutionRunId
+                                                                                              x__)
+                                                                                           (Control.DeepSeq.deepseq
+                                                                                              (_InitializeWorkflow'propagatedNexusSerializationContext
+                                                                                                 x__)
+                                                                                              ())))))))))))))))))))))))))))
 {- | Fields :
      
          * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.key' @:: Lens' InitializeWorkflow'HeadersEntry Data.Text.Text@
@@ -5240,10 +5443,12 @@ _ResolveNexusOperationStart'Failed
      
          * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.seq' @:: Lens' ResolveRequestCancelExternalWorkflow Data.Word.Word32@
          * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.failure' @:: Lens' ResolveRequestCancelExternalWorkflow Proto.Temporal.Api.Failure.V1.Message.Failure@
-         * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.maybe'failure' @:: Lens' ResolveRequestCancelExternalWorkflow (Prelude.Maybe Proto.Temporal.Api.Failure.V1.Message.Failure)@ -}
+         * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.maybe'failure' @:: Lens' ResolveRequestCancelExternalWorkflow (Prelude.Maybe Proto.Temporal.Api.Failure.V1.Message.Failure)@
+         * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.cause' @:: Lens' ResolveRequestCancelExternalWorkflow Proto.Temporal.Api.Enums.V1.FailedCause.CancelExternalWorkflowExecutionFailedCause@ -}
 data ResolveRequestCancelExternalWorkflow
   = ResolveRequestCancelExternalWorkflow'_constructor {_ResolveRequestCancelExternalWorkflow'seq :: !Data.Word.Word32,
                                                        _ResolveRequestCancelExternalWorkflow'failure :: !(Prelude.Maybe Proto.Temporal.Api.Failure.V1.Message.Failure),
+                                                       _ResolveRequestCancelExternalWorkflow'cause :: !Proto.Temporal.Api.Enums.V1.FailedCause.CancelExternalWorkflowExecutionFailedCause,
                                                        _ResolveRequestCancelExternalWorkflow'_unknownFields :: !Data.ProtoLens.FieldSet}
   deriving stock (Prelude.Eq, Prelude.Ord)
 instance Prelude.Show ResolveRequestCancelExternalWorkflow where
@@ -5276,6 +5481,14 @@ instance Data.ProtoLens.Field.HasField ResolveRequestCancelExternalWorkflow "may
            (\ x__ y__
               -> x__ {_ResolveRequestCancelExternalWorkflow'failure = y__}))
         Prelude.id
+instance Data.ProtoLens.Field.HasField ResolveRequestCancelExternalWorkflow "cause" Proto.Temporal.Api.Enums.V1.FailedCause.CancelExternalWorkflowExecutionFailedCause where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _ResolveRequestCancelExternalWorkflow'cause
+           (\ x__ y__
+              -> x__ {_ResolveRequestCancelExternalWorkflow'cause = y__}))
+        Prelude.id
 instance Data.ProtoLens.Message ResolveRequestCancelExternalWorkflow where
   messageName _
     = Data.Text.pack
@@ -5284,7 +5497,8 @@ instance Data.ProtoLens.Message ResolveRequestCancelExternalWorkflow where
     = "\n\
       \$ResolveRequestCancelExternalWorkflow\DC2\DLE\n\
       \\ETXseq\CAN\SOH \SOH(\rR\ETXseq\DC2:\n\
-      \\afailure\CAN\STX \SOH(\v2 .temporal.api.failure.v1.FailureR\afailure"
+      \\afailure\CAN\STX \SOH(\v2 .temporal.api.failure.v1.FailureR\afailure\DC2W\n\
+      \\ENQcause\CAN\ETX \SOH(\SO2A.temporal.api.enums.v1.CancelExternalWorkflowExecutionFailedCauseR\ENQcause"
   packedFileDescriptor _ = packedFileDescriptor
   fieldsByTag
     = let
@@ -5304,10 +5518,19 @@ instance Data.ProtoLens.Message ResolveRequestCancelExternalWorkflow where
               (Data.ProtoLens.OptionalField
                  (Data.ProtoLens.Field.field @"maybe'failure")) ::
               Data.ProtoLens.FieldDescriptor ResolveRequestCancelExternalWorkflow
+        cause__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "cause"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.EnumField ::
+                 Data.ProtoLens.FieldTypeDescriptor Proto.Temporal.Api.Enums.V1.FailedCause.CancelExternalWorkflowExecutionFailedCause)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional (Data.ProtoLens.Field.field @"cause")) ::
+              Data.ProtoLens.FieldDescriptor ResolveRequestCancelExternalWorkflow
       in
         Data.Map.fromList
           [(Data.ProtoLens.Tag 1, seq__field_descriptor),
-           (Data.ProtoLens.Tag 2, failure__field_descriptor)]
+           (Data.ProtoLens.Tag 2, failure__field_descriptor),
+           (Data.ProtoLens.Tag 3, cause__field_descriptor)]
   unknownFields
     = Lens.Family2.Unchecked.lens
         _ResolveRequestCancelExternalWorkflow'_unknownFields
@@ -5318,6 +5541,7 @@ instance Data.ProtoLens.Message ResolveRequestCancelExternalWorkflow where
     = ResolveRequestCancelExternalWorkflow'_constructor
         {_ResolveRequestCancelExternalWorkflow'seq = Data.ProtoLens.fieldDefault,
          _ResolveRequestCancelExternalWorkflow'failure = Prelude.Nothing,
+         _ResolveRequestCancelExternalWorkflow'cause = Data.ProtoLens.fieldDefault,
          _ResolveRequestCancelExternalWorkflow'_unknownFields = []}
   parseMessage
     = let
@@ -5355,6 +5579,15 @@ instance Data.ProtoLens.Message ResolveRequestCancelExternalWorkflow where
                                              (Prelude.fromIntegral len) Data.ProtoLens.parseMessage)
                                        "failure"
                                 loop (Lens.Family2.set (Data.ProtoLens.Field.field @"failure") y x)
+                        24
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (Prelude.fmap
+                                          Prelude.toEnum
+                                          (Prelude.fmap
+                                             Prelude.fromIntegral
+                                             Data.ProtoLens.Encoding.Bytes.getVarInt))
+                                       "cause"
+                                loop (Lens.Family2.set (Data.ProtoLens.Field.field @"cause") y x)
                         wire
                           -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
                                         wire
@@ -5392,8 +5625,21 @@ instance Data.ProtoLens.Message ResolveRequestCancelExternalWorkflow where
                                         (Prelude.fromIntegral (Data.ByteString.length bs)))
                                      (Data.ProtoLens.Encoding.Bytes.putBytes bs))
                              Data.ProtoLens.encodeMessage _v))
-                (Data.ProtoLens.Encoding.Wire.buildFieldSet
-                   (Lens.Family2.view Data.ProtoLens.unknownFields _x)))
+                ((Data.Monoid.<>)
+                   (let
+                      _v = Lens.Family2.view (Data.ProtoLens.Field.field @"cause") _x
+                    in
+                      if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                          Data.Monoid.mempty
+                      else
+                          (Data.Monoid.<>)
+                            (Data.ProtoLens.Encoding.Bytes.putVarInt 24)
+                            ((Prelude..)
+                               ((Prelude..)
+                                  Data.ProtoLens.Encoding.Bytes.putVarInt Prelude.fromIntegral)
+                               Prelude.fromEnum _v))
+                   (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                      (Lens.Family2.view Data.ProtoLens.unknownFields _x))))
 instance Control.DeepSeq.NFData ResolveRequestCancelExternalWorkflow where
   rnf
     = \ x__
@@ -5402,15 +5648,19 @@ instance Control.DeepSeq.NFData ResolveRequestCancelExternalWorkflow where
              (Control.DeepSeq.deepseq
                 (_ResolveRequestCancelExternalWorkflow'seq x__)
                 (Control.DeepSeq.deepseq
-                   (_ResolveRequestCancelExternalWorkflow'failure x__) ()))
+                   (_ResolveRequestCancelExternalWorkflow'failure x__)
+                   (Control.DeepSeq.deepseq
+                      (_ResolveRequestCancelExternalWorkflow'cause x__) ())))
 {- | Fields :
      
          * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.seq' @:: Lens' ResolveSignalExternalWorkflow Data.Word.Word32@
          * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.failure' @:: Lens' ResolveSignalExternalWorkflow Proto.Temporal.Api.Failure.V1.Message.Failure@
-         * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.maybe'failure' @:: Lens' ResolveSignalExternalWorkflow (Prelude.Maybe Proto.Temporal.Api.Failure.V1.Message.Failure)@ -}
+         * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.maybe'failure' @:: Lens' ResolveSignalExternalWorkflow (Prelude.Maybe Proto.Temporal.Api.Failure.V1.Message.Failure)@
+         * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.cause' @:: Lens' ResolveSignalExternalWorkflow Proto.Temporal.Api.Enums.V1.FailedCause.SignalExternalWorkflowExecutionFailedCause@ -}
 data ResolveSignalExternalWorkflow
   = ResolveSignalExternalWorkflow'_constructor {_ResolveSignalExternalWorkflow'seq :: !Data.Word.Word32,
                                                 _ResolveSignalExternalWorkflow'failure :: !(Prelude.Maybe Proto.Temporal.Api.Failure.V1.Message.Failure),
+                                                _ResolveSignalExternalWorkflow'cause :: !Proto.Temporal.Api.Enums.V1.FailedCause.SignalExternalWorkflowExecutionFailedCause,
                                                 _ResolveSignalExternalWorkflow'_unknownFields :: !Data.ProtoLens.FieldSet}
   deriving stock (Prelude.Eq, Prelude.Ord)
 instance Prelude.Show ResolveSignalExternalWorkflow where
@@ -5440,6 +5690,13 @@ instance Data.ProtoLens.Field.HasField ResolveSignalExternalWorkflow "maybe'fail
            _ResolveSignalExternalWorkflow'failure
            (\ x__ y__ -> x__ {_ResolveSignalExternalWorkflow'failure = y__}))
         Prelude.id
+instance Data.ProtoLens.Field.HasField ResolveSignalExternalWorkflow "cause" Proto.Temporal.Api.Enums.V1.FailedCause.SignalExternalWorkflowExecutionFailedCause where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _ResolveSignalExternalWorkflow'cause
+           (\ x__ y__ -> x__ {_ResolveSignalExternalWorkflow'cause = y__}))
+        Prelude.id
 instance Data.ProtoLens.Message ResolveSignalExternalWorkflow where
   messageName _
     = Data.Text.pack
@@ -5448,7 +5705,8 @@ instance Data.ProtoLens.Message ResolveSignalExternalWorkflow where
     = "\n\
       \\GSResolveSignalExternalWorkflow\DC2\DLE\n\
       \\ETXseq\CAN\SOH \SOH(\rR\ETXseq\DC2:\n\
-      \\afailure\CAN\STX \SOH(\v2 .temporal.api.failure.v1.FailureR\afailure"
+      \\afailure\CAN\STX \SOH(\v2 .temporal.api.failure.v1.FailureR\afailure\DC2W\n\
+      \\ENQcause\CAN\ETX \SOH(\SO2A.temporal.api.enums.v1.SignalExternalWorkflowExecutionFailedCauseR\ENQcause"
   packedFileDescriptor _ = packedFileDescriptor
   fieldsByTag
     = let
@@ -5468,10 +5726,19 @@ instance Data.ProtoLens.Message ResolveSignalExternalWorkflow where
               (Data.ProtoLens.OptionalField
                  (Data.ProtoLens.Field.field @"maybe'failure")) ::
               Data.ProtoLens.FieldDescriptor ResolveSignalExternalWorkflow
+        cause__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "cause"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.EnumField ::
+                 Data.ProtoLens.FieldTypeDescriptor Proto.Temporal.Api.Enums.V1.FailedCause.SignalExternalWorkflowExecutionFailedCause)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional (Data.ProtoLens.Field.field @"cause")) ::
+              Data.ProtoLens.FieldDescriptor ResolveSignalExternalWorkflow
       in
         Data.Map.fromList
           [(Data.ProtoLens.Tag 1, seq__field_descriptor),
-           (Data.ProtoLens.Tag 2, failure__field_descriptor)]
+           (Data.ProtoLens.Tag 2, failure__field_descriptor),
+           (Data.ProtoLens.Tag 3, cause__field_descriptor)]
   unknownFields
     = Lens.Family2.Unchecked.lens
         _ResolveSignalExternalWorkflow'_unknownFields
@@ -5481,6 +5748,7 @@ instance Data.ProtoLens.Message ResolveSignalExternalWorkflow where
     = ResolveSignalExternalWorkflow'_constructor
         {_ResolveSignalExternalWorkflow'seq = Data.ProtoLens.fieldDefault,
          _ResolveSignalExternalWorkflow'failure = Prelude.Nothing,
+         _ResolveSignalExternalWorkflow'cause = Data.ProtoLens.fieldDefault,
          _ResolveSignalExternalWorkflow'_unknownFields = []}
   parseMessage
     = let
@@ -5518,6 +5786,15 @@ instance Data.ProtoLens.Message ResolveSignalExternalWorkflow where
                                              (Prelude.fromIntegral len) Data.ProtoLens.parseMessage)
                                        "failure"
                                 loop (Lens.Family2.set (Data.ProtoLens.Field.field @"failure") y x)
+                        24
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (Prelude.fmap
+                                          Prelude.toEnum
+                                          (Prelude.fmap
+                                             Prelude.fromIntegral
+                                             Data.ProtoLens.Encoding.Bytes.getVarInt))
+                                       "cause"
+                                loop (Lens.Family2.set (Data.ProtoLens.Field.field @"cause") y x)
                         wire
                           -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
                                         wire
@@ -5554,8 +5831,21 @@ instance Data.ProtoLens.Message ResolveSignalExternalWorkflow where
                                         (Prelude.fromIntegral (Data.ByteString.length bs)))
                                      (Data.ProtoLens.Encoding.Bytes.putBytes bs))
                              Data.ProtoLens.encodeMessage _v))
-                (Data.ProtoLens.Encoding.Wire.buildFieldSet
-                   (Lens.Family2.view Data.ProtoLens.unknownFields _x)))
+                ((Data.Monoid.<>)
+                   (let
+                      _v = Lens.Family2.view (Data.ProtoLens.Field.field @"cause") _x
+                    in
+                      if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                          Data.Monoid.mempty
+                      else
+                          (Data.Monoid.<>)
+                            (Data.ProtoLens.Encoding.Bytes.putVarInt 24)
+                            ((Prelude..)
+                               ((Prelude..)
+                                  Data.ProtoLens.Encoding.Bytes.putVarInt Prelude.fromIntegral)
+                               Prelude.fromEnum _v))
+                   (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                      (Lens.Family2.view Data.ProtoLens.unknownFields _x))))
 instance Control.DeepSeq.NFData ResolveSignalExternalWorkflow where
   rnf
     = \ x__
@@ -5564,19 +5854,23 @@ instance Control.DeepSeq.NFData ResolveSignalExternalWorkflow where
              (Control.DeepSeq.deepseq
                 (_ResolveSignalExternalWorkflow'seq x__)
                 (Control.DeepSeq.deepseq
-                   (_ResolveSignalExternalWorkflow'failure x__) ()))
+                   (_ResolveSignalExternalWorkflow'failure x__)
+                   (Control.DeepSeq.deepseq
+                      (_ResolveSignalExternalWorkflow'cause x__) ())))
 {- | Fields :
      
          * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.signalName' @:: Lens' SignalWorkflow Data.Text.Text@
          * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.input' @:: Lens' SignalWorkflow [Proto.Temporal.Api.Common.V1.Message.Payload]@
          * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.vec'input' @:: Lens' SignalWorkflow (Data.Vector.Vector Proto.Temporal.Api.Common.V1.Message.Payload)@
          * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.identity' @:: Lens' SignalWorkflow Data.Text.Text@
-         * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.headers' @:: Lens' SignalWorkflow (Data.Map.Map Data.Text.Text Proto.Temporal.Api.Common.V1.Message.Payload)@ -}
+         * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.headers' @:: Lens' SignalWorkflow (Data.Map.Map Data.Text.Text Proto.Temporal.Api.Common.V1.Message.Payload)@
+         * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.originatingEventId' @:: Lens' SignalWorkflow Data.Int.Int64@ -}
 data SignalWorkflow
   = SignalWorkflow'_constructor {_SignalWorkflow'signalName :: !Data.Text.Text,
                                  _SignalWorkflow'input :: !(Data.Vector.Vector Proto.Temporal.Api.Common.V1.Message.Payload),
                                  _SignalWorkflow'identity :: !Data.Text.Text,
                                  _SignalWorkflow'headers :: !(Data.Map.Map Data.Text.Text Proto.Temporal.Api.Common.V1.Message.Payload),
+                                 _SignalWorkflow'originatingEventId :: !Data.Int.Int64,
                                  _SignalWorkflow'_unknownFields :: !Data.ProtoLens.FieldSet}
   deriving stock (Prelude.Eq, Prelude.Ord)
 instance Prelude.Show SignalWorkflow where
@@ -5622,6 +5916,13 @@ instance Data.ProtoLens.Field.HasField SignalWorkflow "headers" (Data.Map.Map Da
            _SignalWorkflow'headers
            (\ x__ y__ -> x__ {_SignalWorkflow'headers = y__}))
         Prelude.id
+instance Data.ProtoLens.Field.HasField SignalWorkflow "originatingEventId" Data.Int.Int64 where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _SignalWorkflow'originatingEventId
+           (\ x__ y__ -> x__ {_SignalWorkflow'originatingEventId = y__}))
+        Prelude.id
 instance Data.ProtoLens.Message SignalWorkflow where
   messageName _
     = Data.Text.pack "coresdk.workflow_activation.SignalWorkflow"
@@ -5632,7 +5933,8 @@ instance Data.ProtoLens.Message SignalWorkflow where
       \signalName\DC25\n\
       \\ENQinput\CAN\STX \ETX(\v2\US.temporal.api.common.v1.PayloadR\ENQinput\DC2\SUB\n\
       \\bidentity\CAN\ETX \SOH(\tR\bidentity\DC2R\n\
-      \\aheaders\CAN\ENQ \ETX(\v28.coresdk.workflow_activation.SignalWorkflow.HeadersEntryR\aheaders\SUB[\n\
+      \\aheaders\CAN\ENQ \ETX(\v28.coresdk.workflow_activation.SignalWorkflow.HeadersEntryR\aheaders\DC20\n\
+      \\DC4originating_event_id\CAN\ACK \SOH(\ETXR\DC2originatingEventId\SUB[\n\
       \\fHeadersEntry\DC2\DLE\n\
       \\ETXkey\CAN\SOH \SOH(\tR\ETXkey\DC25\n\
       \\ENQvalue\CAN\STX \SOH(\v2\US.temporal.api.common.v1.PayloadR\ENQvalue:\STX8\SOH"
@@ -5675,12 +5977,22 @@ instance Data.ProtoLens.Message SignalWorkflow where
                  (Data.ProtoLens.Field.field @"value")
                  (Data.ProtoLens.Field.field @"headers")) ::
               Data.ProtoLens.FieldDescriptor SignalWorkflow
+        originatingEventId__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "originating_event_id"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.Int64Field ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Int.Int64)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"originatingEventId")) ::
+              Data.ProtoLens.FieldDescriptor SignalWorkflow
       in
         Data.Map.fromList
           [(Data.ProtoLens.Tag 1, signalName__field_descriptor),
            (Data.ProtoLens.Tag 2, input__field_descriptor),
            (Data.ProtoLens.Tag 3, identity__field_descriptor),
-           (Data.ProtoLens.Tag 5, headers__field_descriptor)]
+           (Data.ProtoLens.Tag 5, headers__field_descriptor),
+           (Data.ProtoLens.Tag 6, originatingEventId__field_descriptor)]
   unknownFields
     = Lens.Family2.Unchecked.lens
         _SignalWorkflow'_unknownFields
@@ -5691,6 +6003,7 @@ instance Data.ProtoLens.Message SignalWorkflow where
          _SignalWorkflow'input = Data.Vector.Generic.empty,
          _SignalWorkflow'identity = Data.ProtoLens.fieldDefault,
          _SignalWorkflow'headers = Data.Map.empty,
+         _SignalWorkflow'originatingEventId = Data.ProtoLens.fieldDefault,
          _SignalWorkflow'_unknownFields = []}
   parseMessage
     = let
@@ -5766,6 +6079,16 @@ instance Data.ProtoLens.Message SignalWorkflow where
                                         (Data.ProtoLens.Field.field @"headers")
                                         (\ !t -> Data.Map.insert key value t) x)
                                      mutable'input)
+                        48
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (Prelude.fmap
+                                          Prelude.fromIntegral
+                                          Data.ProtoLens.Encoding.Bytes.getVarInt)
+                                       "originating_event_id"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field @"originatingEventId") y x)
+                                  mutable'input
                         wire
                           -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
                                         wire
@@ -5849,8 +6172,22 @@ instance Data.ProtoLens.Message SignalWorkflow where
                                                 SignalWorkflow'HeadersEntry)))))
                             (Data.Map.toList
                                (Lens.Family2.view (Data.ProtoLens.Field.field @"headers") _x))))
-                      (Data.ProtoLens.Encoding.Wire.buildFieldSet
-                         (Lens.Family2.view Data.ProtoLens.unknownFields _x)))))
+                      ((Data.Monoid.<>)
+                         (let
+                            _v
+                              = Lens.Family2.view
+                                  (Data.ProtoLens.Field.field @"originatingEventId") _x
+                          in
+                            if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                                Data.Monoid.mempty
+                            else
+                                (Data.Monoid.<>)
+                                  (Data.ProtoLens.Encoding.Bytes.putVarInt 48)
+                                  ((Prelude..)
+                                     Data.ProtoLens.Encoding.Bytes.putVarInt Prelude.fromIntegral
+                                     _v))
+                         (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                            (Lens.Family2.view Data.ProtoLens.unknownFields _x))))))
 instance Control.DeepSeq.NFData SignalWorkflow where
   rnf
     = \ x__
@@ -5862,7 +6199,10 @@ instance Control.DeepSeq.NFData SignalWorkflow where
                    (_SignalWorkflow'input x__)
                    (Control.DeepSeq.deepseq
                       (_SignalWorkflow'identity x__)
-                      (Control.DeepSeq.deepseq (_SignalWorkflow'headers x__) ()))))
+                      (Control.DeepSeq.deepseq
+                         (_SignalWorkflow'headers x__)
+                         (Control.DeepSeq.deepseq
+                            (_SignalWorkflow'originatingEventId x__) ())))))
 {- | Fields :
      
          * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.key' @:: Lens' SignalWorkflow'HeadersEntry Data.Text.Text@
@@ -6155,7 +6495,10 @@ instance Control.DeepSeq.NFData UpdateRandomSeed where
          * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.continueAsNewSuggested' @:: Lens' WorkflowActivation Prelude.Bool@
          * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.deploymentVersionForCurrentTask' @:: Lens' WorkflowActivation Proto.Temporal.Sdk.Core.Common.Common.WorkerDeploymentVersion@
          * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.maybe'deploymentVersionForCurrentTask' @:: Lens' WorkflowActivation (Prelude.Maybe Proto.Temporal.Sdk.Core.Common.Common.WorkerDeploymentVersion)@
-         * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.lastSdkVersion' @:: Lens' WorkflowActivation Data.Text.Text@ -}
+         * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.lastSdkVersion' @:: Lens' WorkflowActivation Data.Text.Text@
+         * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.suggestContinueAsNewReasons' @:: Lens' WorkflowActivation [Proto.Temporal.Api.Enums.V1.Workflow.SuggestContinueAsNewReason]@
+         * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.vec'suggestContinueAsNewReasons' @:: Lens' WorkflowActivation (Data.Vector.Vector Proto.Temporal.Api.Enums.V1.Workflow.SuggestContinueAsNewReason)@
+         * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.targetWorkerDeploymentVersionChanged' @:: Lens' WorkflowActivation Prelude.Bool@ -}
 data WorkflowActivation
   = WorkflowActivation'_constructor {_WorkflowActivation'runId :: !Data.Text.Text,
                                      _WorkflowActivation'timestamp :: !(Prelude.Maybe Proto.Google.Protobuf.Timestamp.Timestamp),
@@ -6167,6 +6510,8 @@ data WorkflowActivation
                                      _WorkflowActivation'continueAsNewSuggested :: !Prelude.Bool,
                                      _WorkflowActivation'deploymentVersionForCurrentTask :: !(Prelude.Maybe Proto.Temporal.Sdk.Core.Common.Common.WorkerDeploymentVersion),
                                      _WorkflowActivation'lastSdkVersion :: !Data.Text.Text,
+                                     _WorkflowActivation'suggestContinueAsNewReasons :: !(Data.Vector.Vector Proto.Temporal.Api.Enums.V1.Workflow.SuggestContinueAsNewReason),
+                                     _WorkflowActivation'targetWorkerDeploymentVersionChanged :: !Prelude.Bool,
                                      _WorkflowActivation'_unknownFields :: !Data.ProtoLens.FieldSet}
   deriving stock (Prelude.Eq, Prelude.Ord)
 instance Prelude.Show WorkflowActivation where
@@ -6284,6 +6629,33 @@ instance Data.ProtoLens.Field.HasField WorkflowActivation "lastSdkVersion" Data.
            _WorkflowActivation'lastSdkVersion
            (\ x__ y__ -> x__ {_WorkflowActivation'lastSdkVersion = y__}))
         Prelude.id
+instance Data.ProtoLens.Field.HasField WorkflowActivation "suggestContinueAsNewReasons" [Proto.Temporal.Api.Enums.V1.Workflow.SuggestContinueAsNewReason] where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _WorkflowActivation'suggestContinueAsNewReasons
+           (\ x__ y__
+              -> x__ {_WorkflowActivation'suggestContinueAsNewReasons = y__}))
+        (Lens.Family2.Unchecked.lens
+           Data.Vector.Generic.toList
+           (\ _ y__ -> Data.Vector.Generic.fromList y__))
+instance Data.ProtoLens.Field.HasField WorkflowActivation "vec'suggestContinueAsNewReasons" (Data.Vector.Vector Proto.Temporal.Api.Enums.V1.Workflow.SuggestContinueAsNewReason) where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _WorkflowActivation'suggestContinueAsNewReasons
+           (\ x__ y__
+              -> x__ {_WorkflowActivation'suggestContinueAsNewReasons = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField WorkflowActivation "targetWorkerDeploymentVersionChanged" Prelude.Bool where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _WorkflowActivation'targetWorkerDeploymentVersionChanged
+           (\ x__ y__
+              -> x__
+                   {_WorkflowActivation'targetWorkerDeploymentVersionChanged = y__}))
+        Prelude.id
 instance Data.ProtoLens.Message WorkflowActivation where
   messageName _
     = Data.Text.pack "coresdk.workflow_activation.WorkflowActivation"
@@ -6300,7 +6672,9 @@ instance Data.ProtoLens.Message WorkflowActivation where
       \\EMcontinue_as_new_suggested\CAN\b \SOH(\bR\SYNcontinueAsNewSuggested\DC2u\n\
       \#deployment_version_for_current_task\CAN\t \SOH(\v2'.coresdk.common.WorkerDeploymentVersionR\USdeploymentVersionForCurrentTask\DC2(\n\
       \\DLElast_sdk_version\CAN\n\
-      \ \SOH(\tR\SOlastSdkVersion"
+      \ \SOH(\tR\SOlastSdkVersion\DC2w\n\
+      \\USsuggest_continue_as_new_reasons\CAN\v \ETX(\SO21.temporal.api.enums.v1.SuggestContinueAsNewReasonR\ESCsuggestContinueAsNewReasons\DC2V\n\
+      \(target_worker_deployment_version_changed\CAN\f \SOH(\bR$targetWorkerDeploymentVersionChanged"
   packedFileDescriptor _ = packedFileDescriptor
   fieldsByTag
     = let
@@ -6391,6 +6765,25 @@ instance Data.ProtoLens.Message WorkflowActivation where
                  Data.ProtoLens.Optional
                  (Data.ProtoLens.Field.field @"lastSdkVersion")) ::
               Data.ProtoLens.FieldDescriptor WorkflowActivation
+        suggestContinueAsNewReasons__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "suggest_continue_as_new_reasons"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.EnumField ::
+                 Data.ProtoLens.FieldTypeDescriptor Proto.Temporal.Api.Enums.V1.Workflow.SuggestContinueAsNewReason)
+              (Data.ProtoLens.RepeatedField
+                 Data.ProtoLens.Packed
+                 (Data.ProtoLens.Field.field @"suggestContinueAsNewReasons")) ::
+              Data.ProtoLens.FieldDescriptor WorkflowActivation
+        targetWorkerDeploymentVersionChanged__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "target_worker_deployment_version_changed"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.BoolField ::
+                 Data.ProtoLens.FieldTypeDescriptor Prelude.Bool)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field
+                    @"targetWorkerDeploymentVersionChanged")) ::
+              Data.ProtoLens.FieldDescriptor WorkflowActivation
       in
         Data.Map.fromList
           [(Data.ProtoLens.Tag 1, runId__field_descriptor),
@@ -6403,7 +6796,11 @@ instance Data.ProtoLens.Message WorkflowActivation where
            (Data.ProtoLens.Tag 8, continueAsNewSuggested__field_descriptor),
            (Data.ProtoLens.Tag 9, 
             deploymentVersionForCurrentTask__field_descriptor),
-           (Data.ProtoLens.Tag 10, lastSdkVersion__field_descriptor)]
+           (Data.ProtoLens.Tag 10, lastSdkVersion__field_descriptor),
+           (Data.ProtoLens.Tag 11, 
+            suggestContinueAsNewReasons__field_descriptor),
+           (Data.ProtoLens.Tag 12, 
+            targetWorkerDeploymentVersionChanged__field_descriptor)]
   unknownFields
     = Lens.Family2.Unchecked.lens
         _WorkflowActivation'_unknownFields
@@ -6420,6 +6817,8 @@ instance Data.ProtoLens.Message WorkflowActivation where
          _WorkflowActivation'continueAsNewSuggested = Data.ProtoLens.fieldDefault,
          _WorkflowActivation'deploymentVersionForCurrentTask = Prelude.Nothing,
          _WorkflowActivation'lastSdkVersion = Data.ProtoLens.fieldDefault,
+         _WorkflowActivation'suggestContinueAsNewReasons = Data.Vector.Generic.empty,
+         _WorkflowActivation'targetWorkerDeploymentVersionChanged = Data.ProtoLens.fieldDefault,
          _WorkflowActivation'_unknownFields = []}
   parseMessage
     = let
@@ -6427,8 +6826,13 @@ instance Data.ProtoLens.Message WorkflowActivation where
           WorkflowActivation
           -> Data.ProtoLens.Encoding.Growing.Growing Data.Vector.Unboxed.Vector Data.ProtoLens.Encoding.Growing.RealWorld Data.Word.Word32
              -> Data.ProtoLens.Encoding.Growing.Growing Data.Vector.Vector Data.ProtoLens.Encoding.Growing.RealWorld WorkflowActivationJob
-                -> Data.ProtoLens.Encoding.Bytes.Parser WorkflowActivation
-        loop x mutable'availableInternalFlags mutable'jobs
+                -> Data.ProtoLens.Encoding.Growing.Growing Data.Vector.Vector Data.ProtoLens.Encoding.Growing.RealWorld Proto.Temporal.Api.Enums.V1.Workflow.SuggestContinueAsNewReason
+                   -> Data.ProtoLens.Encoding.Bytes.Parser WorkflowActivation
+        loop
+          x
+          mutable'availableInternalFlags
+          mutable'jobs
+          mutable'suggestContinueAsNewReasons
           = do end <- Data.ProtoLens.Encoding.Bytes.atEnd
                if end then
                    do frozen'availableInternalFlags <- Data.ProtoLens.Encoding.Parser.Unsafe.unsafeLiftIO
@@ -6436,6 +6840,9 @@ instance Data.ProtoLens.Message WorkflowActivation where
                                                             mutable'availableInternalFlags)
                       frozen'jobs <- Data.ProtoLens.Encoding.Parser.Unsafe.unsafeLiftIO
                                        (Data.ProtoLens.Encoding.Growing.unsafeFreeze mutable'jobs)
+                      frozen'suggestContinueAsNewReasons <- Data.ProtoLens.Encoding.Parser.Unsafe.unsafeLiftIO
+                                                              (Data.ProtoLens.Encoding.Growing.unsafeFreeze
+                                                                 mutable'suggestContinueAsNewReasons)
                       (let missing = []
                        in
                          if Prelude.null missing then
@@ -6452,7 +6859,10 @@ instance Data.ProtoLens.Message WorkflowActivation where
                               (Data.ProtoLens.Field.field @"vec'availableInternalFlags")
                               frozen'availableInternalFlags
                               (Lens.Family2.set
-                                 (Data.ProtoLens.Field.field @"vec'jobs") frozen'jobs x)))
+                                 (Data.ProtoLens.Field.field @"vec'jobs") frozen'jobs
+                                 (Lens.Family2.set
+                                    (Data.ProtoLens.Field.field @"vec'suggestContinueAsNewReasons")
+                                    frozen'suggestContinueAsNewReasons x))))
                else
                    do tag <- Data.ProtoLens.Encoding.Bytes.getVarInt
                       case tag of
@@ -6465,6 +6875,7 @@ instance Data.ProtoLens.Message WorkflowActivation where
                                 loop
                                   (Lens.Family2.set (Data.ProtoLens.Field.field @"runId") y x)
                                   mutable'availableInternalFlags mutable'jobs
+                                  mutable'suggestContinueAsNewReasons
                         18
                           -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
                                        (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
@@ -6474,6 +6885,7 @@ instance Data.ProtoLens.Message WorkflowActivation where
                                 loop
                                   (Lens.Family2.set (Data.ProtoLens.Field.field @"timestamp") y x)
                                   mutable'availableInternalFlags mutable'jobs
+                                  mutable'suggestContinueAsNewReasons
                         24
                           -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
                                        (Prelude.fmap
@@ -6482,6 +6894,7 @@ instance Data.ProtoLens.Message WorkflowActivation where
                                 loop
                                   (Lens.Family2.set (Data.ProtoLens.Field.field @"isReplaying") y x)
                                   mutable'availableInternalFlags mutable'jobs
+                                  mutable'suggestContinueAsNewReasons
                         32
                           -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
                                        (Prelude.fmap
@@ -6492,6 +6905,7 @@ instance Data.ProtoLens.Message WorkflowActivation where
                                   (Lens.Family2.set
                                      (Data.ProtoLens.Field.field @"historyLength") y x)
                                   mutable'availableInternalFlags mutable'jobs
+                                  mutable'suggestContinueAsNewReasons
                         42
                           -> do !y <- (Data.ProtoLens.Encoding.Bytes.<?>)
                                         (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
@@ -6501,7 +6915,9 @@ instance Data.ProtoLens.Message WorkflowActivation where
                                         "jobs"
                                 v <- Data.ProtoLens.Encoding.Parser.Unsafe.unsafeLiftIO
                                        (Data.ProtoLens.Encoding.Growing.append mutable'jobs y)
-                                loop x mutable'availableInternalFlags v
+                                loop
+                                  x mutable'availableInternalFlags v
+                                  mutable'suggestContinueAsNewReasons
                         48
                           -> do !y <- (Data.ProtoLens.Encoding.Bytes.<?>)
                                         (Prelude.fmap
@@ -6511,7 +6927,7 @@ instance Data.ProtoLens.Message WorkflowActivation where
                                 v <- Data.ProtoLens.Encoding.Parser.Unsafe.unsafeLiftIO
                                        (Data.ProtoLens.Encoding.Growing.append
                                           mutable'availableInternalFlags y)
-                                loop x v mutable'jobs
+                                loop x v mutable'jobs mutable'suggestContinueAsNewReasons
                         50
                           -> do y <- do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
                                         Data.ProtoLens.Encoding.Bytes.isolate
@@ -6533,7 +6949,7 @@ instance Data.ProtoLens.Message WorkflowActivation where
                                                             ploop qs'
                                             in ploop)
                                              mutable'availableInternalFlags)
-                                loop x y mutable'jobs
+                                loop x y mutable'jobs mutable'suggestContinueAsNewReasons
                         56
                           -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
                                        Data.ProtoLens.Encoding.Bytes.getVarInt "history_size_bytes"
@@ -6541,6 +6957,7 @@ instance Data.ProtoLens.Message WorkflowActivation where
                                   (Lens.Family2.set
                                      (Data.ProtoLens.Field.field @"historySizeBytes") y x)
                                   mutable'availableInternalFlags mutable'jobs
+                                  mutable'suggestContinueAsNewReasons
                         64
                           -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
                                        (Prelude.fmap
@@ -6550,6 +6967,7 @@ instance Data.ProtoLens.Message WorkflowActivation where
                                   (Lens.Family2.set
                                      (Data.ProtoLens.Field.field @"continueAsNewSuggested") y x)
                                   mutable'availableInternalFlags mutable'jobs
+                                  mutable'suggestContinueAsNewReasons
                         74
                           -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
                                        (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
@@ -6561,6 +6979,7 @@ instance Data.ProtoLens.Message WorkflowActivation where
                                      (Data.ProtoLens.Field.field @"deploymentVersionForCurrentTask")
                                      y x)
                                   mutable'availableInternalFlags mutable'jobs
+                                  mutable'suggestContinueAsNewReasons
                         82
                           -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
                                        (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
@@ -6571,6 +6990,55 @@ instance Data.ProtoLens.Message WorkflowActivation where
                                   (Lens.Family2.set
                                      (Data.ProtoLens.Field.field @"lastSdkVersion") y x)
                                   mutable'availableInternalFlags mutable'jobs
+                                  mutable'suggestContinueAsNewReasons
+                        88
+                          -> do !y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                        (Prelude.fmap
+                                           Prelude.toEnum
+                                           (Prelude.fmap
+                                              Prelude.fromIntegral
+                                              Data.ProtoLens.Encoding.Bytes.getVarInt))
+                                        "suggest_continue_as_new_reasons"
+                                v <- Data.ProtoLens.Encoding.Parser.Unsafe.unsafeLiftIO
+                                       (Data.ProtoLens.Encoding.Growing.append
+                                          mutable'suggestContinueAsNewReasons y)
+                                loop x mutable'availableInternalFlags mutable'jobs v
+                        90
+                          -> do y <- do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                        Data.ProtoLens.Encoding.Bytes.isolate
+                                          (Prelude.fromIntegral len)
+                                          ((let
+                                              ploop qs
+                                                = do packedEnd <- Data.ProtoLens.Encoding.Bytes.atEnd
+                                                     if packedEnd then
+                                                         Prelude.return qs
+                                                     else
+                                                         do !q <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                                                    (Prelude.fmap
+                                                                       Prelude.toEnum
+                                                                       (Prelude.fmap
+                                                                          Prelude.fromIntegral
+                                                                          Data.ProtoLens.Encoding.Bytes.getVarInt))
+                                                                    "suggest_continue_as_new_reasons"
+                                                            qs' <- Data.ProtoLens.Encoding.Parser.Unsafe.unsafeLiftIO
+                                                                     (Data.ProtoLens.Encoding.Growing.append
+                                                                        qs q)
+                                                            ploop qs'
+                                            in ploop)
+                                             mutable'suggestContinueAsNewReasons)
+                                loop x mutable'availableInternalFlags mutable'jobs y
+                        96
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (Prelude.fmap
+                                          ((Prelude./=) 0) Data.ProtoLens.Encoding.Bytes.getVarInt)
+                                       "target_worker_deployment_version_changed"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field
+                                        @"targetWorkerDeploymentVersionChanged")
+                                     y x)
+                                  mutable'availableInternalFlags mutable'jobs
+                                  mutable'suggestContinueAsNewReasons
                         wire
                           -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
                                         wire
@@ -6578,15 +7046,18 @@ instance Data.ProtoLens.Message WorkflowActivation where
                                   (Lens.Family2.over
                                      Data.ProtoLens.unknownFields (\ !t -> (:) y t) x)
                                   mutable'availableInternalFlags mutable'jobs
+                                  mutable'suggestContinueAsNewReasons
       in
         (Data.ProtoLens.Encoding.Bytes.<?>)
           (do mutable'availableInternalFlags <- Data.ProtoLens.Encoding.Parser.Unsafe.unsafeLiftIO
                                                   Data.ProtoLens.Encoding.Growing.new
               mutable'jobs <- Data.ProtoLens.Encoding.Parser.Unsafe.unsafeLiftIO
                                 Data.ProtoLens.Encoding.Growing.new
+              mutable'suggestContinueAsNewReasons <- Data.ProtoLens.Encoding.Parser.Unsafe.unsafeLiftIO
+                                                       Data.ProtoLens.Encoding.Growing.new
               loop
                 Data.ProtoLens.defMessage mutable'availableInternalFlags
-                mutable'jobs)
+                mutable'jobs mutable'suggestContinueAsNewReasons)
           "WorkflowActivation"
   buildMessage
     = \ _x
@@ -6749,9 +7220,52 @@ instance Data.ProtoLens.Message WorkflowActivation where
                                                             (Data.ProtoLens.Encoding.Bytes.putBytes
                                                                bs))
                                                     Data.Text.Encoding.encodeUtf8 _v))
-                                        (Data.ProtoLens.Encoding.Wire.buildFieldSet
-                                           (Lens.Family2.view
-                                              Data.ProtoLens.unknownFields _x)))))))))))
+                                        ((Data.Monoid.<>)
+                                           (let
+                                              p = Lens.Family2.view
+                                                    (Data.ProtoLens.Field.field
+                                                       @"vec'suggestContinueAsNewReasons")
+                                                    _x
+                                            in
+                                              if Data.Vector.Generic.null p then
+                                                  Data.Monoid.mempty
+                                              else
+                                                  (Data.Monoid.<>)
+                                                    (Data.ProtoLens.Encoding.Bytes.putVarInt 90)
+                                                    ((\ bs
+                                                        -> (Data.Monoid.<>)
+                                                             (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                                                (Prelude.fromIntegral
+                                                                   (Data.ByteString.length bs)))
+                                                             (Data.ProtoLens.Encoding.Bytes.putBytes
+                                                                bs))
+                                                       (Data.ProtoLens.Encoding.Bytes.runBuilder
+                                                          (Data.ProtoLens.Encoding.Bytes.foldMapBuilder
+                                                             ((Prelude..)
+                                                                ((Prelude..)
+                                                                   Data.ProtoLens.Encoding.Bytes.putVarInt
+                                                                   Prelude.fromIntegral)
+                                                                Prelude.fromEnum)
+                                                             p))))
+                                           ((Data.Monoid.<>)
+                                              (let
+                                                 _v
+                                                   = Lens.Family2.view
+                                                       (Data.ProtoLens.Field.field
+                                                          @"targetWorkerDeploymentVersionChanged")
+                                                       _x
+                                               in
+                                                 if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                                                     Data.Monoid.mempty
+                                                 else
+                                                     (Data.Monoid.<>)
+                                                       (Data.ProtoLens.Encoding.Bytes.putVarInt 96)
+                                                       ((Prelude..)
+                                                          Data.ProtoLens.Encoding.Bytes.putVarInt
+                                                          (\ b -> if b then 1 else 0) _v))
+                                              (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                                                 (Lens.Family2.view
+                                                    Data.ProtoLens.unknownFields _x)))))))))))))
 instance Control.DeepSeq.NFData WorkflowActivation where
   rnf
     = \ x__
@@ -6776,7 +7290,13 @@ instance Control.DeepSeq.NFData WorkflowActivation where
                                      (Control.DeepSeq.deepseq
                                         (_WorkflowActivation'deploymentVersionForCurrentTask x__)
                                         (Control.DeepSeq.deepseq
-                                           (_WorkflowActivation'lastSdkVersion x__) ()))))))))))
+                                           (_WorkflowActivation'lastSdkVersion x__)
+                                           (Control.DeepSeq.deepseq
+                                              (_WorkflowActivation'suggestContinueAsNewReasons x__)
+                                              (Control.DeepSeq.deepseq
+                                                 (_WorkflowActivation'targetWorkerDeploymentVersionChanged
+                                                    x__)
+                                                 ()))))))))))))
 {- | Fields :
      
          * 'Proto.Temporal.Sdk.Core.WorkflowActivation.WorkflowActivation_Fields.maybe'variant' @:: Lens' WorkflowActivationJob (Prelude.Maybe WorkflowActivationJob'Variant)@
@@ -8065,7 +8585,7 @@ _WorkflowActivationJob'RemoveFromCache
 packedFileDescriptor :: Data.ByteString.ByteString
 packedFileDescriptor
   = "\n\
-    \?temporal/sdk/core/workflow_activation/workflow_activation.proto\DC2\ESCcoresdk.workflow_activation\SUB\USgoogle/protobuf/timestamp.proto\SUB\RSgoogle/protobuf/duration.proto\SUB\ESCgoogle/protobuf/empty.proto\SUB%temporal/api/failure/v1/message.proto\SUB$temporal/api/update/v1/message.proto\SUB$temporal/api/common/v1/message.proto\SUB$temporal/api/enums/v1/workflow.proto\SUB7temporal/sdk/core/activity_result/activity_result.proto\SUB5temporal/sdk/core/child_workflow/child_workflow.proto\SUB%temporal/sdk/core/common/common.proto\SUB#temporal/sdk/core/nexus/nexus.proto\"\187\EOT\n\
+    \?temporal/sdk/core/workflow_activation/workflow_activation.proto\DC2\ESCcoresdk.workflow_activation\SUB\USgoogle/protobuf/timestamp.proto\SUB\RSgoogle/protobuf/duration.proto\SUB\ESCgoogle/protobuf/empty.proto\SUB%temporal/api/failure/v1/message.proto\SUB#temporal/api/nexus/v1/message.proto\SUB$temporal/api/update/v1/message.proto\SUB$temporal/api/common/v1/message.proto\SUB(temporal/api/enums/v1/failed_cause.proto\SUB$temporal/api/enums/v1/workflow.proto\SUB7temporal/sdk/core/activity_result/activity_result.proto\SUB5temporal/sdk/core/child_workflow/child_workflow.proto\SUB%temporal/sdk/core/common/common.proto\SUB#temporal/sdk/core/nexus/nexus.proto\"\140\ACK\n\
     \\DC2WorkflowActivation\DC2\NAK\n\
     \\ACKrun_id\CAN\SOH \SOH(\tR\ENQrunId\DC28\n\
     \\ttimestamp\CAN\STX \SOH(\v2\SUB.google.protobuf.TimestampR\ttimestamp\DC2!\n\
@@ -8077,7 +8597,9 @@ packedFileDescriptor
     \\EMcontinue_as_new_suggested\CAN\b \SOH(\bR\SYNcontinueAsNewSuggested\DC2u\n\
     \#deployment_version_for_current_task\CAN\t \SOH(\v2'.coresdk.common.WorkerDeploymentVersionR\USdeploymentVersionForCurrentTask\DC2(\n\
     \\DLElast_sdk_version\CAN\n\
-    \ \SOH(\tR\SOlastSdkVersion\"\187\r\n\
+    \ \SOH(\tR\SOlastSdkVersion\DC2w\n\
+    \\USsuggest_continue_as_new_reasons\CAN\v \ETX(\SO21.temporal.api.enums.v1.SuggestContinueAsNewReasonR\ESCsuggestContinueAsNewReasons\DC2V\n\
+    \(target_worker_deployment_version_changed\CAN\f \SOH(\bR$targetWorkerDeploymentVersionChanged\"\187\r\n\
     \\NAKWorkflowActivationJob\DC2b\n\
     \\DC3initialize_workflow\CAN\SOH \SOH(\v2/.coresdk.workflow_activation.InitializeWorkflowH\NULR\DC2initializeWorkflow\DC2G\n\
     \\n\
@@ -8097,7 +8619,7 @@ packedFileDescriptor
     \\GSresolve_nexus_operation_start\CAN\SI \SOH(\v27.coresdk.workflow_activation.ResolveNexusOperationStartH\NULR\SUBresolveNexusOperationStart\DC2l\n\
     \\ETBresolve_nexus_operation\CAN\DLE \SOH(\v22.coresdk.workflow_activation.ResolveNexusOperationH\NULR\NAKresolveNexusOperation\DC2Z\n\
     \\DC1remove_from_cache\CAN2 \SOH(\v2,.coresdk.workflow_activation.RemoveFromCacheH\NULR\SIremoveFromCacheB\t\n\
-    \\avariant\"\146\SO\n\
+    \\avariant\"\218\SI\n\
     \\DC2InitializeWorkflow\DC2#\n\
     \\rworkflow_type\CAN\SOH \SOH(\tR\fworkflowType\DC2\US\n\
     \\vworkflow_id\CAN\STX \SOH(\tR\n\
@@ -8126,7 +8648,9 @@ packedFileDescriptor
     \\n\
     \start_time\CAN\ETB \SOH(\v2\SUB.google.protobuf.TimestampR\tstartTime\DC2N\n\
     \\rroot_workflow\CAN\CAN \SOH(\v2).temporal.api.common.v1.WorkflowExecutionR\frootWorkflow\DC2<\n\
-    \\bpriority\CAN\EM \SOH(\v2 .temporal.api.common.v1.PriorityR\bpriority\SUB[\n\
+    \\bpriority\CAN\EM \SOH(\v2 .temporal.api.common.v1.PriorityR\bpriority\DC29\n\
+    \\EMoriginal_execution_run_id\CAN\SUB \SOH(\tR\SYNoriginalExecutionRunId\DC2\138\SOH\n\
+    \&propagated_nexus_serialization_context\CAN\ESC \SOH(\v25.temporal.api.nexus.v1.PropagatedSerializationContextR#propagatedNexusSerializationContext\SUB[\n\
     \\fHeadersEntry\DC2\DLE\n\
     \\ETXkey\CAN\SOH \SOH(\tR\ETXkey\DC25\n\
     \\ENQvalue\CAN\STX \SOH(\v2\US.temporal.api.common.v1.PayloadR\ENQvalue:\STX8\SOH\"\GS\n\
@@ -8166,24 +8690,27 @@ packedFileDescriptor
     \\ETXkey\CAN\SOH \SOH(\tR\ETXkey\DC25\n\
     \\ENQvalue\CAN\STX \SOH(\v2\US.temporal.api.common.v1.PayloadR\ENQvalue:\STX8\SOH\"(\n\
     \\SOCancelWorkflow\DC2\SYN\n\
-    \\ACKreason\CAN\SOH \SOH(\tR\ACKreason\"\181\STX\n\
+    \\ACKreason\CAN\SOH \SOH(\tR\ACKreason\"\231\STX\n\
     \\SOSignalWorkflow\DC2\US\n\
     \\vsignal_name\CAN\SOH \SOH(\tR\n\
     \signalName\DC25\n\
     \\ENQinput\CAN\STX \ETX(\v2\US.temporal.api.common.v1.PayloadR\ENQinput\DC2\SUB\n\
     \\bidentity\CAN\ETX \SOH(\tR\bidentity\DC2R\n\
-    \\aheaders\CAN\ENQ \ETX(\v28.coresdk.workflow_activation.SignalWorkflow.HeadersEntryR\aheaders\SUB[\n\
+    \\aheaders\CAN\ENQ \ETX(\v28.coresdk.workflow_activation.SignalWorkflow.HeadersEntryR\aheaders\DC20\n\
+    \\DC4originating_event_id\CAN\ACK \SOH(\ETXR\DC2originatingEventId\SUB[\n\
     \\fHeadersEntry\DC2\DLE\n\
     \\ETXkey\CAN\SOH \SOH(\tR\ETXkey\DC25\n\
     \\ENQvalue\CAN\STX \SOH(\v2\US.temporal.api.common.v1.PayloadR\ENQvalue:\STX8\SOH\"+\n\
     \\SONotifyHasPatch\DC2\EM\n\
-    \\bpatch_id\CAN\SOH \SOH(\tR\apatchId\"m\n\
+    \\bpatch_id\CAN\SOH \SOH(\tR\apatchId\"\198\SOH\n\
     \\GSResolveSignalExternalWorkflow\DC2\DLE\n\
     \\ETXseq\CAN\SOH \SOH(\rR\ETXseq\DC2:\n\
-    \\afailure\CAN\STX \SOH(\v2 .temporal.api.failure.v1.FailureR\afailure\"t\n\
+    \\afailure\CAN\STX \SOH(\v2 .temporal.api.failure.v1.FailureR\afailure\DC2W\n\
+    \\ENQcause\CAN\ETX \SOH(\SO2A.temporal.api.enums.v1.SignalExternalWorkflowExecutionFailedCauseR\ENQcause\"\205\SOH\n\
     \$ResolveRequestCancelExternalWorkflow\DC2\DLE\n\
     \\ETXseq\CAN\SOH \SOH(\rR\ETXseq\DC2:\n\
-    \\afailure\CAN\STX \SOH(\v2 .temporal.api.failure.v1.FailureR\afailure\"\153\ETX\n\
+    \\afailure\CAN\STX \SOH(\v2 .temporal.api.failure.v1.FailureR\afailure\DC2W\n\
+    \\ENQcause\CAN\ETX \SOH(\SO2A.temporal.api.enums.v1.CancelExternalWorkflowExecutionFailedCauseR\ENQcause\"\166\EOT\n\
     \\bDoUpdate\DC2\SO\n\
     \\STXid\CAN\SOH \SOH(\tR\STXid\DC20\n\
     \\DC4protocol_instance_id\CAN\STX \SOH(\tR\DC2protocolInstanceId\DC2\DC2\n\
@@ -8191,7 +8718,8 @@ packedFileDescriptor
     \\ENQinput\CAN\EOT \ETX(\v2\US.temporal.api.common.v1.PayloadR\ENQinput\DC2L\n\
     \\aheaders\CAN\ENQ \ETX(\v22.coresdk.workflow_activation.DoUpdate.HeadersEntryR\aheaders\DC20\n\
     \\EOTmeta\CAN\ACK \SOH(\v2\FS.temporal.api.update.v1.MetaR\EOTmeta\DC2#\n\
-    \\rrun_validator\CAN\a \SOH(\bR\frunValidator\SUB[\n\
+    \\rrun_validator\CAN\a \SOH(\bR\frunValidator\DC2\138\SOH\n\
+    \&propagated_nexus_serialization_context\CAN\b \SOH(\v25.temporal.api.nexus.v1.PropagatedSerializationContextR#propagatedNexusSerializationContext\SUB[\n\
     \\fHeadersEntry\DC2\DLE\n\
     \\ETXkey\CAN\SOH \SOH(\tR\ETXkey\DC25\n\
     \\ENQvalue\CAN\STX \SOH(\v2\US.temporal.api.common.v1.PayloadR\ENQvalue:\STX8\SOH\"\196\SOH\n\
@@ -8221,8 +8749,8 @@ packedFileDescriptor
     \\ENQFATAL\DLE\b\DC2\US\n\
     \\ESCPAGINATION_OR_HISTORY_FETCH\DLE\t\DC2\GS\n\
     \\EMWORKFLOW_EXECUTION_ENDING\DLE\n\
-    \B8\234\STX5Temporalio::Internal::Bridge::Api::WorkflowActivationJ\243\152\SOH\n\
-    \\a\DC2\ENQ\NUL\NUL\143\ETX\SOH\n\
+    \B8\234\STX5Temporalio::Internal::Bridge::Api::WorkflowActivationJ\194\169\SOH\n\
+    \\a\DC2\ENQ\NUL\NUL\177\ETX\SOH\n\
     \\b\n\
     \\SOH\f\DC2\ETX\NUL\NUL\DC2\n\
     \\172\SOH\n\
@@ -8244,22 +8772,26 @@ packedFileDescriptor
     \\t\n\
     \\STX\ETX\ETX\DC2\ETX\f\NUL/\n\
     \\t\n\
-    \\STX\ETX\EOT\DC2\ETX\r\NUL.\n\
+    \\STX\ETX\EOT\DC2\ETX\r\NUL-\n\
     \\t\n\
     \\STX\ETX\ENQ\DC2\ETX\SO\NUL.\n\
     \\t\n\
     \\STX\ETX\ACK\DC2\ETX\SI\NUL.\n\
     \\t\n\
-    \\STX\ETX\a\DC2\ETX\DLE\NULA\n\
+    \\STX\ETX\a\DC2\ETX\DLE\NUL2\n\
     \\t\n\
-    \\STX\ETX\b\DC2\ETX\DC1\NUL?\n\
+    \\STX\ETX\b\DC2\ETX\DC1\NUL.\n\
     \\t\n\
-    \\STX\ETX\t\DC2\ETX\DC2\NUL/\n\
+    \\STX\ETX\t\DC2\ETX\DC2\NULA\n\
     \\t\n\
     \\STX\ETX\n\
-    \\DC2\ETX\DC3\NUL-\n\
-    \\204\DC2\n\
-    \\STX\EOT\NUL\DC2\EOTA\NUL`\SOH\SUB\191\DC2 An instruction to the lang sdk to run some workflow code, whether for the first time or from\n\
+    \\DC2\ETX\DC3\NUL?\n\
+    \\t\n\
+    \\STX\ETX\v\DC2\ETX\DC4\NUL/\n\
+    \\t\n\
+    \\STX\ETX\f\DC2\ETX\NAK\NUL-\n\
+    \\178\NAK\n\
+    \\STX\EOT\NUL\DC2\EOTI\NULp\SOH\SUB\165\NAK An instruction to the lang sdk to run some workflow code, whether for the first time or from\n\
     \ a cached state.\n\
     \\n\
     \ ## Job ordering guarantees and semantics\n\
@@ -8298,6 +8830,12 @@ packedFileDescriptor
     \ (which must be stable based on lang implementation or convention), rather than the order jobs are\n\
     \ processed.\n\
     \\n\
+    \ A successful activation completion for queries attached to a workflow task must include a query\n\
+    \ response. Core holds local activity results for the next task as soon as it dispatches these\n\
+    \ queries, since sending their responses completes the current task.\n\
+    \\n\
+    \ Workflow tasks with no activation jobs are handled internally by Core, without activating lang.\n\
+    \\n\
     \ ## Evictions\n\
     \\n\
     \ Evictions appear as an activations that contains only a `remove_from_cache` job. Such activations\n\
@@ -8306,92 +8844,92 @@ packedFileDescriptor
     \\n\
     \\n\
     \\n\
-    \\ETX\EOT\NUL\SOH\DC2\ETXA\b\SUB\n\
+    \\ETX\EOT\NUL\SOH\DC2\ETXI\b\SUB\n\
     \\187\SOH\n\
-    \\EOT\EOT\NUL\STX\NUL\DC2\ETXD\EOT\SYN\SUB\173\SOH The id of the currently active run of the workflow. Also used as a cache key. There may\n\
+    \\EOT\EOT\NUL\STX\NUL\DC2\ETXL\EOT\SYN\SUB\173\SOH The id of the currently active run of the workflow. Also used as a cache key. There may\n\
     \ only ever be one active workflow task (and hence activation) of a run at one time.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\NUL\ENQ\DC2\ETXD\EOT\n\
+    \\ENQ\EOT\NUL\STX\NUL\ENQ\DC2\ETXL\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\NUL\SOH\DC2\ETXD\v\DC1\n\
+    \\ENQ\EOT\NUL\STX\NUL\SOH\DC2\ETXL\v\DC1\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\NUL\ETX\DC2\ETXD\DC4\NAK\n\
+    \\ENQ\EOT\NUL\STX\NUL\ETX\DC2\ETXL\DC4\NAK\n\
     \k\n\
-    \\EOT\EOT\NUL\STX\SOH\DC2\ETXF\EOT,\SUB^ The current time as understood by the workflow, which is set by workflow task started events\n\
+    \\EOT\EOT\NUL\STX\SOH\DC2\ETXN\EOT,\SUB^ The current time as understood by the workflow, which is set by workflow task started events\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\SOH\ACK\DC2\ETXF\EOT\GS\n\
+    \\ENQ\EOT\NUL\STX\SOH\ACK\DC2\ETXN\EOT\GS\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\SOH\SOH\DC2\ETXF\RS'\n\
+    \\ENQ\EOT\NUL\STX\SOH\SOH\DC2\ETXN\RS'\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\SOH\ETX\DC2\ETXF*+\n\
+    \\ENQ\EOT\NUL\STX\SOH\ETX\DC2\ETXN*+\n\
     \E\n\
-    \\EOT\EOT\NUL\STX\STX\DC2\ETXH\EOT\SUB\SUB8 Whether or not the activation is replaying past events\n\
+    \\EOT\EOT\NUL\STX\STX\DC2\ETXP\EOT\SUB\SUB8 Whether or not the activation is replaying past events\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\STX\ENQ\DC2\ETXH\EOT\b\n\
+    \\ENQ\EOT\NUL\STX\STX\ENQ\DC2\ETXP\EOT\b\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\STX\SOH\DC2\ETXH\t\NAK\n\
+    \\ENQ\EOT\NUL\STX\STX\SOH\DC2\ETXP\t\NAK\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\STX\ETX\DC2\ETXH\CAN\EM\n\
+    \\ENQ\EOT\NUL\STX\STX\ETX\DC2\ETXP\CAN\EM\n\
     \\160\SOH\n\
-    \\EOT\EOT\NUL\STX\ETX\DC2\ETXK\EOT\RS\SUB\146\SOH Current history length as determined by the event id of the most recently processed event.\n\
+    \\EOT\EOT\NUL\STX\ETX\DC2\ETXS\EOT\RS\SUB\146\SOH Current history length as determined by the event id of the most recently processed event.\n\
     \ This ensures that the number is always deterministic\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\ETX\ENQ\DC2\ETXK\EOT\n\
+    \\ENQ\EOT\NUL\STX\ETX\ENQ\DC2\ETXS\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\ETX\SOH\DC2\ETXK\v\EM\n\
+    \\ENQ\EOT\NUL\STX\ETX\SOH\DC2\ETXS\v\EM\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\ETX\ETX\DC2\ETXK\FS\GS\n\
+    \\ENQ\EOT\NUL\STX\ETX\ETX\DC2\ETXS\FS\GS\n\
     \<\n\
-    \\EOT\EOT\NUL\STX\EOT\DC2\ETXM\EOT,\SUB/ The things to do upon activating the workflow\n\
+    \\EOT\EOT\NUL\STX\EOT\DC2\ETXU\EOT,\SUB/ The things to do upon activating the workflow\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\EOT\EOT\DC2\ETXM\EOT\f\n\
+    \\ENQ\EOT\NUL\STX\EOT\EOT\DC2\ETXU\EOT\f\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\EOT\ACK\DC2\ETXM\r\"\n\
+    \\ENQ\EOT\NUL\STX\EOT\ACK\DC2\ETXU\r\"\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\EOT\SOH\DC2\ETXM#'\n\
+    \\ENQ\EOT\NUL\STX\EOT\SOH\DC2\ETXU#'\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\EOT\ETX\DC2\ETXM*+\n\
+    \\ENQ\EOT\NUL\STX\EOT\ETX\DC2\ETXU*+\n\
     \\227\SOH\n\
-    \\EOT\EOT\NUL\STX\ENQ\DC2\ETXQ\EOT1\SUB\213\SOH Internal flags which are available for use by lang. If `is_replaying` is false, all\n\
+    \\EOT\EOT\NUL\STX\ENQ\DC2\ETXY\EOT1\SUB\213\SOH Internal flags which are available for use by lang. If `is_replaying` is false, all\n\
     \ internal flags may be used. This is not a delta - all previously used flags always\n\
     \ appear since this representation is cheap.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\ENQ\EOT\DC2\ETXQ\EOT\f\n\
+    \\ENQ\EOT\NUL\STX\ENQ\EOT\DC2\ETXY\EOT\f\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\ENQ\ENQ\DC2\ETXQ\r\DC3\n\
+    \\ENQ\EOT\NUL\STX\ENQ\ENQ\DC2\ETXY\r\DC3\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\ENQ\SOH\DC2\ETXQ\DC4,\n\
+    \\ENQ\EOT\NUL\STX\ENQ\SOH\DC2\ETXY\DC4,\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\ENQ\ETX\DC2\ETXQ/0\n\
+    \\ENQ\EOT\NUL\STX\ENQ\ETX\DC2\ETXY/0\n\
     \I\n\
-    \\EOT\EOT\NUL\STX\ACK\DC2\ETXS\EOT\"\SUB< The history size in bytes as of the last WFT started event\n\
+    \\EOT\EOT\NUL\STX\ACK\DC2\ETX[\EOT\"\SUB< The history size in bytes as of the last WFT started event\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\ACK\ENQ\DC2\ETXS\EOT\n\
+    \\ENQ\EOT\NUL\STX\ACK\ENQ\DC2\ETX[\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\ACK\SOH\DC2\ETXS\v\GS\n\
+    \\ENQ\EOT\NUL\STX\ACK\SOH\DC2\ETX[\v\GS\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\ACK\ETX\DC2\ETXS !\n\
+    \\ENQ\EOT\NUL\STX\ACK\ETX\DC2\ETX[ !\n\
     \P\n\
-    \\EOT\EOT\NUL\STX\a\DC2\ETXU\EOT'\SUBC Set true if the most recent WFT started event had this suggestion\n\
+    \\EOT\EOT\NUL\STX\a\DC2\ETX]\EOT'\SUBC Set true if the most recent WFT started event had this suggestion\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\a\ENQ\DC2\ETXU\EOT\b\n\
+    \\ENQ\EOT\NUL\STX\a\ENQ\DC2\ETX]\EOT\b\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\a\SOH\DC2\ETXU\t\"\n\
+    \\ENQ\EOT\NUL\STX\a\SOH\DC2\ETX]\t\"\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\a\ETX\DC2\ETXU%&\n\
+    \\ENQ\EOT\NUL\STX\a\ETX\DC2\ETX]%&\n\
     \\192\ETX\n\
-    \\EOT\EOT\NUL\STX\b\DC2\ETX]\EOTK\SUB\178\ETX Set to the deployment version of the worker that processed this task,\n\
+    \\EOT\EOT\NUL\STX\b\DC2\ETXe\EOTK\SUB\178\ETX Set to the deployment version of the worker that processed this task,\n\
     \ which may be empty. During replay this version may not equal the version\n\
     \ of the replaying worker. If not replaying and this worker has a defined\n\
     \ Deployment Version, it will equal that. It will also be empty for\n\
@@ -8400,416 +8938,445 @@ packedFileDescriptor
     \ feature(s).\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\b\ACK\DC2\ETX]\EOT\"\n\
+    \\ENQ\EOT\NUL\STX\b\ACK\DC2\ETXe\EOT\"\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\b\SOH\DC2\ETX]#F\n\
+    \\ENQ\EOT\NUL\STX\b\SOH\DC2\ETXe#F\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\b\ETX\DC2\ETX]IJ\n\
+    \\ENQ\EOT\NUL\STX\b\ETX\DC2\ETXeIJ\n\
     \Q\n\
-    \\EOT\EOT\NUL\STX\t\DC2\ETX_\EOT!\SUBD The last seen SDK version from the most recent WFT completed event\n\
+    \\EOT\EOT\NUL\STX\t\DC2\ETXg\EOT!\SUBD The last seen SDK version from the most recent WFT completed event\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\t\ENQ\DC2\ETX_\EOT\n\
+    \\ENQ\EOT\NUL\STX\t\ENQ\DC2\ETXg\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\t\SOH\DC2\ETX_\v\ESC\n\
+    \\ENQ\EOT\NUL\STX\t\SOH\DC2\ETXg\v\ESC\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\t\ETX\DC2\ETX_\RS \n\
+    \\ENQ\EOT\NUL\STX\t\ETX\DC2\ETXg\RS \n\
+    \\236\SOH\n\
+    \\EOT\EOT\NUL\STX\n\
+    \\DC2\ETXk\EOTc\SUB\222\SOH Experimental. Optionally decide the versioning behavior that the first task of the new run should use.\n\
+    \ For example, choose to AutoUpgrade on continue-as-new instead of inheriting the pinned version\n\
+    \ of the previous run.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\NUL\STX\n\
+    \\EOT\DC2\ETXk\EOT\f\n\
+    \\f\n\
+    \\ENQ\EOT\NUL\STX\n\
+    \\ACK\DC2\ETXk\r=\n\
+    \\f\n\
+    \\ENQ\EOT\NUL\STX\n\
+    \\SOH\DC2\ETXk>]\n\
+    \\f\n\
+    \\ENQ\EOT\NUL\STX\n\
+    \\ETX\DC2\ETXk`b\n\
+    \\148\SOH\n\
+    \\EOT\EOT\NUL\STX\v\DC2\ETXo\EOT7\SUB\134\SOH True if Workflow's Target Worker Deployment Version is different from its Pinned Version and\n\
+    \ the workflow is Pinned.\n\
+    \ Experimental.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\NUL\STX\v\ENQ\DC2\ETXo\EOT\b\n\
+    \\f\n\
+    \\ENQ\EOT\NUL\STX\v\SOH\DC2\ETXo\t1\n\
+    \\f\n\
+    \\ENQ\EOT\NUL\STX\v\ETX\DC2\ETXo46\n\
     \\v\n\
-    \\STX\EOT\SOH\DC2\ENQb\NUL\138\SOH\SOH\n\
+    \\STX\EOT\SOH\DC2\ENQr\NUL\154\SOH\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\SOH\SOH\DC2\ETXb\b\GS\n\
+    \\ETX\EOT\SOH\SOH\DC2\ETXr\b\GS\n\
     \\r\n\
-    \\EOT\EOT\SOH\b\NUL\DC2\ENQc\EOT\137\SOH\ENQ\n\
+    \\EOT\EOT\SOH\b\NUL\DC2\ENQs\EOT\153\SOH\ENQ\n\
     \\f\n\
-    \\ENQ\EOT\SOH\b\NUL\SOH\DC2\ETXc\n\
+    \\ENQ\EOT\SOH\b\NUL\SOH\DC2\ETXs\n\
     \\DC1\n\
     \Y\n\
-    \\EOT\EOT\SOH\STX\NUL\DC2\ETXe\b3\SUBL A workflow is starting, record all of the information from its start event\n\
+    \\EOT\EOT\SOH\STX\NUL\DC2\ETXu\b3\SUBL A workflow is starting, record all of the information from its start event\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\NUL\ACK\DC2\ETXe\b\SUB\n\
+    \\ENQ\EOT\SOH\STX\NUL\ACK\DC2\ETXu\b\SUB\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\NUL\SOH\DC2\ETXe\ESC.\n\
+    \\ENQ\EOT\SOH\STX\NUL\SOH\DC2\ETXu\ESC.\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\NUL\ETX\DC2\ETXe12\n\
+    \\ENQ\EOT\SOH\STX\NUL\ETX\DC2\ETXu12\n\
     \^\n\
-    \\EOT\EOT\SOH\STX\SOH\DC2\ETXg\b!\SUBQ A timer has fired, allowing whatever was waiting on it (if anything) to proceed\n\
+    \\EOT\EOT\SOH\STX\SOH\DC2\ETXw\b!\SUBQ A timer has fired, allowing whatever was waiting on it (if anything) to proceed\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\SOH\ACK\DC2\ETXg\b\DC1\n\
+    \\ENQ\EOT\SOH\STX\SOH\ACK\DC2\ETXw\b\DC1\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\SOH\SOH\DC2\ETXg\DC2\FS\n\
+    \\ENQ\EOT\SOH\STX\SOH\SOH\DC2\ETXw\DC2\FS\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\SOH\ETX\DC2\ETXg\US \n\
+    \\ENQ\EOT\SOH\STX\SOH\ETX\DC2\ETXw\US \n\
     \G\n\
-    \\EOT\EOT\SOH\STX\STX\DC2\ETXi\b0\SUB: Workflow was reset. The randomness seed must be updated.\n\
+    \\EOT\EOT\SOH\STX\STX\DC2\ETXy\b0\SUB: Workflow was reset. The randomness seed must be updated.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\STX\ACK\DC2\ETXi\b\CAN\n\
+    \\ENQ\EOT\SOH\STX\STX\ACK\DC2\ETXy\b\CAN\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\STX\SOH\DC2\ETXi\EM+\n\
+    \\ENQ\EOT\SOH\STX\STX\SOH\DC2\ETXy\EM+\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\STX\ETX\DC2\ETXi./\n\
+    \\ENQ\EOT\SOH\STX\STX\ETX\DC2\ETXy./\n\
     \\169\SOH\n\
-    \\EOT\EOT\SOH\STX\ETX\DC2\ETXl\b)\SUB\155\SOH A request to query the workflow was received. It is guaranteed that queries (one or more)\n\
+    \\EOT\EOT\SOH\STX\ETX\DC2\ETX|\b)\SUB\155\SOH A request to query the workflow was received. It is guaranteed that queries (one or more)\n\
     \ always come in their own activation after other mutating jobs.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\ETX\ACK\DC2\ETXl\b\NAK\n\
+    \\ENQ\EOT\SOH\STX\ETX\ACK\DC2\ETX|\b\NAK\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\ETX\SOH\DC2\ETXl\SYN$\n\
+    \\ENQ\EOT\SOH\STX\ETX\SOH\DC2\ETX|\SYN$\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\ETX\ETX\DC2\ETXl'(\n\
+    \\ENQ\EOT\SOH\STX\ETX\ETX\DC2\ETX|'(\n\
     \=\n\
-    \\EOT\EOT\SOH\STX\EOT\DC2\ETXn\b+\SUB0 A request to cancel the workflow was received.\n\
+    \\EOT\EOT\SOH\STX\EOT\DC2\ETX~\b+\SUB0 A request to cancel the workflow was received.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\EOT\ACK\DC2\ETXn\b\SYN\n\
+    \\ENQ\EOT\SOH\STX\EOT\ACK\DC2\ETX~\b\SYN\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\EOT\SOH\DC2\ETXn\ETB&\n\
+    \\ENQ\EOT\SOH\STX\EOT\SOH\DC2\ETX~\ETB&\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\EOT\ETX\DC2\ETXn)*\n\
-    \=\n\
-    \\EOT\EOT\SOH\STX\ENQ\DC2\ETXp\b+\SUB0 A request to signal the workflow was received.\n\
+    \\ENQ\EOT\SOH\STX\EOT\ETX\DC2\ETX~)*\n\
+    \>\n\
+    \\EOT\EOT\SOH\STX\ENQ\DC2\EOT\128\SOH\b+\SUB0 A request to signal the workflow was received.\n\
     \\n\
-    \\f\n\
-    \\ENQ\EOT\SOH\STX\ENQ\ACK\DC2\ETXp\b\SYN\n\
-    \\f\n\
-    \\ENQ\EOT\SOH\STX\ENQ\SOH\DC2\ETXp\ETB&\n\
-    \\f\n\
-    \\ENQ\EOT\SOH\STX\ENQ\ETX\DC2\ETXp)*\n\
-    \W\n\
-    \\EOT\EOT\SOH\STX\ACK\DC2\ETXr\b-\SUBJ An activity was resolved, result could be completed, failed or cancelled\n\
+    \\r\n\
+    \\ENQ\EOT\SOH\STX\ENQ\ACK\DC2\EOT\128\SOH\b\SYN\n\
+    \\r\n\
+    \\ENQ\EOT\SOH\STX\ENQ\SOH\DC2\EOT\128\SOH\ETB&\n\
+    \\r\n\
+    \\ENQ\EOT\SOH\STX\ENQ\ETX\DC2\EOT\128\SOH)*\n\
+    \X\n\
+    \\EOT\EOT\SOH\STX\ACK\DC2\EOT\130\SOH\b-\SUBJ An activity was resolved, result could be completed, failed or cancelled\n\
     \\n\
-    \\f\n\
-    \\ENQ\EOT\SOH\STX\ACK\ACK\DC2\ETXr\b\ETB\n\
-    \\f\n\
-    \\ENQ\EOT\SOH\STX\ACK\SOH\DC2\ETXr\CAN(\n\
-    \\f\n\
-    \\ENQ\EOT\SOH\STX\ACK\ETX\DC2\ETXr+,\n\
-    \\206\SOH\n\
-    \\EOT\EOT\SOH\STX\a\DC2\ETXv\b,\SUB\192\SOH A patch marker has been detected and lang is being told that change exists. This\n\
+    \\r\n\
+    \\ENQ\EOT\SOH\STX\ACK\ACK\DC2\EOT\130\SOH\b\ETB\n\
+    \\r\n\
+    \\ENQ\EOT\SOH\STX\ACK\SOH\DC2\EOT\130\SOH\CAN(\n\
+    \\r\n\
+    \\ENQ\EOT\SOH\STX\ACK\ETX\DC2\EOT\130\SOH+,\n\
+    \\207\SOH\n\
+    \\EOT\EOT\SOH\STX\a\DC2\EOT\134\SOH\b,\SUB\192\SOH A patch marker has been detected and lang is being told that change exists. This\n\
     \ job is strange in that it is sent pre-emptively to lang without any corresponding\n\
     \ command being sent first.\n\
     \\n\
-    \\f\n\
-    \\ENQ\EOT\SOH\STX\a\ACK\DC2\ETXv\b\SYN\n\
-    \\f\n\
-    \\ENQ\EOT\SOH\STX\a\SOH\DC2\ETXv\ETB'\n\
-    \\f\n\
-    \\ENQ\EOT\SOH\STX\a\ETX\DC2\ETXv*+\n\
-    \H\n\
-    \\EOT\EOT\SOH\STX\b\DC2\ETXx\bW\SUB; A child workflow execution has started or failed to start\n\
+    \\r\n\
+    \\ENQ\EOT\SOH\STX\a\ACK\DC2\EOT\134\SOH\b\SYN\n\
+    \\r\n\
+    \\ENQ\EOT\SOH\STX\a\SOH\DC2\EOT\134\SOH\ETB'\n\
+    \\r\n\
+    \\ENQ\EOT\SOH\STX\a\ETX\DC2\EOT\134\SOH*+\n\
+    \I\n\
+    \\EOT\EOT\SOH\STX\b\DC2\EOT\136\SOH\bW\SUB; A child workflow execution has started or failed to start\n\
     \\n\
-    \\f\n\
-    \\ENQ\EOT\SOH\STX\b\ACK\DC2\ETXx\b*\n\
-    \\f\n\
-    \\ENQ\EOT\SOH\STX\b\SOH\DC2\ETXx+Q\n\
-    \\f\n\
-    \\ENQ\EOT\SOH\STX\b\ETX\DC2\ETXxTV\n\
-    \Q\n\
-    \\EOT\EOT\SOH\STX\t\DC2\ETXz\bL\SUBD A child workflow was resolved, result could be completed or failed\n\
+    \\r\n\
+    \\ENQ\EOT\SOH\STX\b\ACK\DC2\EOT\136\SOH\b*\n\
+    \\r\n\
+    \\ENQ\EOT\SOH\STX\b\SOH\DC2\EOT\136\SOH+Q\n\
+    \\r\n\
+    \\ENQ\EOT\SOH\STX\b\ETX\DC2\EOT\136\SOHTV\n\
+    \R\n\
+    \\EOT\EOT\SOH\STX\t\DC2\EOT\138\SOH\bL\SUBD A child workflow was resolved, result could be completed or failed\n\
     \\n\
-    \\f\n\
-    \\ENQ\EOT\SOH\STX\t\ACK\DC2\ETXz\b%\n\
-    \\f\n\
-    \\ENQ\EOT\SOH\STX\t\SOH\DC2\ETXz&F\n\
-    \\f\n\
-    \\ENQ\EOT\SOH\STX\t\ETX\DC2\ETXzIK\n\
-    \A\n\
+    \\r\n\
+    \\ENQ\EOT\SOH\STX\t\ACK\DC2\EOT\138\SOH\b%\n\
+    \\r\n\
+    \\ENQ\EOT\SOH\STX\t\SOH\DC2\EOT\138\SOH&F\n\
+    \\r\n\
+    \\ENQ\EOT\SOH\STX\t\ETX\DC2\EOT\138\SOHIK\n\
+    \B\n\
     \\EOT\EOT\SOH\STX\n\
-    \\DC2\ETX|\bL\SUB4 An attempt to signal an external workflow resolved\n\
+    \\DC2\EOT\140\SOH\bL\SUB4 An attempt to signal an external workflow resolved\n\
     \\n\
-    \\f\n\
+    \\r\n\
     \\ENQ\EOT\SOH\STX\n\
-    \\ACK\DC2\ETX|\b%\n\
-    \\f\n\
+    \\ACK\DC2\EOT\140\SOH\b%\n\
+    \\r\n\
     \\ENQ\EOT\SOH\STX\n\
-    \\SOH\DC2\ETX|&F\n\
-    \\f\n\
+    \\SOH\DC2\EOT\140\SOH&F\n\
+    \\r\n\
     \\ENQ\EOT\SOH\STX\n\
-    \\ETX\DC2\ETX|IK\n\
-    \A\n\
-    \\EOT\EOT\SOH\STX\v\DC2\ETX~\b[\SUB4 An attempt to cancel an external workflow resolved\n\
+    \\ETX\DC2\EOT\140\SOHIK\n\
+    \B\n\
+    \\EOT\EOT\SOH\STX\v\DC2\EOT\142\SOH\b[\SUB4 An attempt to cancel an external workflow resolved\n\
     \\n\
-    \\f\n\
-    \\ENQ\EOT\SOH\STX\v\ACK\DC2\ETX~\b,\n\
-    \\f\n\
-    \\ENQ\EOT\SOH\STX\v\SOH\DC2\ETX~-U\n\
-    \\f\n\
-    \\ENQ\EOT\SOH\STX\v\ETX\DC2\ETX~XZ\n\
+    \\r\n\
+    \\ENQ\EOT\SOH\STX\v\ACK\DC2\EOT\142\SOH\b,\n\
+    \\r\n\
+    \\ENQ\EOT\SOH\STX\v\SOH\DC2\EOT\142\SOH-U\n\
+    \\r\n\
+    \\ENQ\EOT\SOH\STX\v\ETX\DC2\EOT\142\SOHXZ\n\
     \6\n\
-    \\EOT\EOT\SOH\STX\f\DC2\EOT\128\SOH\b \SUB( A request to handle a workflow update.\n\
+    \\EOT\EOT\SOH\STX\f\DC2\EOT\144\SOH\b \SUB( A request to handle a workflow update.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\SOH\STX\f\ACK\DC2\EOT\128\SOH\b\DLE\n\
+    \\ENQ\EOT\SOH\STX\f\ACK\DC2\EOT\144\SOH\b\DLE\n\
     \\r\n\
-    \\ENQ\EOT\SOH\STX\f\SOH\DC2\EOT\128\SOH\DC1\SUB\n\
+    \\ENQ\EOT\SOH\STX\f\SOH\DC2\EOT\144\SOH\DC1\SUB\n\
     \\r\n\
-    \\ENQ\EOT\SOH\STX\f\ETX\DC2\EOT\128\SOH\GS\US\n\
+    \\ENQ\EOT\SOH\STX\f\ETX\DC2\EOT\144\SOH\GS\US\n\
     \*\n\
-    \\EOT\EOT\SOH\STX\r\DC2\EOT\130\SOH\bF\SUB\FS A nexus operation started.\n\
+    \\EOT\EOT\SOH\STX\r\DC2\EOT\146\SOH\bF\SUB\FS A nexus operation started.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\SOH\STX\r\ACK\DC2\EOT\130\SOH\b\"\n\
+    \\ENQ\EOT\SOH\STX\r\ACK\DC2\EOT\146\SOH\b\"\n\
     \\r\n\
-    \\ENQ\EOT\SOH\STX\r\SOH\DC2\EOT\130\SOH#@\n\
+    \\ENQ\EOT\SOH\STX\r\SOH\DC2\EOT\146\SOH#@\n\
     \\r\n\
-    \\ENQ\EOT\SOH\STX\r\ETX\DC2\EOT\130\SOHCE\n\
+    \\ENQ\EOT\SOH\STX\r\ETX\DC2\EOT\146\SOHCE\n\
     \+\n\
-    \\EOT\EOT\SOH\STX\SO\DC2\EOT\132\SOH\b;\SUB\GS A nexus operation resolved.\n\
+    \\EOT\EOT\SOH\STX\SO\DC2\EOT\148\SOH\b;\SUB\GS A nexus operation resolved.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\SOH\STX\SO\ACK\DC2\EOT\132\SOH\b\GS\n\
+    \\ENQ\EOT\SOH\STX\SO\ACK\DC2\EOT\148\SOH\b\GS\n\
     \\r\n\
-    \\ENQ\EOT\SOH\STX\SO\SOH\DC2\EOT\132\SOH\RS5\n\
+    \\ENQ\EOT\SOH\STX\SO\SOH\DC2\EOT\148\SOH\RS5\n\
     \\r\n\
-    \\ENQ\EOT\SOH\STX\SO\ETX\DC2\EOT\132\SOH8:\n\
+    \\ENQ\EOT\SOH\STX\SO\ETX\DC2\EOT\148\SOH8:\n\
     \\223\SOH\n\
-    \\EOT\EOT\SOH\STX\SI\DC2\EOT\136\SOH\b/\SUB\208\SOH Remove the workflow identified by the [WorkflowActivation] containing this job from the\n\
+    \\EOT\EOT\SOH\STX\SI\DC2\EOT\152\SOH\b/\SUB\208\SOH Remove the workflow identified by the [WorkflowActivation] containing this job from the\n\
     \ cache after performing the activation. It is guaranteed that this will be the only job\n\
     \ in the activation if present.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\SOH\STX\SI\ACK\DC2\EOT\136\SOH\b\ETB\n\
+    \\ENQ\EOT\SOH\STX\SI\ACK\DC2\EOT\152\SOH\b\ETB\n\
     \\r\n\
-    \\ENQ\EOT\SOH\STX\SI\SOH\DC2\EOT\136\SOH\CAN)\n\
+    \\ENQ\EOT\SOH\STX\SI\SOH\DC2\EOT\152\SOH\CAN)\n\
     \\r\n\
-    \\ENQ\EOT\SOH\STX\SI\ETX\DC2\EOT\136\SOH,.\n\
+    \\ENQ\EOT\SOH\STX\SI\ETX\DC2\EOT\152\SOH,.\n\
     \)\n\
-    \\STX\EOT\STX\DC2\ACK\141\SOH\NUL\205\SOH\SOH\SUB\ESC Initialize a new workflow\n\
+    \\STX\EOT\STX\DC2\ACK\157\SOH\NUL\229\SOH\SOH\SUB\ESC Initialize a new workflow\n\
     \\n\
     \\v\n\
-    \\ETX\EOT\STX\SOH\DC2\EOT\141\SOH\b\SUB\n\
+    \\ETX\EOT\STX\SOH\DC2\EOT\157\SOH\b\SUB\n\
     \R\n\
-    \\EOT\EOT\STX\STX\NUL\DC2\EOT\143\SOH\EOT\GS\SUBD The identifier the lang-specific sdk uses to execute workflow code\n\
+    \\EOT\EOT\STX\STX\NUL\DC2\EOT\159\SOH\EOT\GS\SUBD The identifier the lang-specific sdk uses to execute workflow code\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\NUL\ENQ\DC2\EOT\143\SOH\EOT\n\
+    \\ENQ\EOT\STX\STX\NUL\ENQ\DC2\EOT\159\SOH\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\NUL\SOH\DC2\EOT\143\SOH\v\CAN\n\
+    \\ENQ\EOT\STX\STX\NUL\SOH\DC2\EOT\159\SOH\v\CAN\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\NUL\ETX\DC2\EOT\143\SOH\ESC\FS\n\
+    \\ENQ\EOT\STX\STX\NUL\ETX\DC2\EOT\159\SOH\ESC\FS\n\
     \;\n\
-    \\EOT\EOT\STX\STX\SOH\DC2\EOT\145\SOH\EOT\ESC\SUB- The workflow id used on the temporal server\n\
+    \\EOT\EOT\STX\STX\SOH\DC2\EOT\161\SOH\EOT\ESC\SUB- The workflow id used on the temporal server\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\SOH\ENQ\DC2\EOT\145\SOH\EOT\n\
+    \\ENQ\EOT\STX\STX\SOH\ENQ\DC2\EOT\161\SOH\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\SOH\SOH\DC2\EOT\145\SOH\v\SYN\n\
+    \\ENQ\EOT\STX\STX\SOH\SOH\DC2\EOT\161\SOH\v\SYN\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\SOH\ETX\DC2\EOT\145\SOH\EM\SUB\n\
+    \\ENQ\EOT\STX\STX\SOH\ETX\DC2\EOT\161\SOH\EM\SUB\n\
     \+\n\
-    \\EOT\EOT\STX\STX\STX\DC2\EOT\147\SOH\EOT:\SUB\GS Inputs to the workflow code\n\
+    \\EOT\EOT\STX\STX\STX\DC2\EOT\163\SOH\EOT:\SUB\GS Inputs to the workflow code\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\STX\EOT\DC2\EOT\147\SOH\EOT\f\n\
+    \\ENQ\EOT\STX\STX\STX\EOT\DC2\EOT\163\SOH\EOT\f\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\STX\ACK\DC2\EOT\147\SOH\r+\n\
+    \\ENQ\EOT\STX\STX\STX\ACK\DC2\EOT\163\SOH\r+\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\STX\SOH\DC2\EOT\147\SOH,5\n\
+    \\ENQ\EOT\STX\STX\STX\SOH\DC2\EOT\163\SOH,5\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\STX\ETX\DC2\EOT\147\SOH89\n\
+    \\ENQ\EOT\STX\STX\STX\ETX\DC2\EOT\163\SOH89\n\
     \\149\SOH\n\
-    \\EOT\EOT\STX\STX\ETX\DC2\EOT\150\SOH\EOT\US\SUB\134\SOH The seed must be used to initialize the random generator used by SDK.\n\
+    \\EOT\EOT\STX\STX\ETX\DC2\EOT\166\SOH\EOT\US\SUB\134\SOH The seed must be used to initialize the random generator used by SDK.\n\
     \ RandomSeedUpdatedAttributes are used to deliver seed updates.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\ETX\ENQ\DC2\EOT\150\SOH\EOT\n\
+    \\ENQ\EOT\STX\STX\ETX\ENQ\DC2\EOT\166\SOH\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\ETX\SOH\DC2\EOT\150\SOH\v\SUB\n\
+    \\ENQ\EOT\STX\STX\ETX\SOH\DC2\EOT\166\SOH\v\SUB\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\ETX\ETX\DC2\EOT\150\SOH\GS\RS\n\
+    \\ENQ\EOT\STX\STX\ETX\ETX\DC2\EOT\166\SOH\GS\RS\n\
     \p\n\
-    \\EOT\EOT\STX\STX\EOT\DC2\EOT\152\SOH\EOT<\SUBb Used to add metadata e.g. for tracing and auth, meant to be read and written to by interceptors.\n\
+    \\EOT\EOT\STX\STX\EOT\DC2\EOT\168\SOH\EOT<\SUBb Used to add metadata e.g. for tracing and auth, meant to be read and written to by interceptors.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\EOT\ACK\DC2\EOT\152\SOH\EOT/\n\
+    \\ENQ\EOT\STX\STX\EOT\ACK\DC2\EOT\168\SOH\EOT/\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\EOT\SOH\DC2\EOT\152\SOH07\n\
+    \\ENQ\EOT\STX\STX\EOT\SOH\DC2\EOT\168\SOH07\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\EOT\ETX\DC2\EOT\152\SOH:;\n\
+    \\ENQ\EOT\STX\STX\EOT\ETX\DC2\EOT\168\SOH:;\n\
     \C\n\
-    \\EOT\EOT\STX\STX\ENQ\DC2\EOT\154\SOH\EOT\CAN\SUB5 Identity of the client who requested this execution\n\
+    \\EOT\EOT\STX\STX\ENQ\DC2\EOT\170\SOH\EOT\CAN\SUB5 Identity of the client who requested this execution\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\ENQ\ENQ\DC2\EOT\154\SOH\EOT\n\
+    \\ENQ\EOT\STX\STX\ENQ\ENQ\DC2\EOT\170\SOH\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\ENQ\SOH\DC2\EOT\154\SOH\v\DC3\n\
+    \\ENQ\EOT\STX\STX\ENQ\SOH\DC2\EOT\170\SOH\v\DC3\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\ENQ\ETX\DC2\EOT\154\SOH\SYN\ETB\n\
+    \\ENQ\EOT\STX\STX\ENQ\ETX\DC2\EOT\170\SOH\SYN\ETB\n\
     \I\n\
-    \\EOT\EOT\STX\STX\ACK\DC2\EOT\156\SOH\EOT@\SUB; If this workflow is a child, information about the parent\n\
+    \\EOT\EOT\STX\STX\ACK\DC2\EOT\172\SOH\EOT@\SUB; If this workflow is a child, information about the parent\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\ACK\ACK\DC2\EOT\156\SOH\EOT&\n\
+    \\ENQ\EOT\STX\STX\ACK\ACK\DC2\EOT\172\SOH\EOT&\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\ACK\SOH\DC2\EOT\156\SOH';\n\
+    \\ENQ\EOT\STX\STX\ACK\SOH\DC2\EOT\172\SOH';\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\ACK\ETX\DC2\EOT\156\SOH>?\n\
+    \\ENQ\EOT\STX\STX\ACK\ETX\DC2\EOT\172\SOH>?\n\
     \W\n\
-    \\EOT\EOT\STX\STX\a\DC2\EOT\158\SOH\EOT<\SUBI Total workflow execution timeout including retries and continue as new.\n\
+    \\EOT\EOT\STX\STX\a\DC2\EOT\174\SOH\EOT<\SUBI Total workflow execution timeout including retries and continue as new.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\a\ACK\DC2\EOT\158\SOH\EOT\FS\n\
+    \\ENQ\EOT\STX\STX\a\ACK\DC2\EOT\174\SOH\EOT\FS\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\a\SOH\DC2\EOT\158\SOH\GS7\n\
+    \\ENQ\EOT\STX\STX\a\SOH\DC2\EOT\174\SOH\GS7\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\a\ETX\DC2\EOT\158\SOH:;\n\
+    \\ENQ\EOT\STX\STX\a\ETX\DC2\EOT\174\SOH:;\n\
     \1\n\
-    \\EOT\EOT\STX\STX\b\DC2\EOT\160\SOH\EOT6\SUB# Timeout of a single workflow run.\n\
+    \\EOT\EOT\STX\STX\b\DC2\EOT\176\SOH\EOT6\SUB# Timeout of a single workflow run.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\b\ACK\DC2\EOT\160\SOH\EOT\FS\n\
+    \\ENQ\EOT\STX\STX\b\ACK\DC2\EOT\176\SOH\EOT\FS\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\b\SOH\DC2\EOT\160\SOH\GS1\n\
+    \\ENQ\EOT\STX\STX\b\SOH\DC2\EOT\176\SOH\GS1\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\b\ETX\DC2\EOT\160\SOH45\n\
+    \\ENQ\EOT\STX\STX\b\ETX\DC2\EOT\176\SOH45\n\
     \2\n\
-    \\EOT\EOT\STX\STX\t\DC2\EOT\162\SOH\EOT8\SUB$ Timeout of a single workflow task.\n\
+    \\EOT\EOT\STX\STX\t\DC2\EOT\178\SOH\EOT8\SUB$ Timeout of a single workflow task.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\t\ACK\DC2\EOT\162\SOH\EOT\FS\n\
+    \\ENQ\EOT\STX\STX\t\ACK\DC2\EOT\178\SOH\EOT\FS\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\t\SOH\DC2\EOT\162\SOH\GS2\n\
+    \\ENQ\EOT\STX\STX\t\SOH\DC2\EOT\178\SOH\GS2\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\t\ETX\DC2\EOT\162\SOH57\n\
+    \\ENQ\EOT\STX\STX\t\ETX\DC2\EOT\178\SOH57\n\
     \\DEL\n\
     \\EOT\EOT\STX\STX\n\
-    \\DC2\EOT\165\SOH\EOT0\SUBq Run id of the previous workflow which continued-as-new or retired or cron executed into this\n\
+    \\DC2\EOT\181\SOH\EOT0\SUBq Run id of the previous workflow which continued-as-new or retired or cron executed into this\n\
     \ workflow, if any.\n\
     \\n\
     \\r\n\
     \\ENQ\EOT\STX\STX\n\
-    \\ENQ\DC2\EOT\165\SOH\EOT\n\
+    \\ENQ\DC2\EOT\181\SOH\EOT\n\
     \\n\
     \\r\n\
     \\ENQ\EOT\STX\STX\n\
-    \\SOH\DC2\EOT\165\SOH\v*\n\
+    \\SOH\DC2\EOT\181\SOH\v*\n\
     \\r\n\
     \\ENQ\EOT\STX\STX\n\
-    \\ETX\DC2\EOT\165\SOH-/\n\
+    \\ETX\DC2\EOT\181\SOH-/\n\
     \X\n\
-    \\EOT\EOT\STX\STX\v\DC2\EOT\167\SOH\EOTJ\SUBJ If this workflow was a continuation, indicates the type of continuation.\n\
+    \\EOT\EOT\STX\STX\v\DC2\EOT\183\SOH\EOTJ\SUBJ If this workflow was a continuation, indicates the type of continuation.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\v\ACK\DC2\EOT\167\SOH\EOT0\n\
+    \\ENQ\EOT\STX\STX\v\ACK\DC2\EOT\183\SOH\EOT0\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\v\SOH\DC2\EOT\167\SOH1D\n\
+    \\ENQ\EOT\STX\STX\v\SOH\DC2\EOT\183\SOH1D\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\v\ETX\DC2\EOT\167\SOHGI\n\
+    \\ENQ\EOT\STX\STX\v\ETX\DC2\EOT\183\SOHGI\n\
     \f\n\
-    \\EOT\EOT\STX\STX\f\DC2\EOT\169\SOH\EOT;\SUBX If this workflow was a continuation and that continuation failed, the details of that.\n\
+    \\EOT\EOT\STX\STX\f\DC2\EOT\185\SOH\EOT;\SUBX If this workflow was a continuation and that continuation failed, the details of that.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\f\ACK\DC2\EOT\169\SOH\EOT#\n\
+    \\ENQ\EOT\STX\STX\f\ACK\DC2\EOT\185\SOH\EOT#\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\f\SOH\DC2\EOT\169\SOH$5\n\
+    \\ENQ\EOT\STX\STX\f\SOH\DC2\EOT\185\SOH$5\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\f\ETX\DC2\EOT\169\SOH8:\n\
+    \\ENQ\EOT\STX\STX\f\ETX\DC2\EOT\185\SOH8:\n\
     \i\n\
-    \\EOT\EOT\STX\STX\r\DC2\EOT\171\SOH\EOT@\SUB[ If this workflow was a continuation and that continuation completed, the details of that.\n\
+    \\EOT\EOT\STX\STX\r\DC2\EOT\187\SOH\EOT@\SUB[ If this workflow was a continuation and that continuation completed, the details of that.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\r\ACK\DC2\EOT\171\SOH\EOT#\n\
+    \\ENQ\EOT\STX\STX\r\ACK\DC2\EOT\187\SOH\EOT#\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\r\SOH\DC2\EOT\171\SOH$:\n\
+    \\ENQ\EOT\STX\STX\r\SOH\DC2\EOT\187\SOH$:\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\r\ETX\DC2\EOT\171\SOH=?\n\
+    \\ENQ\EOT\STX\STX\r\ETX\DC2\EOT\187\SOH=?\n\
     \c\n\
-    \\EOT\EOT\STX\STX\SO\DC2\EOT\173\SOH\EOT'\SUBU This is the very first run id the workflow ever had, following continuation chains.\n\
+    \\EOT\EOT\STX\STX\SO\DC2\EOT\189\SOH\EOT'\SUBU This is the very first run id the workflow ever had, following continuation chains.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\SO\ENQ\DC2\EOT\173\SOH\EOT\n\
+    \\ENQ\EOT\STX\STX\SO\ENQ\DC2\EOT\189\SOH\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\SO\SOH\DC2\EOT\173\SOH\v!\n\
+    \\ENQ\EOT\STX\STX\SO\SOH\DC2\EOT\189\SOH\v!\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\SO\ETX\DC2\EOT\173\SOH$&\n\
+    \\ENQ\EOT\STX\STX\SO\ETX\DC2\EOT\189\SOH$&\n\
     \,\n\
-    \\EOT\EOT\STX\STX\SI\DC2\EOT\175\SOH\EOT9\SUB\RS This workflow's retry policy\n\
+    \\EOT\EOT\STX\STX\SI\DC2\EOT\191\SOH\EOT9\SUB\RS This workflow's retry policy\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\SI\ACK\DC2\EOT\175\SOH\EOT&\n\
+    \\ENQ\EOT\STX\STX\SI\ACK\DC2\EOT\191\SOH\EOT&\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\SI\SOH\DC2\EOT\175\SOH'3\n\
+    \\ENQ\EOT\STX\STX\SI\SOH\DC2\EOT\191\SOH'3\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\SI\ETX\DC2\EOT\175\SOH68\n\
+    \\ENQ\EOT\STX\STX\SI\ETX\DC2\EOT\191\SOH68\n\
     \Y\n\
-    \\EOT\EOT\STX\STX\DLE\DC2\EOT\177\SOH\EOT\ETB\SUBK Starting at 1, the number of times we have tried to execute this workflow\n\
+    \\EOT\EOT\STX\STX\DLE\DC2\EOT\193\SOH\EOT\ETB\SUBK Starting at 1, the number of times we have tried to execute this workflow\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\DLE\ENQ\DC2\EOT\177\SOH\EOT\t\n\
+    \\ENQ\EOT\STX\STX\DLE\ENQ\DC2\EOT\193\SOH\EOT\t\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\DLE\SOH\DC2\EOT\177\SOH\n\
+    \\ENQ\EOT\STX\STX\DLE\SOH\DC2\EOT\193\SOH\n\
     \\DC1\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\DLE\ETX\DC2\EOT\177\SOH\DC4\SYN\n\
+    \\ENQ\EOT\STX\STX\DLE\ETX\DC2\EOT\193\SOH\DC4\SYN\n\
     \M\n\
-    \\EOT\EOT\STX\STX\DC1\DC2\EOT\179\SOH\EOT\RS\SUB? If this workflow runs on a cron schedule, it will appear here\n\
+    \\EOT\EOT\STX\STX\DC1\DC2\EOT\195\SOH\EOT\RS\SUB? If this workflow runs on a cron schedule, it will appear here\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\DC1\ENQ\DC2\EOT\179\SOH\EOT\n\
+    \\ENQ\EOT\STX\STX\DC1\ENQ\DC2\EOT\195\SOH\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\DC1\SOH\DC2\EOT\179\SOH\v\CAN\n\
+    \\ENQ\EOT\STX\STX\DC1\SOH\DC2\EOT\195\SOH\v\CAN\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\DC1\ETX\DC2\EOT\179\SOH\ESC\GS\n\
+    \\ENQ\EOT\STX\STX\DC1\ETX\DC2\EOT\195\SOH\ESC\GS\n\
     \\143\SOH\n\
-    \\EOT\EOT\STX\STX\DC2\DC2\EOT\182\SOH\EOTF\SUB\128\SOH The absolute time at which the workflow will be timed out.\n\
+    \\EOT\EOT\STX\STX\DC2\DC2\EOT\198\SOH\EOTF\SUB\128\SOH The absolute time at which the workflow will be timed out.\n\
     \ This is passed without change to the next run/retry of a workflow.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\DC2\ACK\DC2\EOT\182\SOH\EOT\GS\n\
+    \\ENQ\EOT\STX\STX\DC2\ACK\DC2\EOT\198\SOH\EOT\GS\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\DC2\SOH\DC2\EOT\182\SOH\RS@\n\
+    \\ENQ\EOT\STX\STX\DC2\SOH\DC2\EOT\198\SOH\RS@\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\DC2\ETX\DC2\EOT\182\SOHCE\n\
+    \\ENQ\EOT\STX\STX\DC2\ETX\DC2\EOT\198\SOHCE\n\
     \\185\SOH\n\
-    \\EOT\EOT\STX\STX\DC3\DC2\EOT\185\SOH\EOTE\SUB\170\SOH For a cron workflow, this contains the amount of time between when this iteration of\n\
+    \\EOT\EOT\STX\STX\DC3\DC2\EOT\201\SOH\EOTE\SUB\170\SOH For a cron workflow, this contains the amount of time between when this iteration of\n\
     \ the cron workflow was scheduled and when it should run next per its cron_schedule.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\DC3\ACK\DC2\EOT\185\SOH\EOT\FS\n\
+    \\ENQ\EOT\STX\STX\DC3\ACK\DC2\EOT\201\SOH\EOT\FS\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\DC3\SOH\DC2\EOT\185\SOH\GS?\n\
+    \\ENQ\EOT\STX\STX\DC3\SOH\DC2\EOT\201\SOH\GS?\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\DC3\ETX\DC2\EOT\185\SOHBD\n\
+    \\ENQ\EOT\STX\STX\DC3\ETX\DC2\EOT\201\SOHBD\n\
     \!\n\
-    \\EOT\EOT\STX\STX\DC4\DC2\EOT\187\SOH\EOT*\SUB\DC3 User-defined memo\n\
+    \\EOT\EOT\STX\STX\DC4\DC2\EOT\203\SOH\EOT*\SUB\DC3 User-defined memo\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\DC4\ACK\DC2\EOT\187\SOH\EOT\US\n\
+    \\ENQ\EOT\STX\STX\DC4\ACK\DC2\EOT\203\SOH\EOT\US\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\DC4\SOH\DC2\EOT\187\SOH $\n\
+    \\ENQ\EOT\STX\STX\DC4\SOH\DC2\EOT\203\SOH $\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\DC4\ETX\DC2\EOT\187\SOH')\n\
+    \\ENQ\EOT\STX\STX\DC4\ETX\DC2\EOT\203\SOH')\n\
     \P\n\
-    \\EOT\EOT\STX\STX\NAK\DC2\EOT\189\SOH\EOTC\SUBB Search attributes created/updated when this workflow was started\n\
+    \\EOT\EOT\STX\STX\NAK\DC2\EOT\205\SOH\EOTC\SUBB Search attributes created/updated when this workflow was started\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\NAK\ACK\DC2\EOT\189\SOH\EOT+\n\
+    \\ENQ\EOT\STX\STX\NAK\ACK\DC2\EOT\205\SOH\EOT+\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\NAK\SOH\DC2\EOT\189\SOH,=\n\
+    \\ENQ\EOT\STX\STX\NAK\SOH\DC2\EOT\205\SOH,=\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\NAK\ETX\DC2\EOT\189\SOH@B\n\
+    \\ENQ\EOT\STX\STX\NAK\ETX\DC2\EOT\205\SOH@B\n\
     \K\n\
-    \\EOT\EOT\STX\STX\SYN\DC2\EOT\191\SOH\EOT.\SUB= When the workflow execution started event was first written\n\
+    \\EOT\EOT\STX\STX\SYN\DC2\EOT\207\SOH\EOT.\SUB= When the workflow execution started event was first written\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\SYN\ACK\DC2\EOT\191\SOH\EOT\GS\n\
+    \\ENQ\EOT\STX\STX\SYN\ACK\DC2\EOT\207\SOH\EOT\GS\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\SYN\SOH\DC2\EOT\191\SOH\RS(\n\
+    \\ENQ\EOT\STX\STX\SYN\SOH\DC2\EOT\207\SOH\RS(\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\SYN\ETX\DC2\EOT\191\SOH+-\n\
+    \\ENQ\EOT\STX\STX\SYN\ETX\DC2\EOT\207\SOH+-\n\
     \\182\EOT\n\
-    \\EOT\EOT\STX\STX\ETB\DC2\EOT\202\SOH\EOT@\SUB\167\EOT Contains information about the root workflow execution. It is possible for the namespace to\n\
+    \\EOT\EOT\STX\STX\ETB\DC2\EOT\218\SOH\EOT@\SUB\167\EOT Contains information about the root workflow execution. It is possible for the namespace to\n\
     \ be different than this workflow if using OSS and cross-namespace children, but this\n\
     \ information is not retained. Users should take care to track it by other means in such\n\
     \ situations.\n\
@@ -8821,643 +9388,705 @@ packedFileDescriptor
     \ See field in WorkflowExecutionStarted for more detail.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\ETB\ACK\DC2\EOT\202\SOH\EOT,\n\
+    \\ENQ\EOT\STX\STX\ETB\ACK\DC2\EOT\218\SOH\EOT,\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\ETB\SOH\DC2\EOT\202\SOH-:\n\
+    \\ENQ\EOT\STX\STX\ETB\SOH\DC2\EOT\218\SOH-:\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\ETB\ETX\DC2\EOT\202\SOH=?\n\
+    \\ENQ\EOT\STX\STX\ETB\ETX\DC2\EOT\218\SOH=?\n\
     \3\n\
-    \\EOT\EOT\STX\STX\CAN\DC2\EOT\204\SOH\EOT2\SUB% Priority of this workflow execution\n\
+    \\EOT\EOT\STX\STX\CAN\DC2\EOT\220\SOH\EOT2\SUB% Priority of this workflow execution\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\CAN\ACK\DC2\EOT\204\SOH\EOT#\n\
+    \\ENQ\EOT\STX\STX\CAN\ACK\DC2\EOT\220\SOH\EOT#\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\CAN\SOH\DC2\EOT\204\SOH$,\n\
+    \\ENQ\EOT\STX\STX\CAN\SOH\DC2\EOT\220\SOH$,\n\
     \\r\n\
-    \\ENQ\EOT\STX\STX\CAN\ETX\DC2\EOT\204\SOH/1\n\
+    \\ENQ\EOT\STX\STX\CAN\ETX\DC2\EOT\220\SOH/1\n\
+    \\134\STX\n\
+    \\EOT\EOT\STX\STX\EM\DC2\EOT\224\SOH\EOT*\SUB\247\SOH The run id recorded on the `WORKFLOW_EXECUTION_STARTED` event. Unlike the execution's current\n\
+    \ run id, this value is preserved across workflow resets. Mirrors the `original_execution_run_id`\n\
+    \ field from `WorkflowExecutionStartedEventAttributes`.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\STX\STX\EM\ENQ\DC2\EOT\224\SOH\EOT\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\STX\STX\EM\SOH\DC2\EOT\224\SOH\v$\n\
+    \\r\n\
+    \\ENQ\EOT\STX\STX\EM\ETX\DC2\EOT\224\SOH')\n\
+    \\214\SOH\n\
+    \\EOT\EOT\STX\STX\SUB\DC2\EOT\228\SOH\EOTe\SUB\199\SOH Serialization context of the Nexus operation handler that started this workflow, if any.\n\
+    \ Lang should use it to serialize the workflow's result and failure, which are returned to the\n\
+    \ Nexus caller.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\STX\STX\SUB\ACK\DC2\EOT\228\SOH\EOT8\n\
+    \\r\n\
+    \\ENQ\EOT\STX\STX\SUB\SOH\DC2\EOT\228\SOH9_\n\
+    \\r\n\
+    \\ENQ\EOT\STX\STX\SUB\ETX\DC2\EOT\228\SOHbd\n\
     \8\n\
-    \\STX\EOT\ETX\DC2\ACK\208\SOH\NUL\211\SOH\SOH\SUB* Notify a workflow that a timer has fired\n\
+    \\STX\EOT\ETX\DC2\ACK\232\SOH\NUL\235\SOH\SOH\SUB* Notify a workflow that a timer has fired\n\
     \\n\
     \\v\n\
-    \\ETX\EOT\ETX\SOH\DC2\EOT\208\SOH\b\DC1\n\
+    \\ETX\EOT\ETX\SOH\DC2\EOT\232\SOH\b\DC1\n\
     \[\n\
-    \\EOT\EOT\ETX\STX\NUL\DC2\EOT\210\SOH\EOT\DC3\SUBM Sequence number as provided by lang in the corresponding StartTimer command\n\
+    \\EOT\EOT\ETX\STX\NUL\DC2\EOT\234\SOH\EOT\DC3\SUBM Sequence number as provided by lang in the corresponding StartTimer command\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\ETX\STX\NUL\ENQ\DC2\EOT\210\SOH\EOT\n\
+    \\ENQ\EOT\ETX\STX\NUL\ENQ\DC2\EOT\234\SOH\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\ETX\STX\NUL\SOH\DC2\EOT\210\SOH\v\SO\n\
+    \\ENQ\EOT\ETX\STX\NUL\SOH\DC2\EOT\234\SOH\v\SO\n\
     \\r\n\
-    \\ENQ\EOT\ETX\STX\NUL\ETX\DC2\EOT\210\SOH\DC1\DC2\n\
+    \\ENQ\EOT\ETX\STX\NUL\ETX\DC2\EOT\234\SOH\DC1\DC2\n\
     \D\n\
-    \\STX\EOT\EOT\DC2\ACK\214\SOH\NUL\221\SOH\SOH\SUB6 Notify a workflow that an activity has been resolved\n\
+    \\STX\EOT\EOT\DC2\ACK\238\SOH\NUL\245\SOH\SOH\SUB6 Notify a workflow that an activity has been resolved\n\
     \\n\
     \\v\n\
-    \\ETX\EOT\EOT\SOH\DC2\EOT\214\SOH\b\ETB\n\
+    \\ETX\EOT\EOT\SOH\DC2\EOT\238\SOH\b\ETB\n\
     \a\n\
-    \\EOT\EOT\EOT\STX\NUL\DC2\EOT\216\SOH\EOT\DC3\SUBS Sequence number as provided by lang in the corresponding ScheduleActivity command\n\
+    \\EOT\EOT\EOT\STX\NUL\DC2\EOT\240\SOH\EOT\DC3\SUBS Sequence number as provided by lang in the corresponding ScheduleActivity command\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\EOT\STX\NUL\ENQ\DC2\EOT\216\SOH\EOT\n\
+    \\ENQ\EOT\EOT\STX\NUL\ENQ\DC2\EOT\240\SOH\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\EOT\STX\NUL\SOH\DC2\EOT\216\SOH\v\SO\n\
+    \\ENQ\EOT\EOT\STX\NUL\SOH\DC2\EOT\240\SOH\v\SO\n\
     \\r\n\
-    \\ENQ\EOT\EOT\STX\NUL\ETX\DC2\EOT\216\SOH\DC1\DC2\n\
+    \\ENQ\EOT\EOT\STX\NUL\ETX\DC2\EOT\240\SOH\DC1\DC2\n\
     \\f\n\
-    \\EOT\EOT\EOT\STX\SOH\DC2\EOT\217\SOH\EOT2\n\
+    \\EOT\EOT\EOT\STX\SOH\DC2\EOT\241\SOH\EOT2\n\
     \\r\n\
-    \\ENQ\EOT\EOT\STX\SOH\ACK\DC2\EOT\217\SOH\EOT&\n\
+    \\ENQ\EOT\EOT\STX\SOH\ACK\DC2\EOT\241\SOH\EOT&\n\
     \\r\n\
-    \\ENQ\EOT\EOT\STX\SOH\SOH\DC2\EOT\217\SOH'-\n\
+    \\ENQ\EOT\EOT\STX\SOH\SOH\DC2\EOT\241\SOH'-\n\
     \\r\n\
-    \\ENQ\EOT\EOT\STX\SOH\ETX\DC2\EOT\217\SOH01\n\
+    \\ENQ\EOT\EOT\STX\SOH\ETX\DC2\EOT\241\SOH01\n\
     \\145\SOH\n\
-    \\EOT\EOT\EOT\STX\STX\DC2\EOT\220\SOH\EOT\SYN\SUB\130\SOH Set to true if the resolution is for a local activity. This is used internally by Core and\n\
+    \\EOT\EOT\EOT\STX\STX\DC2\EOT\244\SOH\EOT\SYN\SUB\130\SOH Set to true if the resolution is for a local activity. This is used internally by Core and\n\
     \ lang does not need to care about it.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\EOT\STX\STX\ENQ\DC2\EOT\220\SOH\EOT\b\n\
+    \\ENQ\EOT\EOT\STX\STX\ENQ\DC2\EOT\244\SOH\EOT\b\n\
     \\r\n\
-    \\ENQ\EOT\EOT\STX\STX\SOH\DC2\EOT\220\SOH\t\DC1\n\
+    \\ENQ\EOT\EOT\STX\STX\SOH\DC2\EOT\244\SOH\t\DC1\n\
     \\r\n\
-    \\ENQ\EOT\EOT\STX\STX\ETX\DC2\EOT\220\SOH\DC4\NAK\n\
+    \\ENQ\EOT\EOT\STX\STX\ETX\DC2\EOT\244\SOH\DC4\NAK\n\
     \x\n\
-    \\STX\EOT\ENQ\DC2\ACK\225\SOH\NUL\233\SOH\SOH\SUBj Notify a workflow that a start child workflow execution request has succeeded, failed or was\n\
+    \\STX\EOT\ENQ\DC2\ACK\249\SOH\NUL\129\STX\SOH\SUBj Notify a workflow that a start child workflow execution request has succeeded, failed or was\n\
     \ cancelled.\n\
     \\n\
     \\v\n\
-    \\ETX\EOT\ENQ\SOH\DC2\EOT\225\SOH\b*\n\
+    \\ETX\EOT\ENQ\SOH\DC2\EOT\249\SOH\b*\n\
     \l\n\
-    \\EOT\EOT\ENQ\STX\NUL\DC2\EOT\227\SOH\EOT\DC3\SUB^ Sequence number as provided by lang in the corresponding StartChildWorkflowExecution command\n\
+    \\EOT\EOT\ENQ\STX\NUL\DC2\EOT\251\SOH\EOT\DC3\SUB^ Sequence number as provided by lang in the corresponding StartChildWorkflowExecution command\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\ENQ\STX\NUL\ENQ\DC2\EOT\227\SOH\EOT\n\
+    \\ENQ\EOT\ENQ\STX\NUL\ENQ\DC2\EOT\251\SOH\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\ENQ\STX\NUL\SOH\DC2\EOT\227\SOH\v\SO\n\
+    \\ENQ\EOT\ENQ\STX\NUL\SOH\DC2\EOT\251\SOH\v\SO\n\
     \\r\n\
-    \\ENQ\EOT\ENQ\STX\NUL\ETX\DC2\EOT\227\SOH\DC1\DC2\n\
+    \\ENQ\EOT\ENQ\STX\NUL\ETX\DC2\EOT\251\SOH\DC1\DC2\n\
     \\SO\n\
-    \\EOT\EOT\ENQ\b\NUL\DC2\ACK\228\SOH\EOT\232\SOH\ENQ\n\
+    \\EOT\EOT\ENQ\b\NUL\DC2\ACK\252\SOH\EOT\128\STX\ENQ\n\
     \\r\n\
-    \\ENQ\EOT\ENQ\b\NUL\SOH\DC2\EOT\228\SOH\n\
+    \\ENQ\EOT\ENQ\b\NUL\SOH\DC2\EOT\252\SOH\n\
     \\DLE\n\
     \\f\n\
-    \\EOT\EOT\ENQ\STX\SOH\DC2\EOT\229\SOH\b@\n\
+    \\EOT\EOT\ENQ\STX\SOH\DC2\EOT\253\SOH\b@\n\
     \\r\n\
-    \\ENQ\EOT\ENQ\STX\SOH\ACK\DC2\EOT\229\SOH\b1\n\
+    \\ENQ\EOT\ENQ\STX\SOH\ACK\DC2\EOT\253\SOH\b1\n\
     \\r\n\
-    \\ENQ\EOT\ENQ\STX\SOH\SOH\DC2\EOT\229\SOH2;\n\
+    \\ENQ\EOT\ENQ\STX\SOH\SOH\DC2\EOT\253\SOH2;\n\
     \\r\n\
-    \\ENQ\EOT\ENQ\STX\SOH\ETX\DC2\EOT\229\SOH>?\n\
+    \\ENQ\EOT\ENQ\STX\SOH\ETX\DC2\EOT\253\SOH>?\n\
     \\f\n\
-    \\EOT\EOT\ENQ\STX\STX\DC2\EOT\230\SOH\b=\n\
+    \\EOT\EOT\ENQ\STX\STX\DC2\EOT\254\SOH\b=\n\
     \\r\n\
-    \\ENQ\EOT\ENQ\STX\STX\ACK\DC2\EOT\230\SOH\b1\n\
+    \\ENQ\EOT\ENQ\STX\STX\ACK\DC2\EOT\254\SOH\b1\n\
     \\r\n\
-    \\ENQ\EOT\ENQ\STX\STX\SOH\DC2\EOT\230\SOH28\n\
+    \\ENQ\EOT\ENQ\STX\STX\SOH\DC2\EOT\254\SOH28\n\
     \\r\n\
-    \\ENQ\EOT\ENQ\STX\STX\ETX\DC2\EOT\230\SOH;<\n\
+    \\ENQ\EOT\ENQ\STX\STX\ETX\DC2\EOT\254\SOH;<\n\
     \\f\n\
-    \\EOT\EOT\ENQ\STX\ETX\DC2\EOT\231\SOH\bB\n\
+    \\EOT\EOT\ENQ\STX\ETX\DC2\EOT\255\SOH\bB\n\
     \\r\n\
-    \\ENQ\EOT\ENQ\STX\ETX\ACK\DC2\EOT\231\SOH\b3\n\
+    \\ENQ\EOT\ENQ\STX\ETX\ACK\DC2\EOT\255\SOH\b3\n\
     \\r\n\
-    \\ENQ\EOT\ENQ\STX\ETX\SOH\DC2\EOT\231\SOH4=\n\
+    \\ENQ\EOT\ENQ\STX\ETX\SOH\DC2\EOT\255\SOH4=\n\
     \\r\n\
-    \\ENQ\EOT\ENQ\STX\ETX\ETX\DC2\EOT\231\SOH@A\n\
+    \\ENQ\EOT\ENQ\STX\ETX\ETX\DC2\EOT\255\SOH@A\n\
     \.\n\
-    \\STX\EOT\ACK\DC2\ACK\236\SOH\NUL\238\SOH\SOH\SUB  Simply pass the run_id to lang\n\
+    \\STX\EOT\ACK\DC2\ACK\132\STX\NUL\134\STX\SOH\SUB  Simply pass the run_id to lang\n\
     \\n\
     \\v\n\
-    \\ETX\EOT\ACK\SOH\DC2\EOT\236\SOH\b1\n\
+    \\ETX\EOT\ACK\SOH\DC2\EOT\132\STX\b1\n\
     \\f\n\
-    \\EOT\EOT\ACK\STX\NUL\DC2\EOT\237\SOH\EOT\SYN\n\
+    \\EOT\EOT\ACK\STX\NUL\DC2\EOT\133\STX\EOT\SYN\n\
     \\r\n\
-    \\ENQ\EOT\ACK\STX\NUL\ENQ\DC2\EOT\237\SOH\EOT\n\
+    \\ENQ\EOT\ACK\STX\NUL\ENQ\DC2\EOT\133\STX\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\ACK\STX\NUL\SOH\DC2\EOT\237\SOH\v\DC1\n\
+    \\ENQ\EOT\ACK\STX\NUL\SOH\DC2\EOT\133\STX\v\DC1\n\
     \\r\n\
-    \\ENQ\EOT\ACK\STX\NUL\ETX\DC2\EOT\237\SOH\DC4\NAK\n\
+    \\ENQ\EOT\ACK\STX\NUL\ETX\DC2\EOT\133\STX\DC4\NAK\n\
     \1\n\
-    \\STX\EOT\a\DC2\ACK\241\SOH\NUL\247\SOH\SOH\SUB# Provide lang the cause of failure\n\
+    \\STX\EOT\a\DC2\ACK\137\STX\NUL\143\STX\SOH\SUB# Provide lang the cause of failure\n\
     \\n\
     \\v\n\
-    \\ETX\EOT\a\SOH\DC2\EOT\241\SOH\b1\n\
+    \\ETX\EOT\a\SOH\DC2\EOT\137\STX\b1\n\
     \\132\SOH\n\
-    \\EOT\EOT\a\STX\NUL\DC2\EOT\244\SOH\EOT\ESC\SUBv Lang should have this information but it's more convenient to pass it back\n\
+    \\EOT\EOT\a\STX\NUL\DC2\EOT\140\STX\EOT\ESC\SUBv Lang should have this information but it's more convenient to pass it back\n\
     \ for error construction on the lang side.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\a\STX\NUL\ENQ\DC2\EOT\244\SOH\EOT\n\
+    \\ENQ\EOT\a\STX\NUL\ENQ\DC2\EOT\140\STX\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\a\STX\NUL\SOH\DC2\EOT\244\SOH\v\SYN\n\
+    \\ENQ\EOT\a\STX\NUL\SOH\DC2\EOT\140\STX\v\SYN\n\
     \\r\n\
-    \\ENQ\EOT\a\STX\NUL\ETX\DC2\EOT\244\SOH\EM\SUB\n\
+    \\ENQ\EOT\a\STX\NUL\ETX\DC2\EOT\140\STX\EM\SUB\n\
     \\f\n\
-    \\EOT\EOT\a\STX\SOH\DC2\EOT\245\SOH\EOT\GS\n\
+    \\EOT\EOT\a\STX\SOH\DC2\EOT\141\STX\EOT\GS\n\
     \\r\n\
-    \\ENQ\EOT\a\STX\SOH\ENQ\DC2\EOT\245\SOH\EOT\n\
+    \\ENQ\EOT\a\STX\SOH\ENQ\DC2\EOT\141\STX\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\a\STX\SOH\SOH\DC2\EOT\245\SOH\v\CAN\n\
+    \\ENQ\EOT\a\STX\SOH\SOH\DC2\EOT\141\STX\v\CAN\n\
     \\r\n\
-    \\ENQ\EOT\a\STX\SOH\ETX\DC2\EOT\245\SOH\ESC\FS\n\
+    \\ENQ\EOT\a\STX\SOH\ETX\DC2\EOT\141\STX\ESC\FS\n\
     \\f\n\
-    \\EOT\EOT\a\STX\STX\DC2\EOT\246\SOH\EOTD\n\
+    \\EOT\EOT\a\STX\STX\DC2\EOT\142\STX\EOTD\n\
     \\r\n\
-    \\ENQ\EOT\a\STX\STX\ACK\DC2\EOT\246\SOH\EOT9\n\
+    \\ENQ\EOT\a\STX\STX\ACK\DC2\EOT\142\STX\EOT9\n\
     \\r\n\
-    \\ENQ\EOT\a\STX\STX\SOH\DC2\EOT\246\SOH:?\n\
+    \\ENQ\EOT\a\STX\STX\SOH\DC2\EOT\142\STX:?\n\
     \\r\n\
-    \\ENQ\EOT\a\STX\STX\ETX\DC2\EOT\246\SOHBC\n\
+    \\ENQ\EOT\a\STX\STX\ETX\DC2\EOT\142\STXBC\n\
     \\153\SOH\n\
-    \\STX\EOT\b\DC2\ACK\251\SOH\NUL\253\SOH\SOH\SUB\138\SOH `failure` should be ChildWorkflowFailure with cause set to CancelledFailure.\n\
+    \\STX\EOT\b\DC2\ACK\147\STX\NUL\149\STX\SOH\SUB\138\SOH `failure` should be ChildWorkflowFailure with cause set to CancelledFailure.\n\
     \ The failure is constructed in core for lang's convenience.\n\
     \\n\
     \\v\n\
-    \\ETX\EOT\b\SOH\DC2\EOT\251\SOH\b3\n\
+    \\ETX\EOT\b\SOH\DC2\EOT\147\STX\b3\n\
     \\f\n\
-    \\EOT\EOT\b\STX\NUL\DC2\EOT\252\SOH\EOT0\n\
+    \\EOT\EOT\b\STX\NUL\DC2\EOT\148\STX\EOT0\n\
     \\r\n\
-    \\ENQ\EOT\b\STX\NUL\ACK\DC2\EOT\252\SOH\EOT#\n\
+    \\ENQ\EOT\b\STX\NUL\ACK\DC2\EOT\148\STX\EOT#\n\
     \\r\n\
-    \\ENQ\EOT\b\STX\NUL\SOH\DC2\EOT\252\SOH$+\n\
+    \\ENQ\EOT\b\STX\NUL\SOH\DC2\EOT\148\STX$+\n\
     \\r\n\
-    \\ENQ\EOT\b\STX\NUL\ETX\DC2\EOT\252\SOH./\n\
+    \\ENQ\EOT\b\STX\NUL\ETX\DC2\EOT\148\STX./\n\
     \S\n\
-    \\STX\EOT\t\DC2\ACK\128\STX\NUL\132\STX\SOH\SUBE Notify a workflow that a child workflow execution has been resolved\n\
+    \\STX\EOT\t\DC2\ACK\152\STX\NUL\156\STX\SOH\SUBE Notify a workflow that a child workflow execution has been resolved\n\
     \\n\
     \\v\n\
-    \\ETX\EOT\t\SOH\DC2\EOT\128\STX\b%\n\
+    \\ETX\EOT\t\SOH\DC2\EOT\152\STX\b%\n\
     \l\n\
-    \\EOT\EOT\t\STX\NUL\DC2\EOT\130\STX\EOT\DC3\SUB^ Sequence number as provided by lang in the corresponding StartChildWorkflowExecution command\n\
+    \\EOT\EOT\t\STX\NUL\DC2\EOT\154\STX\EOT\DC3\SUB^ Sequence number as provided by lang in the corresponding StartChildWorkflowExecution command\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\t\STX\NUL\ENQ\DC2\EOT\130\STX\EOT\n\
+    \\ENQ\EOT\t\STX\NUL\ENQ\DC2\EOT\154\STX\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\t\STX\NUL\SOH\DC2\EOT\130\STX\v\SO\n\
+    \\ENQ\EOT\t\STX\NUL\SOH\DC2\EOT\154\STX\v\SO\n\
     \\r\n\
-    \\ENQ\EOT\t\STX\NUL\ETX\DC2\EOT\130\STX\DC1\DC2\n\
+    \\ENQ\EOT\t\STX\NUL\ETX\DC2\EOT\154\STX\DC1\DC2\n\
     \\f\n\
-    \\EOT\EOT\t\STX\SOH\DC2\EOT\131\STX\EOT2\n\
+    \\EOT\EOT\t\STX\SOH\DC2\EOT\155\STX\EOT2\n\
     \\r\n\
-    \\ENQ\EOT\t\STX\SOH\ACK\DC2\EOT\131\STX\EOT&\n\
+    \\ENQ\EOT\t\STX\SOH\ACK\DC2\EOT\155\STX\EOT&\n\
     \\r\n\
-    \\ENQ\EOT\t\STX\SOH\SOH\DC2\EOT\131\STX'-\n\
+    \\ENQ\EOT\t\STX\SOH\SOH\DC2\EOT\155\STX'-\n\
     \\r\n\
-    \\ENQ\EOT\t\STX\SOH\ETX\DC2\EOT\131\STX01\n\
+    \\ENQ\EOT\t\STX\SOH\ETX\DC2\EOT\155\STX01\n\
     \1\n\
     \\STX\EOT\n\
-    \\DC2\ACK\135\STX\NUL\137\STX\SOH\SUB# Update the workflow's random seed\n\
+    \\DC2\ACK\159\STX\NUL\161\STX\SOH\SUB# Update the workflow's random seed\n\
     \\n\
     \\v\n\
     \\ETX\EOT\n\
-    \\SOH\DC2\EOT\135\STX\b\CAN\n\
+    \\SOH\DC2\EOT\159\STX\b\CAN\n\
     \\f\n\
     \\EOT\EOT\n\
-    \\STX\NUL\DC2\EOT\136\STX\EOT\US\n\
+    \\STX\NUL\DC2\EOT\160\STX\EOT\US\n\
     \\r\n\
     \\ENQ\EOT\n\
-    \\STX\NUL\ENQ\DC2\EOT\136\STX\EOT\n\
+    \\STX\NUL\ENQ\DC2\EOT\160\STX\EOT\n\
     \\n\
     \\r\n\
     \\ENQ\EOT\n\
-    \\STX\NUL\SOH\DC2\EOT\136\STX\v\SUB\n\
+    \\STX\NUL\SOH\DC2\EOT\160\STX\v\SUB\n\
     \\r\n\
     \\ENQ\EOT\n\
-    \\STX\NUL\ETX\DC2\EOT\136\STX\GS\RS\n\
+    \\STX\NUL\ETX\DC2\EOT\160\STX\GS\RS\n\
     \ \n\
-    \\STX\EOT\v\DC2\ACK\140\STX\NUL\150\STX\SOH\SUB\DC2 Query a workflow\n\
+    \\STX\EOT\v\DC2\ACK\164\STX\NUL\174\STX\SOH\SUB\DC2 Query a workflow\n\
     \\n\
     \\v\n\
-    \\ETX\EOT\v\SOH\DC2\EOT\140\STX\b\NAK\n\
+    \\ETX\EOT\v\SOH\DC2\EOT\164\STX\b\NAK\n\
     \\137\STX\n\
-    \\EOT\EOT\v\STX\NUL\DC2\EOT\144\STX\EOT\CAN\SUB\250\SOH For PollWFTResp `query` field, this will be set to the special value `legacy`. For the\n\
+    \\EOT\EOT\v\STX\NUL\DC2\EOT\168\STX\EOT\CAN\SUB\250\SOH For PollWFTResp `query` field, this will be set to the special value `legacy`. For the\n\
     \ `queries` field, the server provides a unique identifier. If it is a `legacy` query,\n\
     \ lang cannot issue any commands in response other than to answer the query.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\v\STX\NUL\ENQ\DC2\EOT\144\STX\EOT\n\
+    \\ENQ\EOT\v\STX\NUL\ENQ\DC2\EOT\168\STX\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\v\STX\NUL\SOH\DC2\EOT\144\STX\v\DC3\n\
+    \\ENQ\EOT\v\STX\NUL\SOH\DC2\EOT\168\STX\v\DC3\n\
     \\r\n\
-    \\ENQ\EOT\v\STX\NUL\ETX\DC2\EOT\144\STX\SYN\ETB\n\
+    \\ENQ\EOT\v\STX\NUL\ETX\DC2\EOT\168\STX\SYN\ETB\n\
     \4\n\
-    \\EOT\EOT\v\STX\SOH\DC2\EOT\146\STX\EOT\SUB\SUB& The query's function/method/etc name\n\
+    \\EOT\EOT\v\STX\SOH\DC2\EOT\170\STX\EOT\SUB\SUB& The query's function/method/etc name\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\v\STX\SOH\ENQ\DC2\EOT\146\STX\EOT\n\
+    \\ENQ\EOT\v\STX\SOH\ENQ\DC2\EOT\170\STX\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\v\STX\SOH\SOH\DC2\EOT\146\STX\v\NAK\n\
+    \\ENQ\EOT\v\STX\SOH\SOH\DC2\EOT\170\STX\v\NAK\n\
     \\r\n\
-    \\ENQ\EOT\v\STX\SOH\ETX\DC2\EOT\146\STX\CAN\EM\n\
+    \\ENQ\EOT\v\STX\SOH\ETX\DC2\EOT\170\STX\CAN\EM\n\
     \\f\n\
-    \\EOT\EOT\v\STX\STX\DC2\EOT\147\STX\EOT:\n\
+    \\EOT\EOT\v\STX\STX\DC2\EOT\171\STX\EOT:\n\
     \\r\n\
-    \\ENQ\EOT\v\STX\STX\EOT\DC2\EOT\147\STX\EOT\f\n\
+    \\ENQ\EOT\v\STX\STX\EOT\DC2\EOT\171\STX\EOT\f\n\
     \\r\n\
-    \\ENQ\EOT\v\STX\STX\ACK\DC2\EOT\147\STX\r+\n\
+    \\ENQ\EOT\v\STX\STX\ACK\DC2\EOT\171\STX\r+\n\
     \\r\n\
-    \\ENQ\EOT\v\STX\STX\SOH\DC2\EOT\147\STX,5\n\
+    \\ENQ\EOT\v\STX\STX\SOH\DC2\EOT\171\STX,5\n\
     \\r\n\
-    \\ENQ\EOT\v\STX\STX\ETX\DC2\EOT\147\STX89\n\
+    \\ENQ\EOT\v\STX\STX\ETX\DC2\EOT\171\STX89\n\
     \-\n\
-    \\EOT\EOT\v\STX\ETX\DC2\EOT\149\STX\EOT<\SUB\US Headers attached to the query\n\
+    \\EOT\EOT\v\STX\ETX\DC2\EOT\173\STX\EOT<\SUB\US Headers attached to the query\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\v\STX\ETX\ACK\DC2\EOT\149\STX\EOT/\n\
+    \\ENQ\EOT\v\STX\ETX\ACK\DC2\EOT\173\STX\EOT/\n\
     \\r\n\
-    \\ENQ\EOT\v\STX\ETX\SOH\DC2\EOT\149\STX07\n\
+    \\ENQ\EOT\v\STX\ETX\SOH\DC2\EOT\173\STX07\n\
     \\r\n\
-    \\ENQ\EOT\v\STX\ETX\ETX\DC2\EOT\149\STX:;\n\
+    \\ENQ\EOT\v\STX\ETX\ETX\DC2\EOT\173\STX:;\n\
     \)\n\
-    \\STX\EOT\f\DC2\ACK\153\STX\NUL\156\STX\SOH\SUB\ESC Cancel a running workflow\n\
+    \\STX\EOT\f\DC2\ACK\177\STX\NUL\180\STX\SOH\SUB\ESC Cancel a running workflow\n\
     \\n\
     \\v\n\
-    \\ETX\EOT\f\SOH\DC2\EOT\153\STX\b\SYN\n\
+    \\ETX\EOT\f\SOH\DC2\EOT\177\STX\b\SYN\n\
     \C\n\
-    \\EOT\EOT\f\STX\NUL\DC2\EOT\155\STX\EOT\SYN\SUB5 User-specified reason the cancel request was issued\n\
+    \\EOT\EOT\f\STX\NUL\DC2\EOT\179\STX\EOT\SYN\SUB5 User-specified reason the cancel request was issued\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\f\STX\NUL\ENQ\DC2\EOT\155\STX\EOT\n\
+    \\ENQ\EOT\f\STX\NUL\ENQ\DC2\EOT\179\STX\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\f\STX\NUL\SOH\DC2\EOT\155\STX\v\DC1\n\
+    \\ENQ\EOT\f\STX\NUL\SOH\DC2\EOT\179\STX\v\DC1\n\
     \\r\n\
-    \\ENQ\EOT\f\STX\NUL\ETX\DC2\EOT\155\STX\DC4\NAK\n\
+    \\ENQ\EOT\f\STX\NUL\ETX\DC2\EOT\179\STX\DC4\NAK\n\
     \+\n\
-    \\STX\EOT\r\DC2\ACK\159\STX\NUL\166\STX\SOH\SUB\GS Send a signal to a workflow\n\
+    \\STX\EOT\r\DC2\ACK\183\STX\NUL\192\STX\SOH\SUB\GS Send a signal to a workflow\n\
     \\n\
     \\v\n\
-    \\ETX\EOT\r\SOH\DC2\EOT\159\STX\b\SYN\n\
+    \\ETX\EOT\r\SOH\DC2\EOT\183\STX\b\SYN\n\
     \\f\n\
-    \\EOT\EOT\r\STX\NUL\DC2\EOT\160\STX\EOT\ESC\n\
+    \\EOT\EOT\r\STX\NUL\DC2\EOT\184\STX\EOT\ESC\n\
     \\r\n\
-    \\ENQ\EOT\r\STX\NUL\ENQ\DC2\EOT\160\STX\EOT\n\
+    \\ENQ\EOT\r\STX\NUL\ENQ\DC2\EOT\184\STX\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\r\STX\NUL\SOH\DC2\EOT\160\STX\v\SYN\n\
+    \\ENQ\EOT\r\STX\NUL\SOH\DC2\EOT\184\STX\v\SYN\n\
     \\r\n\
-    \\ENQ\EOT\r\STX\NUL\ETX\DC2\EOT\160\STX\EM\SUB\n\
+    \\ENQ\EOT\r\STX\NUL\ETX\DC2\EOT\184\STX\EM\SUB\n\
     \\f\n\
-    \\EOT\EOT\r\STX\SOH\DC2\EOT\161\STX\EOT6\n\
+    \\EOT\EOT\r\STX\SOH\DC2\EOT\185\STX\EOT6\n\
     \\r\n\
-    \\ENQ\EOT\r\STX\SOH\EOT\DC2\EOT\161\STX\EOT\f\n\
+    \\ENQ\EOT\r\STX\SOH\EOT\DC2\EOT\185\STX\EOT\f\n\
     \\r\n\
-    \\ENQ\EOT\r\STX\SOH\ACK\DC2\EOT\161\STX\r+\n\
+    \\ENQ\EOT\r\STX\SOH\ACK\DC2\EOT\185\STX\r+\n\
     \\r\n\
-    \\ENQ\EOT\r\STX\SOH\SOH\DC2\EOT\161\STX,1\n\
+    \\ENQ\EOT\r\STX\SOH\SOH\DC2\EOT\185\STX,1\n\
     \\r\n\
-    \\ENQ\EOT\r\STX\SOH\ETX\DC2\EOT\161\STX45\n\
+    \\ENQ\EOT\r\STX\SOH\ETX\DC2\EOT\185\STX45\n\
     \4\n\
-    \\EOT\EOT\r\STX\STX\DC2\EOT\163\STX\EOT\CAN\SUB& Identity of the sender of the signal\n\
+    \\EOT\EOT\r\STX\STX\DC2\EOT\187\STX\EOT\CAN\SUB& Identity of the sender of the signal\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\r\STX\STX\ENQ\DC2\EOT\163\STX\EOT\n\
+    \\ENQ\EOT\r\STX\STX\ENQ\DC2\EOT\187\STX\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\r\STX\STX\SOH\DC2\EOT\163\STX\v\DC3\n\
+    \\ENQ\EOT\r\STX\STX\SOH\DC2\EOT\187\STX\v\DC3\n\
     \\r\n\
-    \\ENQ\EOT\r\STX\STX\ETX\DC2\EOT\163\STX\SYN\ETB\n\
+    \\ENQ\EOT\r\STX\STX\ETX\DC2\EOT\187\STX\SYN\ETB\n\
     \.\n\
-    \\EOT\EOT\r\STX\ETX\DC2\EOT\165\STX\EOT<\SUB  Headers attached to the signal\n\
+    \\EOT\EOT\r\STX\ETX\DC2\EOT\189\STX\EOT<\SUB  Headers attached to the signal\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\r\STX\ETX\ACK\DC2\EOT\165\STX\EOT/\n\
+    \\ENQ\EOT\r\STX\ETX\ACK\DC2\EOT\189\STX\EOT/\n\
     \\r\n\
-    \\ENQ\EOT\r\STX\ETX\SOH\DC2\EOT\165\STX07\n\
+    \\ENQ\EOT\r\STX\ETX\SOH\DC2\EOT\189\STX07\n\
     \\r\n\
-    \\ENQ\EOT\r\STX\ETX\ETX\DC2\EOT\165\STX:;\n\
+    \\ENQ\EOT\r\STX\ETX\ETX\DC2\EOT\189\STX:;\n\
+    \c\n\
+    \\EOT\EOT\r\STX\EOT\DC2\EOT\191\STX\EOT#\SUBU Event ID of the `WORKFLOW_EXECUTION_SIGNALED` history event that produced this job.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\r\STX\EOT\ENQ\DC2\EOT\191\STX\EOT\t\n\
+    \\r\n\
+    \\ENQ\EOT\r\STX\EOT\SOH\DC2\EOT\191\STX\n\
+    \\RS\n\
+    \\r\n\
+    \\ENQ\EOT\r\STX\EOT\ETX\DC2\EOT\191\STX!\"\n\
     \\176\SOH\n\
-    \\STX\EOT\SO\DC2\ACK\170\STX\NUL\172\STX\SOH\SUB\161\SOH Inform lang what the result of a call to `patched` or similar API should be -- this is always\n\
+    \\STX\EOT\SO\DC2\ACK\196\STX\NUL\198\STX\SOH\SUB\161\SOH Inform lang what the result of a call to `patched` or similar API should be -- this is always\n\
     \ sent pre-emptively, so any time it is sent the change is present\n\
     \\n\
     \\v\n\
-    \\ETX\EOT\SO\SOH\DC2\EOT\170\STX\b\SYN\n\
+    \\ETX\EOT\SO\SOH\DC2\EOT\196\STX\b\SYN\n\
     \\f\n\
-    \\EOT\EOT\SO\STX\NUL\DC2\EOT\171\STX\EOT\CAN\n\
+    \\EOT\EOT\SO\STX\NUL\DC2\EOT\197\STX\EOT\CAN\n\
     \\r\n\
-    \\ENQ\EOT\SO\STX\NUL\ENQ\DC2\EOT\171\STX\EOT\n\
+    \\ENQ\EOT\SO\STX\NUL\ENQ\DC2\EOT\197\STX\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\SO\STX\NUL\SOH\DC2\EOT\171\STX\v\DC3\n\
+    \\ENQ\EOT\SO\STX\NUL\SOH\DC2\EOT\197\STX\v\DC3\n\
     \\r\n\
-    \\ENQ\EOT\SO\STX\NUL\ETX\DC2\EOT\171\STX\SYN\ETB\n\
+    \\ENQ\EOT\SO\STX\NUL\ETX\DC2\EOT\197\STX\SYN\ETB\n\
     \\f\n\
-    \\STX\EOT\SI\DC2\ACK\174\STX\NUL\181\STX\SOH\n\
+    \\STX\EOT\SI\DC2\ACK\200\STX\NUL\210\STX\SOH\n\
     \\v\n\
-    \\ETX\EOT\SI\SOH\DC2\EOT\174\STX\b%\n\
+    \\ETX\EOT\SI\SOH\DC2\EOT\200\STX\b%\n\
     \q\n\
-    \\EOT\EOT\SI\STX\NUL\DC2\EOT\177\STX\EOT\DC3\SUBc Sequence number as provided by lang in the corresponding SignalExternalWorkflowExecution\n\
+    \\EOT\EOT\SI\STX\NUL\DC2\EOT\203\STX\EOT\DC3\SUBc Sequence number as provided by lang in the corresponding SignalExternalWorkflowExecution\n\
     \ command\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\SI\STX\NUL\ENQ\DC2\EOT\177\STX\EOT\n\
+    \\ENQ\EOT\SI\STX\NUL\ENQ\DC2\EOT\203\STX\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\SI\STX\NUL\SOH\DC2\EOT\177\STX\v\SO\n\
+    \\ENQ\EOT\SI\STX\NUL\SOH\DC2\EOT\203\STX\v\SO\n\
     \\r\n\
-    \\ENQ\EOT\SI\STX\NUL\ETX\DC2\EOT\177\STX\DC1\DC2\n\
+    \\ENQ\EOT\SI\STX\NUL\ETX\DC2\EOT\203\STX\DC1\DC2\n\
     \v\n\
-    \\EOT\EOT\SI\STX\SOH\DC2\EOT\180\STX\EOT0\SUBh If populated, this signal either failed to be sent or was cancelled depending on failure\n\
+    \\EOT\EOT\SI\STX\SOH\DC2\EOT\206\STX\EOT0\SUBh If populated, this signal either failed to be sent or was cancelled depending on failure\n\
     \ type / info.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\SI\STX\SOH\ACK\DC2\EOT\180\STX\EOT#\n\
+    \\ENQ\EOT\SI\STX\SOH\ACK\DC2\EOT\206\STX\EOT#\n\
     \\r\n\
-    \\ENQ\EOT\SI\STX\SOH\SOH\DC2\EOT\180\STX$+\n\
+    \\ENQ\EOT\SI\STX\SOH\SOH\DC2\EOT\206\STX$+\n\
     \\r\n\
-    \\ENQ\EOT\SI\STX\SOH\ETX\DC2\EOT\180\STX./\n\
+    \\ENQ\EOT\SI\STX\SOH\ETX\DC2\EOT\206\STX./\n\
+    \\140\SOH\n\
+    \\EOT\EOT\SI\STX\STX\DC2\EOT\209\STX\EOTO\SUB~ The server-reported cause when the signal failed. Unspecified when the signal succeeded or\n\
+    \ was cancelled before being sent.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\SI\STX\STX\ACK\DC2\EOT\209\STX\EOTD\n\
+    \\r\n\
+    \\ENQ\EOT\SI\STX\STX\SOH\DC2\EOT\209\STXEJ\n\
+    \\r\n\
+    \\ENQ\EOT\SI\STX\STX\ETX\DC2\EOT\209\STXMN\n\
     \\f\n\
-    \\STX\EOT\DLE\DC2\ACK\183\STX\NUL\190\STX\SOH\n\
+    \\STX\EOT\DLE\DC2\ACK\212\STX\NUL\220\STX\SOH\n\
     \\v\n\
-    \\ETX\EOT\DLE\SOH\DC2\EOT\183\STX\b,\n\
+    \\ETX\EOT\DLE\SOH\DC2\EOT\212\STX\b,\n\
     \x\n\
-    \\EOT\EOT\DLE\STX\NUL\DC2\EOT\186\STX\EOT\DC3\SUBj Sequence number as provided by lang in the corresponding\n\
+    \\EOT\EOT\DLE\STX\NUL\DC2\EOT\215\STX\EOT\DC3\SUBj Sequence number as provided by lang in the corresponding\n\
     \ RequestCancelExternalWorkflowExecution command\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DLE\STX\NUL\ENQ\DC2\EOT\186\STX\EOT\n\
+    \\ENQ\EOT\DLE\STX\NUL\ENQ\DC2\EOT\215\STX\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DLE\STX\NUL\SOH\DC2\EOT\186\STX\v\SO\n\
+    \\ENQ\EOT\DLE\STX\NUL\SOH\DC2\EOT\215\STX\v\SO\n\
     \\r\n\
-    \\ENQ\EOT\DLE\STX\NUL\ETX\DC2\EOT\186\STX\DC1\DC2\n\
-    \v\n\
-    \\EOT\EOT\DLE\STX\SOH\DC2\EOT\189\STX\EOT0\SUBh If populated, this signal either failed to be sent or was cancelled depending on failure\n\
-    \ type / info.\n\
+    \\ENQ\EOT\DLE\STX\NUL\ETX\DC2\EOT\215\STX\DC1\DC2\n\
+    \>\n\
+    \\EOT\EOT\DLE\STX\SOH\DC2\EOT\217\STX\EOT0\SUB0 If populated, the cancellation request failed.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DLE\STX\SOH\ACK\DC2\EOT\189\STX\EOT#\n\
+    \\ENQ\EOT\DLE\STX\SOH\ACK\DC2\EOT\217\STX\EOT#\n\
     \\r\n\
-    \\ENQ\EOT\DLE\STX\SOH\SOH\DC2\EOT\189\STX$+\n\
+    \\ENQ\EOT\DLE\STX\SOH\SOH\DC2\EOT\217\STX$+\n\
     \\r\n\
-    \\ENQ\EOT\DLE\STX\SOH\ETX\DC2\EOT\189\STX./\n\
+    \\ENQ\EOT\DLE\STX\SOH\ETX\DC2\EOT\217\STX./\n\
+    \O\n\
+    \\EOT\EOT\DLE\STX\STX\DC2\EOT\219\STX\EOTO\SUBA The server-reported cause when the cancellation request failed.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\DLE\STX\STX\ACK\DC2\EOT\219\STX\EOTD\n\
+    \\r\n\
+    \\ENQ\EOT\DLE\STX\STX\SOH\DC2\EOT\219\STXEJ\n\
+    \\r\n\
+    \\ENQ\EOT\DLE\STX\STX\ETX\DC2\EOT\219\STXMN\n\
     \\160\STX\n\
-    \\STX\EOT\DC1\DC2\ACK\195\STX\NUL\213\STX\SOH\SUB\145\STX Lang is requested to invoke an update handler on the workflow. Lang should invoke the update\n\
+    \\STX\EOT\DC1\DC2\ACK\225\STX\NUL\247\STX\SOH\SUB\145\STX Lang is requested to invoke an update handler on the workflow. Lang should invoke the update\n\
     \ validator first (if requested). If it accepts the update, immediately invoke the update handler.\n\
     \ Lang must reply to the activation containing this job with an `UpdateResponse`.\n\
     \\n\
     \\v\n\
-    \\ETX\EOT\DC1\SOH\DC2\EOT\195\STX\b\DLE\n\
+    \\ETX\EOT\DC1\SOH\DC2\EOT\225\STX\b\DLE\n\
     \<\n\
-    \\EOT\EOT\DC1\STX\NUL\DC2\EOT\197\STX\EOT\DC2\SUB. A workflow-unique identifier for this update\n\
+    \\EOT\EOT\DC1\STX\NUL\DC2\EOT\227\STX\EOT\DC2\SUB. A workflow-unique identifier for this update\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\NUL\ENQ\DC2\EOT\197\STX\EOT\n\
+    \\ENQ\EOT\DC1\STX\NUL\ENQ\DC2\EOT\227\STX\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\NUL\SOH\DC2\EOT\197\STX\v\r\n\
+    \\ENQ\EOT\DC1\STX\NUL\SOH\DC2\EOT\227\STX\v\r\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\NUL\ETX\DC2\EOT\197\STX\DLE\DC1\n\
+    \\ENQ\EOT\DC1\STX\NUL\ETX\DC2\EOT\227\STX\DLE\DC1\n\
     \u\n\
-    \\EOT\EOT\DC1\STX\SOH\DC2\EOT\200\STX\EOT$\SUBg The protocol message instance ID - this is used to uniquely track the ID server side and\n\
+    \\EOT\EOT\DC1\STX\SOH\DC2\EOT\230\STX\EOT$\SUBg The protocol message instance ID - this is used to uniquely track the ID server side and\n\
     \ internally.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\SOH\ENQ\DC2\EOT\200\STX\EOT\n\
+    \\ENQ\EOT\DC1\STX\SOH\ENQ\DC2\EOT\230\STX\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\SOH\SOH\DC2\EOT\200\STX\v\US\n\
+    \\ENQ\EOT\DC1\STX\SOH\SOH\DC2\EOT\230\STX\v\US\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\SOH\ETX\DC2\EOT\200\STX\"#\n\
+    \\ENQ\EOT\DC1\STX\SOH\ETX\DC2\EOT\230\STX\"#\n\
     \.\n\
-    \\EOT\EOT\DC1\STX\STX\DC2\EOT\202\STX\EOT\DC4\SUB  The name of the update handler\n\
+    \\EOT\EOT\DC1\STX\STX\DC2\EOT\232\STX\EOT\DC4\SUB  The name of the update handler\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\STX\ENQ\DC2\EOT\202\STX\EOT\n\
+    \\ENQ\EOT\DC1\STX\STX\ENQ\DC2\EOT\232\STX\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\STX\SOH\DC2\EOT\202\STX\v\SI\n\
+    \\ENQ\EOT\DC1\STX\STX\SOH\DC2\EOT\232\STX\v\SI\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\STX\ETX\DC2\EOT\202\STX\DC2\DC3\n\
+    \\ENQ\EOT\DC1\STX\STX\ETX\DC2\EOT\232\STX\DC2\DC3\n\
     \'\n\
-    \\EOT\EOT\DC1\STX\ETX\DC2\EOT\204\STX\EOT6\SUB\EM The input to the update\n\
+    \\EOT\EOT\DC1\STX\ETX\DC2\EOT\234\STX\EOT6\SUB\EM The input to the update\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\ETX\EOT\DC2\EOT\204\STX\EOT\f\n\
+    \\ENQ\EOT\DC1\STX\ETX\EOT\DC2\EOT\234\STX\EOT\f\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\ETX\ACK\DC2\EOT\204\STX\r+\n\
+    \\ENQ\EOT\DC1\STX\ETX\ACK\DC2\EOT\234\STX\r+\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\ETX\SOH\DC2\EOT\204\STX,1\n\
+    \\ENQ\EOT\DC1\STX\ETX\SOH\DC2\EOT\234\STX,1\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\ETX\ETX\DC2\EOT\204\STX45\n\
+    \\ENQ\EOT\DC1\STX\ETX\ETX\DC2\EOT\234\STX45\n\
     \.\n\
-    \\EOT\EOT\DC1\STX\EOT\DC2\EOT\206\STX\EOT<\SUB  Headers attached to the update\n\
+    \\EOT\EOT\DC1\STX\EOT\DC2\EOT\236\STX\EOT<\SUB  Headers attached to the update\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\EOT\ACK\DC2\EOT\206\STX\EOT/\n\
+    \\ENQ\EOT\DC1\STX\EOT\ACK\DC2\EOT\236\STX\EOT/\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\EOT\SOH\DC2\EOT\206\STX07\n\
+    \\ENQ\EOT\DC1\STX\EOT\SOH\DC2\EOT\236\STX07\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\EOT\ETX\DC2\EOT\206\STX:;\n\
+    \\ENQ\EOT\DC1\STX\EOT\ETX\DC2\EOT\236\STX:;\n\
     \\165\SOH\n\
-    \\EOT\EOT\DC1\STX\ENQ\DC2\EOT\209\STX\EOT)\SUB\150\SOH Remaining metadata associated with the update. The `update_id` field is stripped from here\n\
+    \\EOT\EOT\DC1\STX\ENQ\DC2\EOT\239\STX\EOT)\SUB\150\SOH Remaining metadata associated with the update. The `update_id` field is stripped from here\n\
     \ and moved to `id`, since it is guaranteed to be present.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\ENQ\ACK\DC2\EOT\209\STX\EOT\US\n\
+    \\ENQ\EOT\DC1\STX\ENQ\ACK\DC2\EOT\239\STX\EOT\US\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\ENQ\SOH\DC2\EOT\209\STX $\n\
+    \\ENQ\EOT\DC1\STX\ENQ\SOH\DC2\EOT\239\STX $\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\ENQ\ETX\DC2\EOT\209\STX'(\n\
+    \\ENQ\EOT\DC1\STX\ENQ\ETX\DC2\EOT\239\STX'(\n\
     \\179\SOH\n\
-    \\EOT\EOT\DC1\STX\ACK\DC2\EOT\212\STX\EOT\ESC\SUB\164\SOH If set true, lang must run the update's validator before running the handler. This will be\n\
+    \\EOT\EOT\DC1\STX\ACK\DC2\EOT\242\STX\EOT\ESC\SUB\164\SOH If set true, lang must run the update's validator before running the handler. This will be\n\
     \ set false during replay, since validation is not re-run during replay.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\ACK\ENQ\DC2\EOT\212\STX\EOT\b\n\
+    \\ENQ\EOT\DC1\STX\ACK\ENQ\DC2\EOT\242\STX\EOT\b\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\ACK\SOH\DC2\EOT\212\STX\t\SYN\n\
+    \\ENQ\EOT\DC1\STX\ACK\SOH\DC2\EOT\242\STX\t\SYN\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\ACK\ETX\DC2\EOT\212\STX\EM\SUB\n\
+    \\ENQ\EOT\DC1\STX\ACK\ETX\DC2\EOT\242\STX\EM\SUB\n\
+    \\207\SOH\n\
+    \\EOT\EOT\DC1\STX\a\DC2\EOT\246\STX\EOTd\SUB\192\SOH Serialization context of the Nexus operation handler that sent this update, if any. Lang\n\
+    \ should use it to serialize the update's result and failure, which are returned to the Nexus\n\
+    \ caller.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\DC1\STX\a\ACK\DC2\EOT\246\STX\EOT8\n\
+    \\r\n\
+    \\ENQ\EOT\DC1\STX\a\SOH\DC2\EOT\246\STX9_\n\
+    \\r\n\
+    \\ENQ\EOT\DC1\STX\a\ETX\DC2\EOT\246\STXbc\n\
     \\f\n\
-    \\STX\EOT\DC2\DC2\ACK\215\STX\NUL\231\STX\SOH\n\
+    \\STX\EOT\DC2\DC2\ACK\249\STX\NUL\137\ETX\SOH\n\
     \\v\n\
-    \\ETX\EOT\DC2\SOH\DC2\EOT\215\STX\b\"\n\
+    \\ETX\EOT\DC2\SOH\DC2\EOT\249\STX\b\"\n\
     \g\n\
-    \\EOT\EOT\DC2\STX\NUL\DC2\EOT\217\STX\EOT\DC3\SUBY Sequence number as provided by lang in the corresponding ScheduleNexusOperation command\n\
+    \\EOT\EOT\DC2\STX\NUL\DC2\EOT\251\STX\EOT\DC3\SUBY Sequence number as provided by lang in the corresponding ScheduleNexusOperation command\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DC2\STX\NUL\ENQ\DC2\EOT\217\STX\EOT\n\
+    \\ENQ\EOT\DC2\STX\NUL\ENQ\DC2\EOT\251\STX\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DC2\STX\NUL\SOH\DC2\EOT\217\STX\v\SO\n\
+    \\ENQ\EOT\DC2\STX\NUL\SOH\DC2\EOT\251\STX\v\SO\n\
     \\r\n\
-    \\ENQ\EOT\DC2\STX\NUL\ETX\DC2\EOT\217\STX\DC1\DC2\n\
+    \\ENQ\EOT\DC2\STX\NUL\ETX\DC2\EOT\251\STX\DC1\DC2\n\
     \\SO\n\
-    \\EOT\EOT\DC2\b\NUL\DC2\ACK\218\STX\EOT\230\STX\ENQ\n\
+    \\EOT\EOT\DC2\b\NUL\DC2\ACK\252\STX\EOT\136\ETX\ENQ\n\
     \\r\n\
-    \\ENQ\EOT\DC2\b\NUL\SOH\DC2\EOT\218\STX\n\
+    \\ENQ\EOT\DC2\b\NUL\SOH\DC2\EOT\252\STX\n\
     \\DLE\n\
     \\211\SOH\n\
-    \\EOT\EOT\DC2\STX\SOH\DC2\EOT\222\STX\b#\SUB\196\SOH The operation started asynchronously. Contains a token that can be used to perform\n\
+    \\EOT\EOT\DC2\STX\SOH\DC2\EOT\128\ETX\b#\SUB\196\SOH The operation started asynchronously. Contains a token that can be used to perform\n\
     \ operations on the started operation by, ex, clients. A `ResolveNexusOperation` job will\n\
     \ follow at some point.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DC2\STX\SOH\ENQ\DC2\EOT\222\STX\b\SO\n\
+    \\ENQ\EOT\DC2\STX\SOH\ENQ\DC2\EOT\128\ETX\b\SO\n\
     \\r\n\
-    \\ENQ\EOT\DC2\STX\SOH\SOH\DC2\EOT\222\STX\SI\RS\n\
+    \\ENQ\EOT\DC2\STX\SOH\SOH\DC2\EOT\128\ETX\SI\RS\n\
     \\r\n\
-    \\ENQ\EOT\DC2\STX\SOH\ETX\DC2\EOT\222\STX!\"\n\
+    \\ENQ\EOT\DC2\STX\SOH\ETX\DC2\EOT\128\ETX!\"\n\
     \\156\SOH\n\
-    \\EOT\EOT\DC2\STX\STX\DC2\EOT\225\STX\b\RS\SUB\141\SOH If true the operation \"started\" but only because it's also already resolved. A\n\
+    \\EOT\EOT\DC2\STX\STX\DC2\EOT\131\ETX\b\RS\SUB\141\SOH If true the operation \"started\" but only because it's also already resolved. A\n\
     \ `ResolveNexusOperation` job will be in the same activation.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DC2\STX\STX\ENQ\DC2\EOT\225\STX\b\f\n\
+    \\ENQ\EOT\DC2\STX\STX\ENQ\DC2\EOT\131\ETX\b\f\n\
     \\r\n\
-    \\ENQ\EOT\DC2\STX\STX\SOH\DC2\EOT\225\STX\r\EM\n\
+    \\ENQ\EOT\DC2\STX\STX\SOH\DC2\EOT\131\ETX\r\EM\n\
     \\r\n\
-    \\ENQ\EOT\DC2\STX\STX\ETX\DC2\EOT\225\STX\FS\GS\n\
+    \\ENQ\EOT\DC2\STX\STX\ETX\DC2\EOT\131\ETX\FS\GS\n\
     \\237\SOH\n\
-    \\EOT\EOT\DC2\STX\ETX\DC2\EOT\229\STX\b3\SUB\222\SOH The operation either failed to start, was cancelled before it started, timed out, or\n\
+    \\EOT\EOT\DC2\STX\ETX\DC2\EOT\135\ETX\b3\SUB\222\SOH The operation either failed to start, was cancelled before it started, timed out, or\n\
     \ failed synchronously. Details are included inside the message. In this case, the\n\
     \ subsequent ResolveNexusOperation will never be sent.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DC2\STX\ETX\ACK\DC2\EOT\229\STX\b'\n\
+    \\ENQ\EOT\DC2\STX\ETX\ACK\DC2\EOT\135\ETX\b'\n\
     \\r\n\
-    \\ENQ\EOT\DC2\STX\ETX\SOH\DC2\EOT\229\STX(.\n\
+    \\ENQ\EOT\DC2\STX\ETX\SOH\DC2\EOT\135\ETX(.\n\
     \\r\n\
-    \\ENQ\EOT\DC2\STX\ETX\ETX\DC2\EOT\229\STX12\n\
+    \\ENQ\EOT\DC2\STX\ETX\ETX\DC2\EOT\135\ETX12\n\
     \\f\n\
-    \\STX\EOT\DC3\DC2\ACK\233\STX\NUL\237\STX\SOH\n\
+    \\STX\EOT\DC3\DC2\ACK\139\ETX\NUL\143\ETX\SOH\n\
     \\v\n\
-    \\ETX\EOT\DC3\SOH\DC2\EOT\233\STX\b\GS\n\
+    \\ETX\EOT\DC3\SOH\DC2\EOT\139\ETX\b\GS\n\
     \g\n\
-    \\EOT\EOT\DC3\STX\NUL\DC2\EOT\235\STX\EOT\DC3\SUBY Sequence number as provided by lang in the corresponding ScheduleNexusOperation command\n\
+    \\EOT\EOT\DC3\STX\NUL\DC2\EOT\141\ETX\EOT\DC3\SUBY Sequence number as provided by lang in the corresponding ScheduleNexusOperation command\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DC3\STX\NUL\ENQ\DC2\EOT\235\STX\EOT\n\
+    \\ENQ\EOT\DC3\STX\NUL\ENQ\DC2\EOT\141\ETX\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DC3\STX\NUL\SOH\DC2\EOT\235\STX\v\SO\n\
+    \\ENQ\EOT\DC3\STX\NUL\SOH\DC2\EOT\141\ETX\v\SO\n\
     \\r\n\
-    \\ENQ\EOT\DC3\STX\NUL\ETX\DC2\EOT\235\STX\DC1\DC2\n\
+    \\ENQ\EOT\DC3\STX\NUL\ETX\DC2\EOT\141\ETX\DC1\DC2\n\
     \\f\n\
-    \\EOT\EOT\DC3\STX\SOH\DC2\EOT\236\STX\EOT*\n\
+    \\EOT\EOT\DC3\STX\SOH\DC2\EOT\142\ETX\EOT*\n\
     \\r\n\
-    \\ENQ\EOT\DC3\STX\SOH\ACK\DC2\EOT\236\STX\EOT\RS\n\
+    \\ENQ\EOT\DC3\STX\SOH\ACK\DC2\EOT\142\ETX\EOT\RS\n\
     \\r\n\
-    \\ENQ\EOT\DC3\STX\SOH\SOH\DC2\EOT\236\STX\US%\n\
+    \\ENQ\EOT\DC3\STX\SOH\SOH\DC2\EOT\142\ETX\US%\n\
     \\r\n\
-    \\ENQ\EOT\DC3\STX\SOH\ETX\DC2\EOT\236\STX()\n\
+    \\ENQ\EOT\DC3\STX\SOH\ETX\DC2\EOT\142\ETX()\n\
     \\f\n\
-    \\STX\EOT\DC4\DC2\ACK\239\STX\NUL\143\ETX\SOH\n\
+    \\STX\EOT\DC4\DC2\ACK\145\ETX\NUL\177\ETX\SOH\n\
     \\v\n\
-    \\ETX\EOT\DC4\SOH\DC2\EOT\239\STX\b\ETB\n\
+    \\ETX\EOT\DC4\SOH\DC2\EOT\145\ETX\b\ETB\n\
     \\f\n\
-    \\EOT\EOT\DC4\STX\NUL\DC2\EOT\240\STX\EOT\ETB\n\
+    \\EOT\EOT\DC4\STX\NUL\DC2\EOT\146\ETX\EOT\ETB\n\
     \\r\n\
-    \\ENQ\EOT\DC4\STX\NUL\ENQ\DC2\EOT\240\STX\EOT\n\
+    \\ENQ\EOT\DC4\STX\NUL\ENQ\DC2\EOT\146\ETX\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DC4\STX\NUL\SOH\DC2\EOT\240\STX\v\DC2\n\
+    \\ENQ\EOT\DC4\STX\NUL\SOH\DC2\EOT\146\ETX\v\DC2\n\
     \\r\n\
-    \\ENQ\EOT\DC4\STX\NUL\ETX\DC2\EOT\240\STX\NAK\SYN\n\
+    \\ENQ\EOT\DC4\STX\NUL\ETX\DC2\EOT\146\ETX\NAK\SYN\n\
     \\SO\n\
-    \\EOT\EOT\DC4\EOT\NUL\DC2\ACK\242\STX\EOT\141\ETX\ENQ\n\
+    \\EOT\EOT\DC4\EOT\NUL\DC2\ACK\148\ETX\EOT\175\ETX\ENQ\n\
     \\r\n\
-    \\ENQ\EOT\DC4\EOT\NUL\SOH\DC2\EOT\242\STX\t\ETB\n\
+    \\ENQ\EOT\DC4\EOT\NUL\SOH\DC2\EOT\148\ETX\t\ETB\n\
     \\SO\n\
-    \\ACK\EOT\DC4\EOT\NUL\STX\NUL\DC2\EOT\243\STX\b\CAN\n\
+    \\ACK\EOT\DC4\EOT\NUL\STX\NUL\DC2\EOT\149\ETX\b\CAN\n\
     \\SI\n\
-    \\a\EOT\DC4\EOT\NUL\STX\NUL\SOH\DC2\EOT\243\STX\b\DC3\n\
+    \\a\EOT\DC4\EOT\NUL\STX\NUL\SOH\DC2\EOT\149\ETX\b\DC3\n\
     \\SI\n\
-    \\a\EOT\DC4\EOT\NUL\STX\NUL\STX\DC2\EOT\243\STX\SYN\ETB\n\
+    \\a\EOT\DC4\EOT\NUL\STX\NUL\STX\DC2\EOT\149\ETX\SYN\ETB\n\
     \(\n\
-    \\ACK\EOT\DC4\EOT\NUL\STX\SOH\DC2\EOT\245\STX\b\ETB\SUB\CAN Workflow cache is full\n\
+    \\ACK\EOT\DC4\EOT\NUL\STX\SOH\DC2\EOT\151\ETX\b\ETB\SUB\CAN Workflow cache is full\n\
     \\n\
     \\SI\n\
-    \\a\EOT\DC4\EOT\NUL\STX\SOH\SOH\DC2\EOT\245\STX\b\DC2\n\
+    \\a\EOT\DC4\EOT\NUL\STX\SOH\SOH\DC2\EOT\151\ETX\b\DC2\n\
     \\SI\n\
-    \\a\EOT\DC4\EOT\NUL\STX\SOH\STX\DC2\EOT\245\STX\NAK\SYN\n\
+    \\a\EOT\DC4\EOT\NUL\STX\SOH\STX\DC2\EOT\151\ETX\NAK\SYN\n\
     \\176\SOH\n\
-    \\ACK\EOT\DC4\EOT\NUL\STX\STX\DC2\EOT\248\STX\b\ETB\SUB\159\SOH Workflow received a partial task but was not in the cache. Typically it won't be in the\n\
+    \\ACK\EOT\DC4\EOT\NUL\STX\STX\DC2\EOT\154\ETX\b\ETB\SUB\159\SOH Workflow received a partial task but was not in the cache. Typically it won't be in the\n\
     \ lang cache either at this point, but we send an eviction to be sure.\n\
     \\n\
     \\SI\n\
-    \\a\EOT\DC4\EOT\NUL\STX\STX\SOH\DC2\EOT\248\STX\b\DC2\n\
+    \\a\EOT\DC4\EOT\NUL\STX\STX\SOH\DC2\EOT\154\ETX\b\DC2\n\
     \\SI\n\
-    \\a\EOT\DC4\EOT\NUL\STX\STX\STX\DC2\EOT\248\STX\NAK\SYN\n\
+    \\a\EOT\DC4\EOT\NUL\STX\STX\STX\DC2\EOT\154\ETX\NAK\SYN\n\
     \J\n\
-    \\ACK\EOT\DC4\EOT\NUL\STX\ETX\DC2\EOT\250\STX\b\ESC\SUB: The workflow produced results inconsistent with history.\n\
+    \\ACK\EOT\DC4\EOT\NUL\STX\ETX\DC2\EOT\156\ETX\b\ESC\SUB: The workflow produced results inconsistent with history.\n\
     \\n\
     \\SI\n\
-    \\a\EOT\DC4\EOT\NUL\STX\ETX\SOH\DC2\EOT\250\STX\b\SYN\n\
+    \\a\EOT\DC4\EOT\NUL\STX\ETX\SOH\DC2\EOT\156\ETX\b\SYN\n\
     \\SI\n\
-    \\a\EOT\DC4\EOT\NUL\STX\ETX\STX\DC2\EOT\250\STX\EM\SUB\n\
+    \\a\EOT\DC4\EOT\NUL\STX\ETX\STX\DC2\EOT\156\ETX\EM\SUB\n\
     \Q\n\
-    \\ACK\EOT\DC4\EOT\NUL\STX\EOT\DC2\EOT\252\STX\b\SYN\SUBA The lang side completed the workflow activation with a failure.\n\
+    \\ACK\EOT\DC4\EOT\NUL\STX\EOT\DC2\EOT\158\ETX\b\SYN\SUBA The lang side completed the workflow activation with a failure.\n\
     \\n\
     \\SI\n\
-    \\a\EOT\DC4\EOT\NUL\STX\EOT\SOH\DC2\EOT\252\STX\b\DC1\n\
+    \\a\EOT\DC4\EOT\NUL\STX\EOT\SOH\DC2\EOT\158\ETX\b\DC1\n\
     \\SI\n\
-    \\a\EOT\DC4\EOT\NUL\STX\EOT\STX\DC2\EOT\252\STX\DC4\NAK\n\
+    \\a\EOT\DC4\EOT\NUL\STX\EOT\STX\DC2\EOT\158\ETX\DC4\NAK\n\
     \N\n\
-    \\ACK\EOT\DC4\EOT\NUL\STX\ENQ\DC2\EOT\254\STX\b\ESC\SUB> The lang side explicitly requested this workflow be evicted.\n\
+    \\ACK\EOT\DC4\EOT\NUL\STX\ENQ\DC2\EOT\160\ETX\b\ESC\SUB> The lang side explicitly requested this workflow be evicted.\n\
     \\n\
     \\SI\n\
-    \\a\EOT\DC4\EOT\NUL\STX\ENQ\SOH\DC2\EOT\254\STX\b\SYN\n\
+    \\a\EOT\DC4\EOT\NUL\STX\ENQ\SOH\DC2\EOT\160\ETX\b\SYN\n\
     \\SI\n\
-    \\a\EOT\DC4\EOT\NUL\STX\ENQ\STX\DC2\EOT\254\STX\EM\SUB\n\
+    \\a\EOT\DC4\EOT\NUL\STX\ENQ\STX\DC2\EOT\160\ETX\EM\SUB\n\
     \\173\SOH\n\
-    \\ACK\EOT\DC4\EOT\NUL\STX\ACK\DC2\EOT\129\ETX\b\ESC\SUB\156\SOH The workflow task we tried to respond to didn't exist. The workflow might have already\n\
+    \\ACK\EOT\DC4\EOT\NUL\STX\ACK\DC2\EOT\163\ETX\b\ESC\SUB\156\SOH The workflow task we tried to respond to didn't exist. The workflow might have already\n\
     \ finished, or the WFT timed out but we didn't learn about that yet.\n\
     \\n\
     \\SI\n\
-    \\a\EOT\DC4\EOT\NUL\STX\ACK\SOH\DC2\EOT\129\ETX\b\SYN\n\
+    \\a\EOT\DC4\EOT\NUL\STX\ACK\SOH\DC2\EOT\163\ETX\b\SYN\n\
     \\SI\n\
-    \\a\EOT\DC4\EOT\NUL\STX\ACK\STX\DC2\EOT\129\ETX\EM\SUB\n\
+    \\a\EOT\DC4\EOT\NUL\STX\ACK\STX\DC2\EOT\163\ETX\EM\SUB\n\
     \\163\SOH\n\
-    \\ACK\EOT\DC4\EOT\NUL\STX\a\DC2\EOT\132\ETX\b\RS\SUB\146\SOH There was new work that must be handled while we attempted to complete the WFT. Ex:\n\
+    \\ACK\EOT\DC4\EOT\NUL\STX\a\DC2\EOT\166\ETX\b\RS\SUB\146\SOH There was new work that must be handled while we attempted to complete the WFT. Ex:\n\
     \ a new signal came in while trying to complete the workflow.\n\
     \\n\
     \\SI\n\
-    \\a\EOT\DC4\EOT\NUL\STX\a\SOH\DC2\EOT\132\ETX\b\EM\n\
+    \\a\EOT\DC4\EOT\NUL\STX\a\SOH\DC2\EOT\166\ETX\b\EM\n\
     \\SI\n\
-    \\a\EOT\DC4\EOT\NUL\STX\a\STX\DC2\EOT\132\ETX\FS\GS\n\
+    \\a\EOT\DC4\EOT\NUL\STX\a\STX\DC2\EOT\166\ETX\FS\GS\n\
     \\186\SOH\n\
-    \\ACK\EOT\DC4\EOT\NUL\STX\b\DC2\EOT\135\ETX\b\DC2\SUB\169\SOH There was some fatal error processing the workflow, typically an internal error, but\n\
+    \\ACK\EOT\DC4\EOT\NUL\STX\b\DC2\EOT\169\ETX\b\DC2\SUB\169\SOH There was some fatal error processing the workflow, typically an internal error, but\n\
     \ can also happen if then network drops out while paginating. Check message string.\n\
     \\n\
     \\SI\n\
-    \\a\EOT\DC4\EOT\NUL\STX\b\SOH\DC2\EOT\135\ETX\b\r\n\
+    \\a\EOT\DC4\EOT\NUL\STX\b\SOH\DC2\EOT\169\ETX\b\r\n\
     \\SI\n\
-    \\a\EOT\DC4\EOT\NUL\STX\b\STX\DC2\EOT\135\ETX\DLE\DC1\n\
+    \\a\EOT\DC4\EOT\NUL\STX\b\STX\DC2\EOT\169\ETX\DLE\DC1\n\
     \O\n\
-    \\ACK\EOT\DC4\EOT\NUL\STX\t\DC2\EOT\137\ETX\b(\SUB? Something went wrong attempting to fetch more history events.\n\
+    \\ACK\EOT\DC4\EOT\NUL\STX\t\DC2\EOT\171\ETX\b(\SUB? Something went wrong attempting to fetch more history events.\n\
     \\n\
     \\SI\n\
-    \\a\EOT\DC4\EOT\NUL\STX\t\SOH\DC2\EOT\137\ETX\b#\n\
+    \\a\EOT\DC4\EOT\NUL\STX\t\SOH\DC2\EOT\171\ETX\b#\n\
     \\SI\n\
-    \\a\EOT\DC4\EOT\NUL\STX\t\STX\DC2\EOT\137\ETX&'\n\
+    \\a\EOT\DC4\EOT\NUL\STX\t\STX\DC2\EOT\171\ETX&'\n\
     \\129\SOH\n\
     \\ACK\EOT\DC4\EOT\NUL\STX\n\
-    \\DC2\EOT\140\ETX\b'\SUBq The workflow is being completed with a terminal command and we sent the WFT completion\n\
+    \\DC2\EOT\174\ETX\b'\SUBq The workflow is being completed with a terminal command and we sent the WFT completion\n\
     \ to server successfully.\n\
     \\n\
     \\SI\n\
     \\a\EOT\DC4\EOT\NUL\STX\n\
-    \\SOH\DC2\EOT\140\ETX\b!\n\
+    \\SOH\DC2\EOT\174\ETX\b!\n\
     \\SI\n\
     \\a\EOT\DC4\EOT\NUL\STX\n\
-    \\STX\DC2\EOT\140\ETX$&\n\
+    \\STX\DC2\EOT\174\ETX$&\n\
     \\f\n\
-    \\EOT\EOT\DC4\STX\SOH\DC2\EOT\142\ETX\EOT\RS\n\
+    \\EOT\EOT\DC4\STX\SOH\DC2\EOT\176\ETX\EOT\RS\n\
     \\r\n\
-    \\ENQ\EOT\DC4\STX\SOH\ACK\DC2\EOT\142\ETX\EOT\DC2\n\
+    \\ENQ\EOT\DC4\STX\SOH\ACK\DC2\EOT\176\ETX\EOT\DC2\n\
     \\r\n\
-    \\ENQ\EOT\DC4\STX\SOH\SOH\DC2\EOT\142\ETX\DC3\EM\n\
+    \\ENQ\EOT\DC4\STX\SOH\SOH\DC2\EOT\176\ETX\DC3\EM\n\
     \\r\n\
-    \\ENQ\EOT\DC4\STX\SOH\ETX\DC2\EOT\142\ETX\FS\GSb\ACKproto3"
+    \\ENQ\EOT\DC4\STX\SOH\ETX\DC2\EOT\176\ETX\FS\GSb\ACKproto3"

@@ -33,7 +33,9 @@ import qualified Proto.Google.Protobuf.Timestamp
 import qualified Proto.Temporal.Api.Common.V1.Message
 import qualified Proto.Temporal.Api.Enums.V1.Workflow
 import qualified Proto.Temporal.Api.Failure.V1.Message
+import qualified Proto.Temporal.Api.Sdk.V1.EventGroupMarker
 import qualified Proto.Temporal.Api.Sdk.V1.UserMetadata
+import qualified Proto.Temporal.Api.Workflow.V1.Message
 import qualified Proto.Temporal.Sdk.Core.ChildWorkflow.ChildWorkflow
 import qualified Proto.Temporal.Sdk.Core.Common.Common
 import qualified Proto.Temporal.Sdk.Core.Nexus.Nexus
@@ -71,6 +73,13 @@ attempt ::
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "attempt" a) =>
   Lens.Family2.LensLike' f s a
 attempt = Data.ProtoLens.Field.field @"attempt"
+backoffStartInterval ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "backoffStartInterval" a) =>
+  Lens.Family2.LensLike' f s a
+backoffStartInterval
+  = Data.ProtoLens.Field.field @"backoffStartInterval"
 cancelChildWorkflowExecution ::
   forall f s a.
   (Prelude.Functor f,
@@ -148,6 +157,11 @@ deprecated ::
    Data.ProtoLens.Field.HasField s "deprecated" a) =>
   Lens.Family2.LensLike' f s a
 deprecated = Data.ProtoLens.Field.field @"deprecated"
+details ::
+  forall f s a.
+  (Prelude.Functor f, Data.ProtoLens.Field.HasField s "details" a) =>
+  Lens.Family2.LensLike' f s a
+details = Data.ProtoLens.Field.field @"details"
 doNotEagerlyExecute ::
   forall f s a.
   (Prelude.Functor f,
@@ -161,6 +175,12 @@ endpoint ::
    Data.ProtoLens.Field.HasField s "endpoint" a) =>
   Lens.Family2.LensLike' f s a
 endpoint = Data.ProtoLens.Field.field @"endpoint"
+eventGroupMarkers ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "eventGroupMarkers" a) =>
+  Lens.Family2.LensLike' f s a
+eventGroupMarkers = Data.ProtoLens.Field.field @"eventGroupMarkers"
 failWorkflowExecution ::
   forall f s a.
   (Prelude.Functor f,
@@ -189,6 +209,20 @@ heartbeatTimeout ::
    Data.ProtoLens.Field.HasField s "heartbeatTimeout" a) =>
   Lens.Family2.LensLike' f s a
 heartbeatTimeout = Data.ProtoLens.Field.field @"heartbeatTimeout"
+includeArgumentsInMarker ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "includeArgumentsInMarker" a) =>
+  Lens.Family2.LensLike' f s a
+includeArgumentsInMarker
+  = Data.ProtoLens.Field.field @"includeArgumentsInMarker"
+initialVersioningBehavior ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "initialVersioningBehavior" a) =>
+  Lens.Family2.LensLike' f s a
+initialVersioningBehavior
+  = Data.ProtoLens.Field.field @"initialVersioningBehavior"
 input ::
   forall f s a.
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "input" a) =>
@@ -212,6 +246,13 @@ maybe'accepted ::
    Data.ProtoLens.Field.HasField s "maybe'accepted" a) =>
   Lens.Family2.LensLike' f s a
 maybe'accepted = Data.ProtoLens.Field.field @"maybe'accepted"
+maybe'backoffStartInterval ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'backoffStartInterval" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'backoffStartInterval
+  = Data.ProtoLens.Field.field @"maybe'backoffStartInterval"
 maybe'cancelChildWorkflowExecution ::
   forall f s a.
   (Prelude.Functor f,
@@ -267,6 +308,12 @@ maybe'continueAsNewWorkflowExecution ::
 maybe'continueAsNewWorkflowExecution
   = Data.ProtoLens.Field.field
       @"maybe'continueAsNewWorkflowExecution"
+maybe'details ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'details" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'details = Data.ProtoLens.Field.field @"maybe'details"
 maybe'failWorkflowExecution ::
   forall f s a.
   (Prelude.Functor f,
@@ -421,6 +468,13 @@ maybe'scheduleToStartTimeout ::
   Lens.Family2.LensLike' f s a
 maybe'scheduleToStartTimeout
   = Data.ProtoLens.Field.field @"maybe'scheduleToStartTimeout"
+maybe'searchAttributes ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'searchAttributes" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'searchAttributes
+  = Data.ProtoLens.Field.field @"maybe'searchAttributes"
 maybe'setPatchMarker ::
   forall f s a.
   (Prelude.Functor f,
@@ -516,6 +570,13 @@ maybe'variant ::
    Data.ProtoLens.Field.HasField s "maybe'variant" a) =>
   Lens.Family2.LensLike' f s a
 maybe'variant = Data.ProtoLens.Field.field @"maybe'variant"
+maybe'versioningOverride ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'versioningOverride" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'versioningOverride
+  = Data.ProtoLens.Field.field @"maybe'versioningOverride"
 maybe'workflowExecution ::
   forall f s a.
   (Prelude.Functor f,
@@ -823,6 +884,13 @@ vec'arguments ::
    Data.ProtoLens.Field.HasField s "vec'arguments" a) =>
   Lens.Family2.LensLike' f s a
 vec'arguments = Data.ProtoLens.Field.field @"vec'arguments"
+vec'eventGroupMarkers ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "vec'eventGroupMarkers" a) =>
+  Lens.Family2.LensLike' f s a
+vec'eventGroupMarkers
+  = Data.ProtoLens.Field.field @"vec'eventGroupMarkers"
 vec'input ::
   forall f s a.
   (Prelude.Functor f,
@@ -835,6 +903,13 @@ versioningIntent ::
    Data.ProtoLens.Field.HasField s "versioningIntent" a) =>
   Lens.Family2.LensLike' f s a
 versioningIntent = Data.ProtoLens.Field.field @"versioningIntent"
+versioningOverride ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "versioningOverride" a) =>
+  Lens.Family2.LensLike' f s a
+versioningOverride
+  = Data.ProtoLens.Field.field @"versioningOverride"
 workflowExecution ::
   forall f s a.
   (Prelude.Functor f,

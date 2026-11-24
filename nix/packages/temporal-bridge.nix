@@ -26,9 +26,16 @@ let
           PROTOC = "${pkgs.protobuf}/bin/protoc";
           PROTOC_INCLUDE = "${pkgs.protobuf}/include";
         };
-        temporalio-common = _attrs: {
+        temporalio-protos = attrs: {
           PROTOC = "${pkgs.protobuf}/bin/protoc";
           PROTOC_INCLUDE = "${pkgs.protobuf}/include";
+          postInstall = ''
+            ${attrs.postInstall or ""}
+            # Common consumes the descriptor through Cargo's dependency metadata.
+            # Point it at the installed copy rather than the removed build tree.
+            substituteInPlace "$lib/env" \
+              --replace-fail "$OUT_DIR/descriptors.bin" "$lib/lib/temporalio-protos.out/descriptors.bin"
+          '';
         };
         temporal_bridge = attrs: {
           buildInputs = pkgs.lib.optionals pkgs.stdenv.hostPlatform.isDarwin [ pkgs.apple-sdk ];

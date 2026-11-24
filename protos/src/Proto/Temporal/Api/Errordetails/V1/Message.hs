@@ -4,6 +4,7 @@
 {-# OPTIONS_GHC -Wno-duplicate-exports#-}
 {-# OPTIONS_GHC -Wno-dodgy-exports#-}
 module Proto.Temporal.Api.Errordetails.V1.Message (
+        ActivityExecutionAlreadyStartedFailure(),
         CancellationAlreadyRequestedFailure(),
         ClientVersionNotSupportedFailure(),
         MultiOperationExecutionFailure(),
@@ -11,10 +12,12 @@ module Proto.Temporal.Api.Errordetails.V1.Message (
         NamespaceAlreadyExistsFailure(), NamespaceInvalidStateFailure(),
         NamespaceNotActiveFailure(), NamespaceNotFoundFailure(),
         NamespaceUnavailableFailure(), NewerBuildExistsFailure(),
-        NotFoundFailure(), PermissionDeniedFailure(), QueryFailedFailure(),
+        NexusOperationExecutionAlreadyStartedFailure(), NotFoundFailure(),
+        PermissionDeniedFailure(), QueryFailedFailure(),
         ResourceExhaustedFailure(), ServerVersionNotSupportedFailure(),
         SystemWorkflowFailure(), WorkflowExecutionAlreadyStartedFailure(),
-        WorkflowNotReadyFailure()
+        WorkflowNotReadyFailure(),
+        WorkflowTaskCompletionBufferLostFailure()
     ) where
 import qualified Data.ProtoLens.Runtime.Control.DeepSeq as Control.DeepSeq
 import qualified Data.ProtoLens.Runtime.Data.ProtoLens.Prism as Data.ProtoLens.Prism
@@ -46,6 +49,178 @@ import qualified Proto.Temporal.Api.Common.V1.Message
 import qualified Proto.Temporal.Api.Enums.V1.FailedCause
 import qualified Proto.Temporal.Api.Enums.V1.Namespace
 import qualified Proto.Temporal.Api.Failure.V1.Message
+{- | Fields :
+     
+         * 'Proto.Temporal.Api.Errordetails.V1.Message_Fields.startRequestId' @:: Lens' ActivityExecutionAlreadyStartedFailure Data.Text.Text@
+         * 'Proto.Temporal.Api.Errordetails.V1.Message_Fields.runId' @:: Lens' ActivityExecutionAlreadyStartedFailure Data.Text.Text@ -}
+data ActivityExecutionAlreadyStartedFailure
+  = ActivityExecutionAlreadyStartedFailure'_constructor {_ActivityExecutionAlreadyStartedFailure'startRequestId :: !Data.Text.Text,
+                                                         _ActivityExecutionAlreadyStartedFailure'runId :: !Data.Text.Text,
+                                                         _ActivityExecutionAlreadyStartedFailure'_unknownFields :: !Data.ProtoLens.FieldSet}
+  deriving stock (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show ActivityExecutionAlreadyStartedFailure where
+  showsPrec _ __x __s
+    = Prelude.showChar
+        '{'
+        (Prelude.showString
+           (Data.ProtoLens.showMessageShort __x) (Prelude.showChar '}' __s))
+instance Data.ProtoLens.Field.HasField ActivityExecutionAlreadyStartedFailure "startRequestId" Data.Text.Text where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _ActivityExecutionAlreadyStartedFailure'startRequestId
+           (\ x__ y__
+              -> x__
+                   {_ActivityExecutionAlreadyStartedFailure'startRequestId = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField ActivityExecutionAlreadyStartedFailure "runId" Data.Text.Text where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _ActivityExecutionAlreadyStartedFailure'runId
+           (\ x__ y__
+              -> x__ {_ActivityExecutionAlreadyStartedFailure'runId = y__}))
+        Prelude.id
+instance Data.ProtoLens.Message ActivityExecutionAlreadyStartedFailure where
+  messageName _
+    = Data.Text.pack
+        "temporal.api.errordetails.v1.ActivityExecutionAlreadyStartedFailure"
+  packedMessageDescriptor _
+    = "\n\
+      \&ActivityExecutionAlreadyStartedFailure\DC2(\n\
+      \\DLEstart_request_id\CAN\SOH \SOH(\tR\SOstartRequestId\DC2\NAK\n\
+      \\ACKrun_id\CAN\STX \SOH(\tR\ENQrunId"
+  packedFileDescriptor _ = packedFileDescriptor
+  fieldsByTag
+    = let
+        startRequestId__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "start_request_id"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.StringField ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Text.Text)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"startRequestId")) ::
+              Data.ProtoLens.FieldDescriptor ActivityExecutionAlreadyStartedFailure
+        runId__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "run_id"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.StringField ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Text.Text)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional (Data.ProtoLens.Field.field @"runId")) ::
+              Data.ProtoLens.FieldDescriptor ActivityExecutionAlreadyStartedFailure
+      in
+        Data.Map.fromList
+          [(Data.ProtoLens.Tag 1, startRequestId__field_descriptor),
+           (Data.ProtoLens.Tag 2, runId__field_descriptor)]
+  unknownFields
+    = Lens.Family2.Unchecked.lens
+        _ActivityExecutionAlreadyStartedFailure'_unknownFields
+        (\ x__ y__
+           -> x__
+                {_ActivityExecutionAlreadyStartedFailure'_unknownFields = y__})
+  defMessage
+    = ActivityExecutionAlreadyStartedFailure'_constructor
+        {_ActivityExecutionAlreadyStartedFailure'startRequestId = Data.ProtoLens.fieldDefault,
+         _ActivityExecutionAlreadyStartedFailure'runId = Data.ProtoLens.fieldDefault,
+         _ActivityExecutionAlreadyStartedFailure'_unknownFields = []}
+  parseMessage
+    = let
+        loop ::
+          ActivityExecutionAlreadyStartedFailure
+          -> Data.ProtoLens.Encoding.Bytes.Parser ActivityExecutionAlreadyStartedFailure
+        loop x
+          = do end <- Data.ProtoLens.Encoding.Bytes.atEnd
+               if end then
+                   do (let missing = []
+                       in
+                         if Prelude.null missing then
+                             Prelude.return ()
+                         else
+                             Prelude.fail
+                               ((Prelude.++)
+                                  "Missing required fields: "
+                                  (Prelude.show (missing :: [Prelude.String]))))
+                      Prelude.return
+                        (Lens.Family2.over
+                           Data.ProtoLens.unknownFields (\ !t -> Prelude.reverse t) x)
+               else
+                   do tag <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                      case tag of
+                        10
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.getText
+                                             (Prelude.fromIntegral len))
+                                       "start_request_id"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field @"startRequestId") y x)
+                        18
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.getText
+                                             (Prelude.fromIntegral len))
+                                       "run_id"
+                                loop (Lens.Family2.set (Data.ProtoLens.Field.field @"runId") y x)
+                        wire
+                          -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
+                                        wire
+                                loop
+                                  (Lens.Family2.over
+                                     Data.ProtoLens.unknownFields (\ !t -> (:) y t) x)
+      in
+        (Data.ProtoLens.Encoding.Bytes.<?>)
+          (do loop Data.ProtoLens.defMessage)
+          "ActivityExecutionAlreadyStartedFailure"
+  buildMessage
+    = \ _x
+        -> (Data.Monoid.<>)
+             (let
+                _v
+                  = Lens.Family2.view
+                      (Data.ProtoLens.Field.field @"startRequestId") _x
+              in
+                if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                    Data.Monoid.mempty
+                else
+                    (Data.Monoid.<>)
+                      (Data.ProtoLens.Encoding.Bytes.putVarInt 10)
+                      ((Prelude..)
+                         (\ bs
+                            -> (Data.Monoid.<>)
+                                 (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                    (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                 (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                         Data.Text.Encoding.encodeUtf8 _v))
+             ((Data.Monoid.<>)
+                (let
+                   _v = Lens.Family2.view (Data.ProtoLens.Field.field @"runId") _x
+                 in
+                   if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                       Data.Monoid.mempty
+                   else
+                       (Data.Monoid.<>)
+                         (Data.ProtoLens.Encoding.Bytes.putVarInt 18)
+                         ((Prelude..)
+                            (\ bs
+                               -> (Data.Monoid.<>)
+                                    (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                       (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                    (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                            Data.Text.Encoding.encodeUtf8 _v))
+                (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                   (Lens.Family2.view Data.ProtoLens.unknownFields _x)))
+instance Control.DeepSeq.NFData ActivityExecutionAlreadyStartedFailure where
+  rnf
+    = \ x__
+        -> Control.DeepSeq.deepseq
+             (_ActivityExecutionAlreadyStartedFailure'_unknownFields x__)
+             (Control.DeepSeq.deepseq
+                (_ActivityExecutionAlreadyStartedFailure'startRequestId x__)
+                (Control.DeepSeq.deepseq
+                   (_ActivityExecutionAlreadyStartedFailure'runId x__) ()))
 {- | Fields :
       -}
 data CancellationAlreadyRequestedFailure
@@ -1642,6 +1817,179 @@ instance Control.DeepSeq.NFData NewerBuildExistsFailure where
                 (_NewerBuildExistsFailure'defaultBuildId x__) ())
 {- | Fields :
      
+         * 'Proto.Temporal.Api.Errordetails.V1.Message_Fields.startRequestId' @:: Lens' NexusOperationExecutionAlreadyStartedFailure Data.Text.Text@
+         * 'Proto.Temporal.Api.Errordetails.V1.Message_Fields.runId' @:: Lens' NexusOperationExecutionAlreadyStartedFailure Data.Text.Text@ -}
+data NexusOperationExecutionAlreadyStartedFailure
+  = NexusOperationExecutionAlreadyStartedFailure'_constructor {_NexusOperationExecutionAlreadyStartedFailure'startRequestId :: !Data.Text.Text,
+                                                               _NexusOperationExecutionAlreadyStartedFailure'runId :: !Data.Text.Text,
+                                                               _NexusOperationExecutionAlreadyStartedFailure'_unknownFields :: !Data.ProtoLens.FieldSet}
+  deriving stock (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show NexusOperationExecutionAlreadyStartedFailure where
+  showsPrec _ __x __s
+    = Prelude.showChar
+        '{'
+        (Prelude.showString
+           (Data.ProtoLens.showMessageShort __x) (Prelude.showChar '}' __s))
+instance Data.ProtoLens.Field.HasField NexusOperationExecutionAlreadyStartedFailure "startRequestId" Data.Text.Text where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _NexusOperationExecutionAlreadyStartedFailure'startRequestId
+           (\ x__ y__
+              -> x__
+                   {_NexusOperationExecutionAlreadyStartedFailure'startRequestId = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField NexusOperationExecutionAlreadyStartedFailure "runId" Data.Text.Text where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _NexusOperationExecutionAlreadyStartedFailure'runId
+           (\ x__ y__
+              -> x__
+                   {_NexusOperationExecutionAlreadyStartedFailure'runId = y__}))
+        Prelude.id
+instance Data.ProtoLens.Message NexusOperationExecutionAlreadyStartedFailure where
+  messageName _
+    = Data.Text.pack
+        "temporal.api.errordetails.v1.NexusOperationExecutionAlreadyStartedFailure"
+  packedMessageDescriptor _
+    = "\n\
+      \,NexusOperationExecutionAlreadyStartedFailure\DC2(\n\
+      \\DLEstart_request_id\CAN\SOH \SOH(\tR\SOstartRequestId\DC2\NAK\n\
+      \\ACKrun_id\CAN\STX \SOH(\tR\ENQrunId"
+  packedFileDescriptor _ = packedFileDescriptor
+  fieldsByTag
+    = let
+        startRequestId__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "start_request_id"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.StringField ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Text.Text)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"startRequestId")) ::
+              Data.ProtoLens.FieldDescriptor NexusOperationExecutionAlreadyStartedFailure
+        runId__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "run_id"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.StringField ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Text.Text)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional (Data.ProtoLens.Field.field @"runId")) ::
+              Data.ProtoLens.FieldDescriptor NexusOperationExecutionAlreadyStartedFailure
+      in
+        Data.Map.fromList
+          [(Data.ProtoLens.Tag 1, startRequestId__field_descriptor),
+           (Data.ProtoLens.Tag 2, runId__field_descriptor)]
+  unknownFields
+    = Lens.Family2.Unchecked.lens
+        _NexusOperationExecutionAlreadyStartedFailure'_unknownFields
+        (\ x__ y__
+           -> x__
+                {_NexusOperationExecutionAlreadyStartedFailure'_unknownFields = y__})
+  defMessage
+    = NexusOperationExecutionAlreadyStartedFailure'_constructor
+        {_NexusOperationExecutionAlreadyStartedFailure'startRequestId = Data.ProtoLens.fieldDefault,
+         _NexusOperationExecutionAlreadyStartedFailure'runId = Data.ProtoLens.fieldDefault,
+         _NexusOperationExecutionAlreadyStartedFailure'_unknownFields = []}
+  parseMessage
+    = let
+        loop ::
+          NexusOperationExecutionAlreadyStartedFailure
+          -> Data.ProtoLens.Encoding.Bytes.Parser NexusOperationExecutionAlreadyStartedFailure
+        loop x
+          = do end <- Data.ProtoLens.Encoding.Bytes.atEnd
+               if end then
+                   do (let missing = []
+                       in
+                         if Prelude.null missing then
+                             Prelude.return ()
+                         else
+                             Prelude.fail
+                               ((Prelude.++)
+                                  "Missing required fields: "
+                                  (Prelude.show (missing :: [Prelude.String]))))
+                      Prelude.return
+                        (Lens.Family2.over
+                           Data.ProtoLens.unknownFields (\ !t -> Prelude.reverse t) x)
+               else
+                   do tag <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                      case tag of
+                        10
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.getText
+                                             (Prelude.fromIntegral len))
+                                       "start_request_id"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field @"startRequestId") y x)
+                        18
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.getText
+                                             (Prelude.fromIntegral len))
+                                       "run_id"
+                                loop (Lens.Family2.set (Data.ProtoLens.Field.field @"runId") y x)
+                        wire
+                          -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
+                                        wire
+                                loop
+                                  (Lens.Family2.over
+                                     Data.ProtoLens.unknownFields (\ !t -> (:) y t) x)
+      in
+        (Data.ProtoLens.Encoding.Bytes.<?>)
+          (do loop Data.ProtoLens.defMessage)
+          "NexusOperationExecutionAlreadyStartedFailure"
+  buildMessage
+    = \ _x
+        -> (Data.Monoid.<>)
+             (let
+                _v
+                  = Lens.Family2.view
+                      (Data.ProtoLens.Field.field @"startRequestId") _x
+              in
+                if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                    Data.Monoid.mempty
+                else
+                    (Data.Monoid.<>)
+                      (Data.ProtoLens.Encoding.Bytes.putVarInt 10)
+                      ((Prelude..)
+                         (\ bs
+                            -> (Data.Monoid.<>)
+                                 (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                    (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                 (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                         Data.Text.Encoding.encodeUtf8 _v))
+             ((Data.Monoid.<>)
+                (let
+                   _v = Lens.Family2.view (Data.ProtoLens.Field.field @"runId") _x
+                 in
+                   if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                       Data.Monoid.mempty
+                   else
+                       (Data.Monoid.<>)
+                         (Data.ProtoLens.Encoding.Bytes.putVarInt 18)
+                         ((Prelude..)
+                            (\ bs
+                               -> (Data.Monoid.<>)
+                                    (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                       (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                    (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                            Data.Text.Encoding.encodeUtf8 _v))
+                (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                   (Lens.Family2.view Data.ProtoLens.unknownFields _x)))
+instance Control.DeepSeq.NFData NexusOperationExecutionAlreadyStartedFailure where
+  rnf
+    = \ x__
+        -> Control.DeepSeq.deepseq
+             (_NexusOperationExecutionAlreadyStartedFailure'_unknownFields x__)
+             (Control.DeepSeq.deepseq
+                (_NexusOperationExecutionAlreadyStartedFailure'startRequestId x__)
+                (Control.DeepSeq.deepseq
+                   (_NexusOperationExecutionAlreadyStartedFailure'runId x__) ()))
+{- | Fields :
+     
          * 'Proto.Temporal.Api.Errordetails.V1.Message_Fields.currentCluster' @:: Lens' NotFoundFailure Data.Text.Text@
          * 'Proto.Temporal.Api.Errordetails.V1.Message_Fields.activeCluster' @:: Lens' NotFoundFailure Data.Text.Text@ -}
 data NotFoundFailure
@@ -2563,10 +2911,12 @@ instance Control.DeepSeq.NFData SystemWorkflowFailure where
 {- | Fields :
      
          * 'Proto.Temporal.Api.Errordetails.V1.Message_Fields.startRequestId' @:: Lens' WorkflowExecutionAlreadyStartedFailure Data.Text.Text@
-         * 'Proto.Temporal.Api.Errordetails.V1.Message_Fields.runId' @:: Lens' WorkflowExecutionAlreadyStartedFailure Data.Text.Text@ -}
+         * 'Proto.Temporal.Api.Errordetails.V1.Message_Fields.runId' @:: Lens' WorkflowExecutionAlreadyStartedFailure Data.Text.Text@
+         * 'Proto.Temporal.Api.Errordetails.V1.Message_Fields.firstExecutionRunId' @:: Lens' WorkflowExecutionAlreadyStartedFailure Data.Text.Text@ -}
 data WorkflowExecutionAlreadyStartedFailure
   = WorkflowExecutionAlreadyStartedFailure'_constructor {_WorkflowExecutionAlreadyStartedFailure'startRequestId :: !Data.Text.Text,
                                                          _WorkflowExecutionAlreadyStartedFailure'runId :: !Data.Text.Text,
+                                                         _WorkflowExecutionAlreadyStartedFailure'firstExecutionRunId :: !Data.Text.Text,
                                                          _WorkflowExecutionAlreadyStartedFailure'_unknownFields :: !Data.ProtoLens.FieldSet}
   deriving stock (Prelude.Eq, Prelude.Ord)
 instance Prelude.Show WorkflowExecutionAlreadyStartedFailure where
@@ -2592,6 +2942,15 @@ instance Data.ProtoLens.Field.HasField WorkflowExecutionAlreadyStartedFailure "r
            (\ x__ y__
               -> x__ {_WorkflowExecutionAlreadyStartedFailure'runId = y__}))
         Prelude.id
+instance Data.ProtoLens.Field.HasField WorkflowExecutionAlreadyStartedFailure "firstExecutionRunId" Data.Text.Text where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _WorkflowExecutionAlreadyStartedFailure'firstExecutionRunId
+           (\ x__ y__
+              -> x__
+                   {_WorkflowExecutionAlreadyStartedFailure'firstExecutionRunId = y__}))
+        Prelude.id
 instance Data.ProtoLens.Message WorkflowExecutionAlreadyStartedFailure where
   messageName _
     = Data.Text.pack
@@ -2600,7 +2959,8 @@ instance Data.ProtoLens.Message WorkflowExecutionAlreadyStartedFailure where
     = "\n\
       \&WorkflowExecutionAlreadyStartedFailure\DC2(\n\
       \\DLEstart_request_id\CAN\SOH \SOH(\tR\SOstartRequestId\DC2\NAK\n\
-      \\ACKrun_id\CAN\STX \SOH(\tR\ENQrunId"
+      \\ACKrun_id\CAN\STX \SOH(\tR\ENQrunId\DC23\n\
+      \\SYNfirst_execution_run_id\CAN\ETX \SOH(\tR\DC3firstExecutionRunId"
   packedFileDescriptor _ = packedFileDescriptor
   fieldsByTag
     = let
@@ -2621,10 +2981,20 @@ instance Data.ProtoLens.Message WorkflowExecutionAlreadyStartedFailure where
               (Data.ProtoLens.PlainField
                  Data.ProtoLens.Optional (Data.ProtoLens.Field.field @"runId")) ::
               Data.ProtoLens.FieldDescriptor WorkflowExecutionAlreadyStartedFailure
+        firstExecutionRunId__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "first_execution_run_id"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.StringField ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Text.Text)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"firstExecutionRunId")) ::
+              Data.ProtoLens.FieldDescriptor WorkflowExecutionAlreadyStartedFailure
       in
         Data.Map.fromList
           [(Data.ProtoLens.Tag 1, startRequestId__field_descriptor),
-           (Data.ProtoLens.Tag 2, runId__field_descriptor)]
+           (Data.ProtoLens.Tag 2, runId__field_descriptor),
+           (Data.ProtoLens.Tag 3, firstExecutionRunId__field_descriptor)]
   unknownFields
     = Lens.Family2.Unchecked.lens
         _WorkflowExecutionAlreadyStartedFailure'_unknownFields
@@ -2635,6 +3005,7 @@ instance Data.ProtoLens.Message WorkflowExecutionAlreadyStartedFailure where
     = WorkflowExecutionAlreadyStartedFailure'_constructor
         {_WorkflowExecutionAlreadyStartedFailure'startRequestId = Data.ProtoLens.fieldDefault,
          _WorkflowExecutionAlreadyStartedFailure'runId = Data.ProtoLens.fieldDefault,
+         _WorkflowExecutionAlreadyStartedFailure'firstExecutionRunId = Data.ProtoLens.fieldDefault,
          _WorkflowExecutionAlreadyStartedFailure'_unknownFields = []}
   parseMessage
     = let
@@ -2675,6 +3046,15 @@ instance Data.ProtoLens.Message WorkflowExecutionAlreadyStartedFailure where
                                              (Prelude.fromIntegral len))
                                        "run_id"
                                 loop (Lens.Family2.set (Data.ProtoLens.Field.field @"runId") y x)
+                        26
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.getText
+                                             (Prelude.fromIntegral len))
+                                       "first_execution_run_id"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field @"firstExecutionRunId") y x)
                         wire
                           -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
                                         wire
@@ -2721,8 +3101,26 @@ instance Data.ProtoLens.Message WorkflowExecutionAlreadyStartedFailure where
                                        (Prelude.fromIntegral (Data.ByteString.length bs)))
                                     (Data.ProtoLens.Encoding.Bytes.putBytes bs))
                             Data.Text.Encoding.encodeUtf8 _v))
-                (Data.ProtoLens.Encoding.Wire.buildFieldSet
-                   (Lens.Family2.view Data.ProtoLens.unknownFields _x)))
+                ((Data.Monoid.<>)
+                   (let
+                      _v
+                        = Lens.Family2.view
+                            (Data.ProtoLens.Field.field @"firstExecutionRunId") _x
+                    in
+                      if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                          Data.Monoid.mempty
+                      else
+                          (Data.Monoid.<>)
+                            (Data.ProtoLens.Encoding.Bytes.putVarInt 26)
+                            ((Prelude..)
+                               (\ bs
+                                  -> (Data.Monoid.<>)
+                                       (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                          (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                       (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                               Data.Text.Encoding.encodeUtf8 _v))
+                   (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                      (Lens.Family2.view Data.ProtoLens.unknownFields _x))))
 instance Control.DeepSeq.NFData WorkflowExecutionAlreadyStartedFailure where
   rnf
     = \ x__
@@ -2731,7 +3129,10 @@ instance Control.DeepSeq.NFData WorkflowExecutionAlreadyStartedFailure where
              (Control.DeepSeq.deepseq
                 (_WorkflowExecutionAlreadyStartedFailure'startRequestId x__)
                 (Control.DeepSeq.deepseq
-                   (_WorkflowExecutionAlreadyStartedFailure'runId x__) ()))
+                   (_WorkflowExecutionAlreadyStartedFailure'runId x__)
+                   (Control.DeepSeq.deepseq
+                      (_WorkflowExecutionAlreadyStartedFailure'firstExecutionRunId x__)
+                      ())))
 {- | Fields :
       -}
 data WorkflowNotReadyFailure
@@ -2800,16 +3201,88 @@ instance Control.DeepSeq.NFData WorkflowNotReadyFailure where
     = \ x__
         -> Control.DeepSeq.deepseq
              (_WorkflowNotReadyFailure'_unknownFields x__) ()
+{- | Fields :
+      -}
+data WorkflowTaskCompletionBufferLostFailure
+  = WorkflowTaskCompletionBufferLostFailure'_constructor {_WorkflowTaskCompletionBufferLostFailure'_unknownFields :: !Data.ProtoLens.FieldSet}
+  deriving stock (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show WorkflowTaskCompletionBufferLostFailure where
+  showsPrec _ __x __s
+    = Prelude.showChar
+        '{'
+        (Prelude.showString
+           (Data.ProtoLens.showMessageShort __x) (Prelude.showChar '}' __s))
+instance Data.ProtoLens.Message WorkflowTaskCompletionBufferLostFailure where
+  messageName _
+    = Data.Text.pack
+        "temporal.api.errordetails.v1.WorkflowTaskCompletionBufferLostFailure"
+  packedMessageDescriptor _
+    = "\n\
+      \'WorkflowTaskCompletionBufferLostFailure"
+  packedFileDescriptor _ = packedFileDescriptor
+  fieldsByTag = let in Data.Map.fromList []
+  unknownFields
+    = Lens.Family2.Unchecked.lens
+        _WorkflowTaskCompletionBufferLostFailure'_unknownFields
+        (\ x__ y__
+           -> x__
+                {_WorkflowTaskCompletionBufferLostFailure'_unknownFields = y__})
+  defMessage
+    = WorkflowTaskCompletionBufferLostFailure'_constructor
+        {_WorkflowTaskCompletionBufferLostFailure'_unknownFields = []}
+  parseMessage
+    = let
+        loop ::
+          WorkflowTaskCompletionBufferLostFailure
+          -> Data.ProtoLens.Encoding.Bytes.Parser WorkflowTaskCompletionBufferLostFailure
+        loop x
+          = do end <- Data.ProtoLens.Encoding.Bytes.atEnd
+               if end then
+                   do (let missing = []
+                       in
+                         if Prelude.null missing then
+                             Prelude.return ()
+                         else
+                             Prelude.fail
+                               ((Prelude.++)
+                                  "Missing required fields: "
+                                  (Prelude.show (missing :: [Prelude.String]))))
+                      Prelude.return
+                        (Lens.Family2.over
+                           Data.ProtoLens.unknownFields (\ !t -> Prelude.reverse t) x)
+               else
+                   do tag <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                      case tag of
+                        wire
+                          -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
+                                        wire
+                                loop
+                                  (Lens.Family2.over
+                                     Data.ProtoLens.unknownFields (\ !t -> (:) y t) x)
+      in
+        (Data.ProtoLens.Encoding.Bytes.<?>)
+          (do loop Data.ProtoLens.defMessage)
+          "WorkflowTaskCompletionBufferLostFailure"
+  buildMessage
+    = \ _x
+        -> Data.ProtoLens.Encoding.Wire.buildFieldSet
+             (Lens.Family2.view Data.ProtoLens.unknownFields _x)
+instance Control.DeepSeq.NFData WorkflowTaskCompletionBufferLostFailure where
+  rnf
+    = \ x__
+        -> Control.DeepSeq.deepseq
+             (_WorkflowTaskCompletionBufferLostFailure'_unknownFields x__) ()
 packedFileDescriptor :: Data.ByteString.ByteString
 packedFileDescriptor
   = "\n\
     \*temporal/api/errordetails/v1/message.proto\DC2\FStemporal.api.errordetails.v1\SUB\EMgoogle/protobuf/any.proto\SUB$temporal/api/common/v1/message.proto\SUB(temporal/api/enums/v1/failed_cause.proto\SUB%temporal/api/enums/v1/namespace.proto\SUB%temporal/api/failure/v1/message.proto\"a\n\
     \\SINotFoundFailure\DC2'\n\
     \\SIcurrent_cluster\CAN\SOH \SOH(\tR\SOcurrentCluster\DC2%\n\
-    \\SOactive_cluster\CAN\STX \SOH(\tR\ractiveCluster\"i\n\
+    \\SOactive_cluster\CAN\STX \SOH(\tR\ractiveCluster\"\158\SOH\n\
     \&WorkflowExecutionAlreadyStartedFailure\DC2(\n\
     \\DLEstart_request_id\CAN\SOH \SOH(\tR\SOstartRequestId\DC2\NAK\n\
-    \\ACKrun_id\CAN\STX \SOH(\tR\ENQrunId\"\137\SOH\n\
+    \\ACKrun_id\CAN\STX \SOH(\tR\ENQrunId\DC23\n\
+    \\SYNfirst_execution_run_id\CAN\ETX \SOH(\tR\DC3firstExecutionRunId\"\137\SOH\n\
     \\EMNamespaceNotActiveFailure\DC2\FS\n\
     \\tnamespace\CAN\SOH \SOH(\tR\tnamespace\DC2'\n\
     \\SIcurrent_cluster\CAN\STX \SOH(\tR\SOcurrentCluster\DC2%\n\
@@ -2850,9 +3323,16 @@ packedFileDescriptor
     \\SIOperationStatus\DC2\DC2\n\
     \\EOTcode\CAN\SOH \SOH(\ENQR\EOTcode\DC2\CAN\n\
     \\amessage\CAN\STX \SOH(\tR\amessage\DC2.\n\
-    \\adetails\CAN\ETX \ETX(\v2\DC4.google.protobuf.AnyR\adetailsB\167\SOH\n\
-    \\USio.temporal.api.errordetails.v1B\fMessageProtoP\SOHZ/go.temporal.io/api/errordetails/v1;errordetails\170\STX\RSTemporalio.Api.ErrorDetails.V1\234\STX!Temporalio::Api::ErrorDetails::V1J\194 \n\
-    \\ACK\DC2\EOT\NUL\NULz\SOH\n\
+    \\adetails\CAN\ETX \ETX(\v2\DC4.google.protobuf.AnyR\adetails\"i\n\
+    \&ActivityExecutionAlreadyStartedFailure\DC2(\n\
+    \\DLEstart_request_id\CAN\SOH \SOH(\tR\SOstartRequestId\DC2\NAK\n\
+    \\ACKrun_id\CAN\STX \SOH(\tR\ENQrunId\"o\n\
+    \,NexusOperationExecutionAlreadyStartedFailure\DC2(\n\
+    \\DLEstart_request_id\CAN\SOH \SOH(\tR\SOstartRequestId\DC2\NAK\n\
+    \\ACKrun_id\CAN\STX \SOH(\tR\ENQrunId\")\n\
+    \'WorkflowTaskCompletionBufferLostFailureB\167\SOH\n\
+    \\USio.temporal.api.errordetails.v1B\fMessageProtoP\SOHZ/go.temporal.io/api/errordetails/v1;errordetails\170\STX\RSTemporalio.Api.ErrorDetails.V1\234\STX!Temporalio::Api::ErrorDetails::V1J\169)\n\
+    \\a\DC2\ENQ\NUL\NUL\145\SOH\SOH\n\
     \\b\n\
     \\SOH\f\DC2\ETX\NUL\NUL\DC2\n\
     \\177\STX\n\
@@ -2922,7 +3402,7 @@ packedFileDescriptor
     \\ENQ\EOT\NUL\STX\SOH\ETX\DC2\ETX\ETB\FS\GS\n\
     \\n\
     \\n\
-    \\STX\EOT\SOH\DC2\EOT\SUB\NUL\GS\SOH\n\
+    \\STX\EOT\SOH\DC2\EOT\SUB\NUL\RS\SOH\n\
     \\n\
     \\n\
     \\ETX\EOT\SOH\SOH\DC2\ETX\SUB\b.\n\
@@ -2944,335 +3424,401 @@ packedFileDescriptor
     \\ENQ\EOT\SOH\STX\SOH\SOH\DC2\ETX\FS\v\DC1\n\
     \\f\n\
     \\ENQ\EOT\SOH\STX\SOH\ETX\DC2\ETX\FS\DC4\NAK\n\
-    \\n\
-    \\n\
-    \\STX\EOT\STX\DC2\EOT\US\NUL#\SOH\n\
-    \\n\
-    \\n\
-    \\ETX\EOT\STX\SOH\DC2\ETX\US\b!\n\
     \\v\n\
-    \\EOT\EOT\STX\STX\NUL\DC2\ETX \EOT\EM\n\
+    \\EOT\EOT\SOH\STX\STX\DC2\ETX\GS\EOT&\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\NUL\ENQ\DC2\ETX \EOT\n\
+    \\ENQ\EOT\SOH\STX\STX\ENQ\DC2\ETX\GS\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\NUL\SOH\DC2\ETX \v\DC4\n\
+    \\ENQ\EOT\SOH\STX\STX\SOH\DC2\ETX\GS\v!\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\NUL\ETX\DC2\ETX \ETB\CAN\n\
+    \\ENQ\EOT\SOH\STX\STX\ETX\DC2\ETX\GS$%\n\
+    \\n\
+    \\n\
+    \\STX\EOT\STX\DC2\EOT \NUL$\SOH\n\
+    \\n\
+    \\n\
+    \\ETX\EOT\STX\SOH\DC2\ETX \b!\n\
     \\v\n\
-    \\EOT\EOT\STX\STX\SOH\DC2\ETX!\EOT\US\n\
+    \\EOT\EOT\STX\STX\NUL\DC2\ETX!\EOT\EM\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\SOH\ENQ\DC2\ETX!\EOT\n\
+    \\ENQ\EOT\STX\STX\NUL\ENQ\DC2\ETX!\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\SOH\SOH\DC2\ETX!\v\SUB\n\
+    \\ENQ\EOT\STX\STX\NUL\SOH\DC2\ETX!\v\DC4\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\SOH\ETX\DC2\ETX!\GS\RS\n\
+    \\ENQ\EOT\STX\STX\NUL\ETX\DC2\ETX!\ETB\CAN\n\
     \\v\n\
-    \\EOT\EOT\STX\STX\STX\DC2\ETX\"\EOT\RS\n\
+    \\EOT\EOT\STX\STX\SOH\DC2\ETX\"\EOT\US\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\STX\ENQ\DC2\ETX\"\EOT\n\
+    \\ENQ\EOT\STX\STX\SOH\ENQ\DC2\ETX\"\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\STX\SOH\DC2\ETX\"\v\EM\n\
+    \\ENQ\EOT\STX\STX\SOH\SOH\DC2\ETX\"\v\SUB\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\STX\ETX\DC2\ETX\"\FS\GS\n\
+    \\ENQ\EOT\STX\STX\SOH\ETX\DC2\ETX\"\GS\RS\n\
+    \\v\n\
+    \\EOT\EOT\STX\STX\STX\DC2\ETX#\EOT\RS\n\
+    \\f\n\
+    \\ENQ\EOT\STX\STX\STX\ENQ\DC2\ETX#\EOT\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\STX\STX\STX\SOH\DC2\ETX#\v\EM\n\
+    \\f\n\
+    \\ENQ\EOT\STX\STX\STX\ETX\DC2\ETX#\FS\GS\n\
     \\158\STX\n\
-    \\STX\EOT\ETX\DC2\EOT(\NUL*\SOH\SUB\145\STX NamespaceUnavailableFailure is returned by the service when a request addresses a namespace that is unavailable. For\n\
+    \\STX\EOT\ETX\DC2\EOT)\NUL+\SOH\SUB\145\STX NamespaceUnavailableFailure is returned by the service when a request addresses a namespace that is unavailable. For\n\
     \ example, when a namespace is in the process of failing over between clusters.\n\
     \ This is a transient error that should be automatically retried by clients.\n\
     \\n\
     \\n\
     \\n\
-    \\ETX\EOT\ETX\SOH\DC2\ETX(\b#\n\
+    \\ETX\EOT\ETX\SOH\DC2\ETX)\b#\n\
     \\v\n\
-    \\EOT\EOT\ETX\STX\NUL\DC2\ETX)\EOT\EM\n\
+    \\EOT\EOT\ETX\STX\NUL\DC2\ETX*\EOT\EM\n\
     \\f\n\
-    \\ENQ\EOT\ETX\STX\NUL\ENQ\DC2\ETX)\EOT\n\
+    \\ENQ\EOT\ETX\STX\NUL\ENQ\DC2\ETX*\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\ETX\STX\NUL\SOH\DC2\ETX)\v\DC4\n\
+    \\ENQ\EOT\ETX\STX\NUL\SOH\DC2\ETX*\v\DC4\n\
     \\f\n\
-    \\ENQ\EOT\ETX\STX\NUL\ETX\DC2\ETX)\ETB\CAN\n\
+    \\ENQ\EOT\ETX\STX\NUL\ETX\DC2\ETX*\ETB\CAN\n\
     \\n\
     \\n\
-    \\STX\EOT\EOT\DC2\EOT,\NUL3\SOH\n\
+    \\STX\EOT\EOT\DC2\EOT-\NUL4\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\EOT\SOH\DC2\ETX,\b$\n\
+    \\ETX\EOT\EOT\SOH\DC2\ETX-\b$\n\
     \\v\n\
-    \\EOT\EOT\EOT\STX\NUL\DC2\ETX-\EOT\EM\n\
+    \\EOT\EOT\EOT\STX\NUL\DC2\ETX.\EOT\EM\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\NUL\ENQ\DC2\ETX-\EOT\n\
+    \\ENQ\EOT\EOT\STX\NUL\ENQ\DC2\ETX.\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\NUL\SOH\DC2\ETX-\v\DC4\n\
+    \\ENQ\EOT\EOT\STX\NUL\SOH\DC2\ETX.\v\DC4\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\NUL\ETX\DC2\ETX-\ETB\CAN\n\
+    \\ENQ\EOT\EOT\STX\NUL\ETX\DC2\ETX.\ETB\CAN\n\
     \8\n\
-    \\EOT\EOT\EOT\STX\SOH\DC2\ETX/\EOT3\SUB+ Current state of the requested namespace.\n\
+    \\EOT\EOT\EOT\STX\SOH\DC2\ETX0\EOT3\SUB+ Current state of the requested namespace.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\SOH\ACK\DC2\ETX/\EOT(\n\
+    \\ENQ\EOT\EOT\STX\SOH\ACK\DC2\ETX0\EOT(\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\SOH\SOH\DC2\ETX/).\n\
+    \\ENQ\EOT\EOT\STX\SOH\SOH\DC2\ETX0).\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\SOH\ETX\DC2\ETX/12\n\
+    \\ENQ\EOT\EOT\STX\SOH\ETX\DC2\ETX012\n\
     \\170\SOH\n\
-    \\EOT\EOT\EOT\STX\STX\DC2\ETX2\EOTE\SUB\156\SOH Allowed namespace states for requested operation.\n\
+    \\EOT\EOT\EOT\STX\STX\DC2\ETX3\EOTE\SUB\156\SOH Allowed namespace states for requested operation.\n\
     \ For example NAMESPACE_STATE_DELETED is forbidden for most operations but allowed for DescribeNamespace.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\STX\EOT\DC2\ETX2\EOT\f\n\
+    \\ENQ\EOT\EOT\STX\STX\EOT\DC2\ETX3\EOT\f\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\STX\ACK\DC2\ETX2\r1\n\
+    \\ENQ\EOT\EOT\STX\STX\ACK\DC2\ETX3\r1\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\STX\SOH\DC2\ETX22@\n\
+    \\ENQ\EOT\EOT\STX\STX\SOH\DC2\ETX32@\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\STX\ETX\DC2\ETX2CD\n\
+    \\ENQ\EOT\EOT\STX\STX\ETX\DC2\ETX3CD\n\
     \\n\
     \\n\
-    \\STX\EOT\ENQ\DC2\EOT5\NUL7\SOH\n\
+    \\STX\EOT\ENQ\DC2\EOT6\NUL8\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\ENQ\SOH\DC2\ETX5\b \n\
+    \\ETX\EOT\ENQ\SOH\DC2\ETX6\b \n\
     \\v\n\
-    \\EOT\EOT\ENQ\STX\NUL\DC2\ETX6\EOT\EM\n\
+    \\EOT\EOT\ENQ\STX\NUL\DC2\ETX7\EOT\EM\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\NUL\ENQ\DC2\ETX6\EOT\n\
+    \\ENQ\EOT\ENQ\STX\NUL\ENQ\DC2\ETX7\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\NUL\SOH\DC2\ETX6\v\DC4\n\
+    \\ENQ\EOT\ENQ\STX\NUL\SOH\DC2\ETX7\v\DC4\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\NUL\ETX\DC2\ETX6\ETB\CAN\n\
+    \\ENQ\EOT\ENQ\STX\NUL\ETX\DC2\ETX7\ETB\CAN\n\
     \\n\
     \\n\
-    \\STX\EOT\ACK\DC2\EOT9\NUL:\SOH\n\
+    \\STX\EOT\ACK\DC2\EOT:\NUL;\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\ACK\SOH\DC2\ETX9\b%\n\
+    \\ETX\EOT\ACK\SOH\DC2\ETX:\b%\n\
     \\n\
     \\n\
-    \\STX\EOT\a\DC2\EOT<\NUL@\SOH\n\
+    \\STX\EOT\a\DC2\EOT=\NULA\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\a\SOH\DC2\ETX<\b(\n\
+    \\ETX\EOT\a\SOH\DC2\ETX=\b(\n\
     \\v\n\
-    \\EOT\EOT\a\STX\NUL\DC2\ETX=\EOT\RS\n\
+    \\EOT\EOT\a\STX\NUL\DC2\ETX>\EOT\RS\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\NUL\ENQ\DC2\ETX=\EOT\n\
+    \\ENQ\EOT\a\STX\NUL\ENQ\DC2\ETX>\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\NUL\SOH\DC2\ETX=\v\EM\n\
+    \\ENQ\EOT\a\STX\NUL\SOH\DC2\ETX>\v\EM\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\NUL\ETX\DC2\ETX=\FS\GS\n\
+    \\ENQ\EOT\a\STX\NUL\ETX\DC2\ETX>\FS\GS\n\
     \\v\n\
-    \\EOT\EOT\a\STX\SOH\DC2\ETX>\EOT\ESC\n\
+    \\EOT\EOT\a\STX\SOH\DC2\ETX?\EOT\ESC\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\SOH\ENQ\DC2\ETX>\EOT\n\
+    \\ENQ\EOT\a\STX\SOH\ENQ\DC2\ETX?\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\SOH\SOH\DC2\ETX>\v\SYN\n\
+    \\ENQ\EOT\a\STX\SOH\SOH\DC2\ETX?\v\SYN\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\SOH\ETX\DC2\ETX>\EM\SUB\n\
+    \\ENQ\EOT\a\STX\SOH\ETX\DC2\ETX?\EM\SUB\n\
     \\v\n\
-    \\EOT\EOT\a\STX\STX\DC2\ETX?\EOT\"\n\
+    \\EOT\EOT\a\STX\STX\DC2\ETX@\EOT\"\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\STX\ENQ\DC2\ETX?\EOT\n\
+    \\ENQ\EOT\a\STX\STX\ENQ\DC2\ETX@\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\STX\SOH\DC2\ETX?\v\GS\n\
+    \\ENQ\EOT\a\STX\STX\SOH\DC2\ETX@\v\GS\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\STX\ETX\DC2\ETX? !\n\
+    \\ENQ\EOT\a\STX\STX\ETX\DC2\ETX@ !\n\
     \\n\
     \\n\
-    \\STX\EOT\b\DC2\EOTB\NULE\SOH\n\
+    \\STX\EOT\b\DC2\EOTC\NULF\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\b\SOH\DC2\ETXB\b(\n\
+    \\ETX\EOT\b\SOH\DC2\ETXC\b(\n\
     \\v\n\
-    \\EOT\EOT\b\STX\NUL\DC2\ETXC\EOT\RS\n\
+    \\EOT\EOT\b\STX\NUL\DC2\ETXD\EOT\RS\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\NUL\ENQ\DC2\ETXC\EOT\n\
+    \\ENQ\EOT\b\STX\NUL\ENQ\DC2\ETXD\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\NUL\SOH\DC2\ETXC\v\EM\n\
+    \\ENQ\EOT\b\STX\NUL\SOH\DC2\ETXD\v\EM\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\NUL\ETX\DC2\ETXC\FS\GS\n\
+    \\ENQ\EOT\b\STX\NUL\ETX\DC2\ETXD\FS\GS\n\
     \\v\n\
-    \\EOT\EOT\b\STX\SOH\DC2\ETXD\EOT0\n\
+    \\EOT\EOT\b\STX\SOH\DC2\ETXE\EOT0\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\SOH\ENQ\DC2\ETXD\EOT\n\
+    \\ENQ\EOT\b\STX\SOH\ENQ\DC2\ETXE\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\SOH\SOH\DC2\ETXD\v+\n\
+    \\ENQ\EOT\b\STX\SOH\SOH\DC2\ETXE\v+\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\SOH\ETX\DC2\ETXD./\n\
+    \\ENQ\EOT\b\STX\SOH\ETX\DC2\ETXE./\n\
     \\n\
     \\n\
-    \\STX\EOT\t\DC2\EOTG\NULH\SOH\n\
+    \\STX\EOT\t\DC2\EOTH\NULI\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\t\SOH\DC2\ETXG\b+\n\
+    \\ETX\EOT\t\SOH\DC2\ETXH\b+\n\
     \\n\
     \\n\
     \\STX\EOT\n\
-    \\DC2\EOTJ\NULO\SOH\n\
+    \\DC2\EOTK\NULP\SOH\n\
     \\n\
     \\n\
     \\ETX\EOT\n\
-    \\SOH\DC2\ETXJ\b\SUB\n\
+    \\SOH\DC2\ETXK\b\SUB\n\
     \\235\SOH\n\
     \\EOT\EOT\n\
-    \\STX\NUL\DC2\ETXN\EOT0\SUB\221\SOH The full reason for this query failure. May not be available if the response is generated by an old\n\
+    \\STX\NUL\DC2\ETXO\EOT0\SUB\221\SOH The full reason for this query failure. May not be available if the response is generated by an old\n\
     \ SDK. This field can be encoded by the SDK's failure converter to support E2E encryption of messages and stack\n\
     \ traces.\n\
     \\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\NUL\ACK\DC2\ETXN\EOT#\n\
+    \\STX\NUL\ACK\DC2\ETXO\EOT#\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\NUL\SOH\DC2\ETXN$+\n\
+    \\STX\NUL\SOH\DC2\ETXO$+\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\NUL\ETX\DC2\ETXN./\n\
+    \\STX\NUL\ETX\DC2\ETXO./\n\
     \\n\
     \\n\
-    \\STX\EOT\v\DC2\EOTQ\NULS\SOH\n\
+    \\STX\EOT\v\DC2\EOTR\NULT\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\v\SOH\DC2\ETXQ\b\US\n\
+    \\ETX\EOT\v\SOH\DC2\ETXR\b\US\n\
     \\v\n\
-    \\EOT\EOT\v\STX\NUL\DC2\ETXR\EOT\SYN\n\
+    \\EOT\EOT\v\STX\NUL\DC2\ETXS\EOT\SYN\n\
     \\f\n\
-    \\ENQ\EOT\v\STX\NUL\ENQ\DC2\ETXR\EOT\n\
+    \\ENQ\EOT\v\STX\NUL\ENQ\DC2\ETXS\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\v\STX\NUL\SOH\DC2\ETXR\v\DC1\n\
+    \\ENQ\EOT\v\STX\NUL\SOH\DC2\ETXS\v\DC1\n\
     \\f\n\
-    \\ENQ\EOT\v\STX\NUL\ETX\DC2\ETXR\DC4\NAK\n\
+    \\ENQ\EOT\v\STX\NUL\ETX\DC2\ETXS\DC4\NAK\n\
     \\n\
     \\n\
-    \\STX\EOT\f\DC2\EOTU\NULX\SOH\n\
+    \\STX\EOT\f\DC2\EOTV\NULY\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\f\SOH\DC2\ETXU\b \n\
+    \\ETX\EOT\f\SOH\DC2\ETXV\b \n\
     \\v\n\
-    \\EOT\EOT\f\STX\NUL\DC2\ETXV\EOT;\n\
+    \\EOT\EOT\f\STX\NUL\DC2\ETXW\EOT;\n\
     \\f\n\
-    \\ENQ\EOT\f\STX\NUL\ACK\DC2\ETXV\EOT0\n\
+    \\ENQ\EOT\f\STX\NUL\ACK\DC2\ETXW\EOT0\n\
     \\f\n\
-    \\ENQ\EOT\f\STX\NUL\SOH\DC2\ETXV16\n\
+    \\ENQ\EOT\f\STX\NUL\SOH\DC2\ETXW16\n\
     \\f\n\
-    \\ENQ\EOT\f\STX\NUL\ETX\DC2\ETXV9:\n\
+    \\ENQ\EOT\f\STX\NUL\ETX\DC2\ETXW9:\n\
     \\v\n\
-    \\EOT\EOT\f\STX\SOH\DC2\ETXW\EOT;\n\
+    \\EOT\EOT\f\STX\SOH\DC2\ETXX\EOT;\n\
     \\f\n\
-    \\ENQ\EOT\f\STX\SOH\ACK\DC2\ETXW\EOT0\n\
+    \\ENQ\EOT\f\STX\SOH\ACK\DC2\ETXX\EOT0\n\
     \\f\n\
-    \\ENQ\EOT\f\STX\SOH\SOH\DC2\ETXW16\n\
+    \\ENQ\EOT\f\STX\SOH\SOH\DC2\ETXX16\n\
     \\f\n\
-    \\ENQ\EOT\f\STX\SOH\ETX\DC2\ETXW9:\n\
+    \\ENQ\EOT\f\STX\SOH\ETX\DC2\ETXX9:\n\
     \\n\
     \\n\
-    \\STX\EOT\r\DC2\EOTZ\NUL`\SOH\n\
+    \\STX\EOT\r\DC2\EOT[\NULa\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\r\SOH\DC2\ETXZ\b\GS\n\
+    \\ETX\EOT\r\SOH\DC2\ETX[\b\GS\n\
     \\202\SOH\n\
-    \\EOT\EOT\r\STX\NUL\DC2\ETX]\EOTD\SUB\188\SOH WorkflowId and RunId of the Temporal system workflow performing the underlying operation.\n\
+    \\EOT\EOT\r\STX\NUL\DC2\ETX^\EOTD\SUB\188\SOH WorkflowId and RunId of the Temporal system workflow performing the underlying operation.\n\
     \ Looking up the info of the system workflow run may help identify the issue causing the failure.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\r\STX\NUL\ACK\DC2\ETX]\EOT,\n\
+    \\ENQ\EOT\r\STX\NUL\ACK\DC2\ETX^\EOT,\n\
     \\f\n\
-    \\ENQ\EOT\r\STX\NUL\SOH\DC2\ETX]-?\n\
+    \\ENQ\EOT\r\STX\NUL\SOH\DC2\ETX^-?\n\
     \\f\n\
-    \\ENQ\EOT\r\STX\NUL\ETX\DC2\ETX]BC\n\
+    \\ENQ\EOT\r\STX\NUL\ETX\DC2\ETX^BC\n\
     \d\n\
-    \\EOT\EOT\r\STX\SOH\DC2\ETX_\EOT\RS\SUBW Serialized error returned by the system workflow performing the underlying operation.\n\
+    \\EOT\EOT\r\STX\SOH\DC2\ETX`\EOT\RS\SUBW Serialized error returned by the system workflow performing the underlying operation.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\r\STX\SOH\ENQ\DC2\ETX_\EOT\n\
+    \\ENQ\EOT\r\STX\SOH\ENQ\DC2\ETX`\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\r\STX\SOH\SOH\DC2\ETX_\v\EM\n\
+    \\ENQ\EOT\r\STX\SOH\SOH\DC2\ETX`\v\EM\n\
     \\f\n\
-    \\ENQ\EOT\r\STX\SOH\ETX\DC2\ETX_\FS\GS\n\
+    \\ENQ\EOT\r\STX\SOH\ETX\DC2\ETX`\FS\GS\n\
     \\n\
     \\n\
-    \\STX\EOT\SO\DC2\EOTb\NULc\SOH\n\
+    \\STX\EOT\SO\DC2\EOTc\NULd\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\SO\SOH\DC2\ETXb\b\US\n\
+    \\ETX\EOT\SO\SOH\DC2\ETXc\b\US\n\
     \\n\
     \\n\
-    \\STX\EOT\SI\DC2\EOTe\NULh\SOH\n\
+    \\STX\EOT\SI\DC2\EOTf\NULi\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\SI\SOH\DC2\ETXe\b\US\n\
+    \\ETX\EOT\SI\SOH\DC2\ETXf\b\US\n\
     \O\n\
-    \\EOT\EOT\SI\STX\NUL\DC2\ETXg\EOT \SUBB The current default compatible build ID which will receive tasks\n\
+    \\EOT\EOT\SI\STX\NUL\DC2\ETXh\EOT \SUBB The current default compatible build ID which will receive tasks\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\SI\STX\NUL\ENQ\DC2\ETXg\EOT\n\
+    \\ENQ\EOT\SI\STX\NUL\ENQ\DC2\ETXh\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\SI\STX\NUL\SOH\DC2\ETXg\v\ESC\n\
+    \\ENQ\EOT\SI\STX\NUL\SOH\DC2\ETXh\v\ESC\n\
     \\f\n\
-    \\ENQ\EOT\SI\STX\NUL\ETX\DC2\ETXg\RS\US\n\
+    \\ENQ\EOT\SI\STX\NUL\ETX\DC2\ETXh\RS\US\n\
     \\n\
     \\n\
-    \\STX\EOT\DLE\DC2\EOTj\NULz\SOH\n\
+    \\STX\EOT\DLE\DC2\EOTk\NUL{\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\DLE\SOH\DC2\ETXj\b&\n\
+    \\ETX\EOT\DLE\SOH\DC2\ETXk\b&\n\
     \\167\STX\n\
-    \\EOT\EOT\DLE\STX\NUL\DC2\ETXn\EOT*\SUB\153\STX One status for each requested operation from the failed MultiOperation. The failed\n\
+    \\EOT\EOT\DLE\STX\NUL\DC2\ETXo\EOT*\SUB\153\STX One status for each requested operation from the failed MultiOperation. The failed\n\
     \ operation(s) have the same error details as if it was executed separately. All other operations have the\n\
     \ status code `Aborted` and `MultiOperationExecutionAborted` is added to the details field.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\DLE\STX\NUL\EOT\DC2\ETXn\EOT\f\n\
+    \\ENQ\EOT\DLE\STX\NUL\EOT\DC2\ETXo\EOT\f\n\
     \\f\n\
-    \\ENQ\EOT\DLE\STX\NUL\ACK\DC2\ETXn\r\FS\n\
+    \\ENQ\EOT\DLE\STX\NUL\ACK\DC2\ETXo\r\FS\n\
     \\f\n\
-    \\ENQ\EOT\DLE\STX\NUL\SOH\DC2\ETXn\GS%\n\
+    \\ENQ\EOT\DLE\STX\NUL\SOH\DC2\ETXo\GS%\n\
     \\f\n\
-    \\ENQ\EOT\DLE\STX\NUL\ETX\DC2\ETXn()\n\
+    \\ENQ\EOT\DLE\STX\NUL\ETX\DC2\ETXo()\n\
     \\153\STX\n\
-    \\EOT\EOT\DLE\ETX\NUL\DC2\EOTu\EOTy\ENQ\SUB\138\STX NOTE: `OperationStatus` is modelled after\n\
+    \\EOT\EOT\DLE\ETX\NUL\DC2\EOTv\EOTz\ENQ\SUB\138\STX NOTE: `OperationStatus` is modelled after\n\
     \ [`google.rpc.Status`](https://github.com/googleapis/googleapis/blob/master/google/rpc/status.proto).\n\
     \\n\
     \ (-- api-linter: core::0146::any=disabled\n\
     \     aip.dev/not-precedent: details are meant to hold arbitrary payloads. --)\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\DLE\ETX\NUL\SOH\DC2\ETXu\f\ESC\n\
+    \\ENQ\EOT\DLE\ETX\NUL\SOH\DC2\ETXv\f\ESC\n\
     \\r\n\
-    \\ACK\EOT\DLE\ETX\NUL\STX\NUL\DC2\ETXv\b\ETB\n\
+    \\ACK\EOT\DLE\ETX\NUL\STX\NUL\DC2\ETXw\b\ETB\n\
     \\SO\n\
-    \\a\EOT\DLE\ETX\NUL\STX\NUL\ENQ\DC2\ETXv\b\r\n\
+    \\a\EOT\DLE\ETX\NUL\STX\NUL\ENQ\DC2\ETXw\b\r\n\
     \\SO\n\
-    \\a\EOT\DLE\ETX\NUL\STX\NUL\SOH\DC2\ETXv\SO\DC2\n\
+    \\a\EOT\DLE\ETX\NUL\STX\NUL\SOH\DC2\ETXw\SO\DC2\n\
     \\SO\n\
-    \\a\EOT\DLE\ETX\NUL\STX\NUL\ETX\DC2\ETXv\NAK\SYN\n\
+    \\a\EOT\DLE\ETX\NUL\STX\NUL\ETX\DC2\ETXw\NAK\SYN\n\
     \\r\n\
-    \\ACK\EOT\DLE\ETX\NUL\STX\SOH\DC2\ETXw\b\ESC\n\
+    \\ACK\EOT\DLE\ETX\NUL\STX\SOH\DC2\ETXx\b\ESC\n\
     \\SO\n\
-    \\a\EOT\DLE\ETX\NUL\STX\SOH\ENQ\DC2\ETXw\b\SO\n\
+    \\a\EOT\DLE\ETX\NUL\STX\SOH\ENQ\DC2\ETXx\b\SO\n\
     \\SO\n\
-    \\a\EOT\DLE\ETX\NUL\STX\SOH\SOH\DC2\ETXw\SI\SYN\n\
+    \\a\EOT\DLE\ETX\NUL\STX\SOH\SOH\DC2\ETXx\SI\SYN\n\
     \\SO\n\
-    \\a\EOT\DLE\ETX\NUL\STX\SOH\ETX\DC2\ETXw\EM\SUB\n\
+    \\a\EOT\DLE\ETX\NUL\STX\SOH\ETX\DC2\ETXx\EM\SUB\n\
     \\r\n\
-    \\ACK\EOT\DLE\ETX\NUL\STX\STX\DC2\ETXx\b1\n\
+    \\ACK\EOT\DLE\ETX\NUL\STX\STX\DC2\ETXy\b1\n\
     \\SO\n\
-    \\a\EOT\DLE\ETX\NUL\STX\STX\EOT\DC2\ETXx\b\DLE\n\
+    \\a\EOT\DLE\ETX\NUL\STX\STX\EOT\DC2\ETXy\b\DLE\n\
     \\SO\n\
-    \\a\EOT\DLE\ETX\NUL\STX\STX\ACK\DC2\ETXx\DC1$\n\
+    \\a\EOT\DLE\ETX\NUL\STX\STX\ACK\DC2\ETXy\DC1$\n\
     \\SO\n\
-    \\a\EOT\DLE\ETX\NUL\STX\STX\SOH\DC2\ETXx%,\n\
+    \\a\EOT\DLE\ETX\NUL\STX\STX\SOH\DC2\ETXy%,\n\
     \\SO\n\
-    \\a\EOT\DLE\ETX\NUL\STX\STX\ETX\DC2\ETXx/0b\ACKproto3"
+    \\a\EOT\DLE\ETX\NUL\STX\STX\ETX\DC2\ETXy/0\n\
+    \\137\STX\n\
+    \\STX\EOT\DC1\DC2\ACK\128\SOH\NUL\131\SOH\SOH\SUB\250\SOH An error indicating that an activity execution failed to start. Returned when there is an existing activity with the\n\
+    \ given activity ID, and the given ID reuse and conflict policies do not permit starting a new one or attaching to an\n\
+    \ existing one.\n\
+    \\n\
+    \\v\n\
+    \\ETX\EOT\DC1\SOH\DC2\EOT\128\SOH\b.\n\
+    \\f\n\
+    \\EOT\EOT\DC1\STX\NUL\DC2\EOT\129\SOH\EOT \n\
+    \\r\n\
+    \\ENQ\EOT\DC1\STX\NUL\ENQ\DC2\EOT\129\SOH\EOT\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\DC1\STX\NUL\SOH\DC2\EOT\129\SOH\v\ESC\n\
+    \\r\n\
+    \\ENQ\EOT\DC1\STX\NUL\ETX\DC2\EOT\129\SOH\RS\US\n\
+    \\f\n\
+    \\EOT\EOT\DC1\STX\SOH\DC2\EOT\130\SOH\EOT\SYN\n\
+    \\r\n\
+    \\ENQ\EOT\DC1\STX\SOH\ENQ\DC2\EOT\130\SOH\EOT\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\DC1\STX\SOH\SOH\DC2\EOT\130\SOH\v\DC1\n\
+    \\r\n\
+    \\ENQ\EOT\DC1\STX\SOH\ETX\DC2\EOT\130\SOH\DC4\NAK\n\
+    \\135\STX\n\
+    \\STX\EOT\DC2\DC2\ACK\136\SOH\NUL\139\SOH\SOH\SUB\248\SOH An error indicating that a Nexus operation failed to start. Returned when there is an existing operation with the\n\
+    \ given operation ID, and the given ID reuse and conflict policies do not permit starting a new one or attaching to an\n\
+    \ existing one.\n\
+    \\n\
+    \\v\n\
+    \\ETX\EOT\DC2\SOH\DC2\EOT\136\SOH\b4\n\
+    \\f\n\
+    \\EOT\EOT\DC2\STX\NUL\DC2\EOT\137\SOH\EOT \n\
+    \\r\n\
+    \\ENQ\EOT\DC2\STX\NUL\ENQ\DC2\EOT\137\SOH\EOT\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\DC2\STX\NUL\SOH\DC2\EOT\137\SOH\v\ESC\n\
+    \\r\n\
+    \\ENQ\EOT\DC2\STX\NUL\ETX\DC2\EOT\137\SOH\RS\US\n\
+    \\f\n\
+    \\EOT\EOT\DC2\STX\SOH\DC2\EOT\138\SOH\EOT\SYN\n\
+    \\r\n\
+    \\ENQ\EOT\DC2\STX\SOH\ENQ\DC2\EOT\138\SOH\EOT\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\DC2\STX\SOH\SOH\DC2\EOT\138\SOH\v\DC1\n\
+    \\r\n\
+    \\ENQ\EOT\DC2\STX\SOH\ETX\DC2\EOT\138\SOH\DC4\NAK\n\
+    \\131\STX\n\
+    \\STX\EOT\DC3\DC2\ACK\144\SOH\NUL\145\SOH\SOH\SUB\244\SOH An error indicating that the server lost the buffered pages of a paginated workflow task\n\
+    \ completion. This is a transient error: the workflow task is still valid, and the client \n\
+    \ should resend all pages from page 0 using the same task token.\n\
+    \\n\
+    \\v\n\
+    \\ETX\EOT\DC3\SOH\DC2\EOT\144\SOH\b/b\ACKproto3"

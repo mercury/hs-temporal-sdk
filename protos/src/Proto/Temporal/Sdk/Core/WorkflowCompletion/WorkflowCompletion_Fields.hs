@@ -66,6 +66,20 @@ maybe'failure ::
    Data.ProtoLens.Field.HasField s "maybe'failure" a) =>
   Lens.Family2.LensLike' f s a
 maybe'failure = Data.ProtoLens.Field.field @"maybe'failure"
+maybe'payloadDownloadMetrics ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'payloadDownloadMetrics" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'payloadDownloadMetrics
+  = Data.ProtoLens.Field.field @"maybe'payloadDownloadMetrics"
+maybe'payloadUploadMetrics ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'payloadUploadMetrics" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'payloadUploadMetrics
+  = Data.ProtoLens.Field.field @"maybe'payloadUploadMetrics"
 maybe'status ::
   forall f s a.
   (Prelude.Functor f,
@@ -78,6 +92,20 @@ maybe'successful ::
    Data.ProtoLens.Field.HasField s "maybe'successful" a) =>
   Lens.Family2.LensLike' f s a
 maybe'successful = Data.ProtoLens.Field.field @"maybe'successful"
+payloadDownloadMetrics ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "payloadDownloadMetrics" a) =>
+  Lens.Family2.LensLike' f s a
+payloadDownloadMetrics
+  = Data.ProtoLens.Field.field @"payloadDownloadMetrics"
+payloadUploadMetrics ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "payloadUploadMetrics" a) =>
+  Lens.Family2.LensLike' f s a
+payloadUploadMetrics
+  = Data.ProtoLens.Field.field @"payloadUploadMetrics"
 runId ::
   forall f s a.
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "runId" a) =>

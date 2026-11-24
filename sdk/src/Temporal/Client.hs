@@ -515,6 +515,8 @@ query h (queryRef -> KnownQuery qn codec) opts = withArgs @(QueryArgs query) @(m
       WORKFLOW_EXECUTION_STATUS_TERMINATED -> Terminated
       WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW -> ContinuedAsNew
       WORKFLOW_EXECUTION_STATUS_TIMED_OUT -> TimedOut
+      -- The public status type does not yet distinguish paused workflows.
+      WORKFLOW_EXECUTION_STATUS_PAUSED -> UnknownStatus
       WorkflowExecutionStatus'Unrecognized _ -> UnknownStatus
 
 

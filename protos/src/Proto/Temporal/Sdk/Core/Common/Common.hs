@@ -4,9 +4,9 @@
 {-# OPTIONS_GHC -Wno-duplicate-exports#-}
 {-# OPTIONS_GHC -Wno-dodgy-exports#-}
 module Proto.Temporal.Sdk.Core.Common.Common (
-        NamespacedWorkflowExecution(), VersioningIntent(..),
-        VersioningIntent(), VersioningIntent'UnrecognizedValue,
-        WorkerDeploymentVersion()
+        ExternalStorageMetrics(), NamespacedWorkflowExecution(),
+        VersioningIntent(..), VersioningIntent(),
+        VersioningIntent'UnrecognizedValue, WorkerDeploymentVersion()
     ) where
 import qualified Data.ProtoLens.Runtime.Control.DeepSeq as Control.DeepSeq
 import qualified Data.ProtoLens.Runtime.Data.ProtoLens.Prism as Data.ProtoLens.Prism
@@ -34,6 +34,282 @@ import qualified Data.ProtoLens.Runtime.Data.Vector.Generic as Data.Vector.Gener
 import qualified Data.ProtoLens.Runtime.Data.Vector.Unboxed as Data.Vector.Unboxed
 import qualified Data.ProtoLens.Runtime.Text.Read as Text.Read
 import qualified Proto.Google.Protobuf.Duration
+{- | Fields :
+     
+         * 'Proto.Temporal.Sdk.Core.Common.Common_Fields.payloadCount' @:: Lens' ExternalStorageMetrics Data.Word.Word64@
+         * 'Proto.Temporal.Sdk.Core.Common.Common_Fields.totalSizeBytes' @:: Lens' ExternalStorageMetrics Data.Word.Word64@
+         * 'Proto.Temporal.Sdk.Core.Common.Common_Fields.totalDuration' @:: Lens' ExternalStorageMetrics Proto.Google.Protobuf.Duration.Duration@
+         * 'Proto.Temporal.Sdk.Core.Common.Common_Fields.maybe'totalDuration' @:: Lens' ExternalStorageMetrics (Prelude.Maybe Proto.Google.Protobuf.Duration.Duration)@
+         * 'Proto.Temporal.Sdk.Core.Common.Common_Fields.driverNames' @:: Lens' ExternalStorageMetrics [Data.Text.Text]@
+         * 'Proto.Temporal.Sdk.Core.Common.Common_Fields.vec'driverNames' @:: Lens' ExternalStorageMetrics (Data.Vector.Vector Data.Text.Text)@ -}
+data ExternalStorageMetrics
+  = ExternalStorageMetrics'_constructor {_ExternalStorageMetrics'payloadCount :: !Data.Word.Word64,
+                                         _ExternalStorageMetrics'totalSizeBytes :: !Data.Word.Word64,
+                                         _ExternalStorageMetrics'totalDuration :: !(Prelude.Maybe Proto.Google.Protobuf.Duration.Duration),
+                                         _ExternalStorageMetrics'driverNames :: !(Data.Vector.Vector Data.Text.Text),
+                                         _ExternalStorageMetrics'_unknownFields :: !Data.ProtoLens.FieldSet}
+  deriving stock (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show ExternalStorageMetrics where
+  showsPrec _ __x __s
+    = Prelude.showChar
+        '{'
+        (Prelude.showString
+           (Data.ProtoLens.showMessageShort __x) (Prelude.showChar '}' __s))
+instance Data.ProtoLens.Field.HasField ExternalStorageMetrics "payloadCount" Data.Word.Word64 where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _ExternalStorageMetrics'payloadCount
+           (\ x__ y__ -> x__ {_ExternalStorageMetrics'payloadCount = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField ExternalStorageMetrics "totalSizeBytes" Data.Word.Word64 where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _ExternalStorageMetrics'totalSizeBytes
+           (\ x__ y__ -> x__ {_ExternalStorageMetrics'totalSizeBytes = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField ExternalStorageMetrics "totalDuration" Proto.Google.Protobuf.Duration.Duration where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _ExternalStorageMetrics'totalDuration
+           (\ x__ y__ -> x__ {_ExternalStorageMetrics'totalDuration = y__}))
+        (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
+instance Data.ProtoLens.Field.HasField ExternalStorageMetrics "maybe'totalDuration" (Prelude.Maybe Proto.Google.Protobuf.Duration.Duration) where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _ExternalStorageMetrics'totalDuration
+           (\ x__ y__ -> x__ {_ExternalStorageMetrics'totalDuration = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField ExternalStorageMetrics "driverNames" [Data.Text.Text] where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _ExternalStorageMetrics'driverNames
+           (\ x__ y__ -> x__ {_ExternalStorageMetrics'driverNames = y__}))
+        (Lens.Family2.Unchecked.lens
+           Data.Vector.Generic.toList
+           (\ _ y__ -> Data.Vector.Generic.fromList y__))
+instance Data.ProtoLens.Field.HasField ExternalStorageMetrics "vec'driverNames" (Data.Vector.Vector Data.Text.Text) where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _ExternalStorageMetrics'driverNames
+           (\ x__ y__ -> x__ {_ExternalStorageMetrics'driverNames = y__}))
+        Prelude.id
+instance Data.ProtoLens.Message ExternalStorageMetrics where
+  messageName _
+    = Data.Text.pack "coresdk.common.ExternalStorageMetrics"
+  packedMessageDescriptor _
+    = "\n\
+      \\SYNExternalStorageMetrics\DC2#\n\
+      \\rpayload_count\CAN\SOH \SOH(\EOTR\fpayloadCount\DC2(\n\
+      \\DLEtotal_size_bytes\CAN\STX \SOH(\EOTR\SOtotalSizeBytes\DC2@\n\
+      \\SOtotal_duration\CAN\ETX \SOH(\v2\EM.google.protobuf.DurationR\rtotalDuration\DC2!\n\
+      \\fdriver_names\CAN\EOT \ETX(\tR\vdriverNames"
+  packedFileDescriptor _ = packedFileDescriptor
+  fieldsByTag
+    = let
+        payloadCount__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "payload_count"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.UInt64Field ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Word.Word64)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"payloadCount")) ::
+              Data.ProtoLens.FieldDescriptor ExternalStorageMetrics
+        totalSizeBytes__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "total_size_bytes"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.UInt64Field ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Word.Word64)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"totalSizeBytes")) ::
+              Data.ProtoLens.FieldDescriptor ExternalStorageMetrics
+        totalDuration__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "total_duration"
+              (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                 Data.ProtoLens.FieldTypeDescriptor Proto.Google.Protobuf.Duration.Duration)
+              (Data.ProtoLens.OptionalField
+                 (Data.ProtoLens.Field.field @"maybe'totalDuration")) ::
+              Data.ProtoLens.FieldDescriptor ExternalStorageMetrics
+        driverNames__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "driver_names"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.StringField ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Text.Text)
+              (Data.ProtoLens.RepeatedField
+                 Data.ProtoLens.Unpacked
+                 (Data.ProtoLens.Field.field @"driverNames")) ::
+              Data.ProtoLens.FieldDescriptor ExternalStorageMetrics
+      in
+        Data.Map.fromList
+          [(Data.ProtoLens.Tag 1, payloadCount__field_descriptor),
+           (Data.ProtoLens.Tag 2, totalSizeBytes__field_descriptor),
+           (Data.ProtoLens.Tag 3, totalDuration__field_descriptor),
+           (Data.ProtoLens.Tag 4, driverNames__field_descriptor)]
+  unknownFields
+    = Lens.Family2.Unchecked.lens
+        _ExternalStorageMetrics'_unknownFields
+        (\ x__ y__ -> x__ {_ExternalStorageMetrics'_unknownFields = y__})
+  defMessage
+    = ExternalStorageMetrics'_constructor
+        {_ExternalStorageMetrics'payloadCount = Data.ProtoLens.fieldDefault,
+         _ExternalStorageMetrics'totalSizeBytes = Data.ProtoLens.fieldDefault,
+         _ExternalStorageMetrics'totalDuration = Prelude.Nothing,
+         _ExternalStorageMetrics'driverNames = Data.Vector.Generic.empty,
+         _ExternalStorageMetrics'_unknownFields = []}
+  parseMessage
+    = let
+        loop ::
+          ExternalStorageMetrics
+          -> Data.ProtoLens.Encoding.Growing.Growing Data.Vector.Vector Data.ProtoLens.Encoding.Growing.RealWorld Data.Text.Text
+             -> Data.ProtoLens.Encoding.Bytes.Parser ExternalStorageMetrics
+        loop x mutable'driverNames
+          = do end <- Data.ProtoLens.Encoding.Bytes.atEnd
+               if end then
+                   do frozen'driverNames <- Data.ProtoLens.Encoding.Parser.Unsafe.unsafeLiftIO
+                                              (Data.ProtoLens.Encoding.Growing.unsafeFreeze
+                                                 mutable'driverNames)
+                      (let missing = []
+                       in
+                         if Prelude.null missing then
+                             Prelude.return ()
+                         else
+                             Prelude.fail
+                               ((Prelude.++)
+                                  "Missing required fields: "
+                                  (Prelude.show (missing :: [Prelude.String]))))
+                      Prelude.return
+                        (Lens.Family2.over
+                           Data.ProtoLens.unknownFields (\ !t -> Prelude.reverse t)
+                           (Lens.Family2.set
+                              (Data.ProtoLens.Field.field @"vec'driverNames") frozen'driverNames
+                              x))
+               else
+                   do tag <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                      case tag of
+                        8 -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       Data.ProtoLens.Encoding.Bytes.getVarInt "payload_count"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field @"payloadCount") y x)
+                                  mutable'driverNames
+                        16
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       Data.ProtoLens.Encoding.Bytes.getVarInt "total_size_bytes"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field @"totalSizeBytes") y x)
+                                  mutable'driverNames
+                        26
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.isolate
+                                             (Prelude.fromIntegral len) Data.ProtoLens.parseMessage)
+                                       "total_duration"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field @"totalDuration") y x)
+                                  mutable'driverNames
+                        34
+                          -> do !y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                        (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                            Data.ProtoLens.Encoding.Bytes.getText
+                                              (Prelude.fromIntegral len))
+                                        "driver_names"
+                                v <- Data.ProtoLens.Encoding.Parser.Unsafe.unsafeLiftIO
+                                       (Data.ProtoLens.Encoding.Growing.append
+                                          mutable'driverNames y)
+                                loop x v
+                        wire
+                          -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
+                                        wire
+                                loop
+                                  (Lens.Family2.over
+                                     Data.ProtoLens.unknownFields (\ !t -> (:) y t) x)
+                                  mutable'driverNames
+      in
+        (Data.ProtoLens.Encoding.Bytes.<?>)
+          (do mutable'driverNames <- Data.ProtoLens.Encoding.Parser.Unsafe.unsafeLiftIO
+                                       Data.ProtoLens.Encoding.Growing.new
+              loop Data.ProtoLens.defMessage mutable'driverNames)
+          "ExternalStorageMetrics"
+  buildMessage
+    = \ _x
+        -> (Data.Monoid.<>)
+             (let
+                _v
+                  = Lens.Family2.view (Data.ProtoLens.Field.field @"payloadCount") _x
+              in
+                if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                    Data.Monoid.mempty
+                else
+                    (Data.Monoid.<>)
+                      (Data.ProtoLens.Encoding.Bytes.putVarInt 8)
+                      (Data.ProtoLens.Encoding.Bytes.putVarInt _v))
+             ((Data.Monoid.<>)
+                (let
+                   _v
+                     = Lens.Family2.view
+                         (Data.ProtoLens.Field.field @"totalSizeBytes") _x
+                 in
+                   if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                       Data.Monoid.mempty
+                   else
+                       (Data.Monoid.<>)
+                         (Data.ProtoLens.Encoding.Bytes.putVarInt 16)
+                         (Data.ProtoLens.Encoding.Bytes.putVarInt _v))
+                ((Data.Monoid.<>)
+                   (case
+                        Lens.Family2.view
+                          (Data.ProtoLens.Field.field @"maybe'totalDuration") _x
+                    of
+                      Prelude.Nothing -> Data.Monoid.mempty
+                      (Prelude.Just _v)
+                        -> (Data.Monoid.<>)
+                             (Data.ProtoLens.Encoding.Bytes.putVarInt 26)
+                             ((Prelude..)
+                                (\ bs
+                                   -> (Data.Monoid.<>)
+                                        (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                           (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                        (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                                Data.ProtoLens.encodeMessage _v))
+                   ((Data.Monoid.<>)
+                      (Data.ProtoLens.Encoding.Bytes.foldMapBuilder
+                         (\ _v
+                            -> (Data.Monoid.<>)
+                                 (Data.ProtoLens.Encoding.Bytes.putVarInt 34)
+                                 ((Prelude..)
+                                    (\ bs
+                                       -> (Data.Monoid.<>)
+                                            (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                               (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                            (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                                    Data.Text.Encoding.encodeUtf8 _v))
+                         (Lens.Family2.view
+                            (Data.ProtoLens.Field.field @"vec'driverNames") _x))
+                      (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                         (Lens.Family2.view Data.ProtoLens.unknownFields _x)))))
+instance Control.DeepSeq.NFData ExternalStorageMetrics where
+  rnf
+    = \ x__
+        -> Control.DeepSeq.deepseq
+             (_ExternalStorageMetrics'_unknownFields x__)
+             (Control.DeepSeq.deepseq
+                (_ExternalStorageMetrics'payloadCount x__)
+                (Control.DeepSeq.deepseq
+                   (_ExternalStorageMetrics'totalSizeBytes x__)
+                   (Control.DeepSeq.deepseq
+                      (_ExternalStorageMetrics'totalDuration x__)
+                      (Control.DeepSeq.deepseq
+                         (_ExternalStorageMetrics'driverNames x__) ()))))
 {- | Fields :
      
          * 'Proto.Temporal.Sdk.Core.Common.Common_Fields.namespace' @:: Lens' NamespacedWorkflowExecution Data.Text.Text@
@@ -492,14 +768,18 @@ packedFileDescriptor
     \\ACKrun_id\CAN\ETX \SOH(\tR\ENQrunId\"]\n\
     \\ETBWorkerDeploymentVersion\DC2'\n\
     \\SIdeployment_name\CAN\SOH \SOH(\tR\SOdeploymentName\DC2\EM\n\
-    \\bbuild_id\CAN\STX \SOH(\tR\abuildId*@\n\
+    \\bbuild_id\CAN\STX \SOH(\tR\abuildId\"\204\SOH\n\
+    \\SYNExternalStorageMetrics\DC2#\n\
+    \\rpayload_count\CAN\SOH \SOH(\EOTR\fpayloadCount\DC2(\n\
+    \\DLEtotal_size_bytes\CAN\STX \SOH(\EOTR\SOtotalSizeBytes\DC2@\n\
+    \\SOtotal_duration\CAN\ETX \SOH(\v2\EM.google.protobuf.DurationR\rtotalDuration\DC2!\n\
+    \\fdriver_names\CAN\EOT \ETX(\tR\vdriverNames*@\n\
     \\DLEVersioningIntent\DC2\SI\n\
     \\vUNSPECIFIED\DLE\NUL\DC2\SO\n\
     \\n\
     \COMPATIBLE\DLE\SOH\DC2\v\n\
-    \\aDEFAULT\DLE\STXB,\234\STX)Temporalio::Internal::Bridge::Api::CommonJ\242\n\
-    \\n\
-    \\ACK\DC2\EOT\NUL\NUL$\SOH\n\
+    \\aDEFAULT\DLE\STXB,\234\STX)Temporalio::Internal::Bridge::Api::CommonJ\151\DLE\n\
+    \\ACK\DC2\EOT\NUL\NUL1\SOH\n\
     \\b\n\
     \\SOH\f\DC2\ETX\NUL\NUL\DC2\n\
     \\b\n\
@@ -606,4 +886,51 @@ packedFileDescriptor
     \\f\n\
     \\ENQ\EOT\SOH\STX\SOH\SOH\DC2\ETX#\v\DC3\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\SOH\ETX\DC2\ETX#\SYN\ETBb\ACKproto3"
+    \\ENQ\EOT\SOH\STX\SOH\ETX\DC2\ETX#\SYN\ETB\n\
+    \\181\SOH\n\
+    \\STX\EOT\STX\DC2\EOT(\NUL1\SOH\SUB\168\SOH Metrics for a set of external payload storage operations (all uploads and downloads)\n\
+    \ performed while processing a task, so core can emit unified logging and metrics.\n\
+    \\n\
+    \\n\
+    \\n\
+    \\ETX\EOT\STX\SOH\DC2\ETX(\b\RS\n\
+    \A\n\
+    \\EOT\EOT\STX\STX\NUL\DC2\ETX*\EOT\GS\SUB4 Number of payloads stored or retrieved externally.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\STX\STX\NUL\ENQ\DC2\ETX*\EOT\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\STX\STX\NUL\SOH\DC2\ETX*\v\CAN\n\
+    \\f\n\
+    \\ENQ\EOT\STX\STX\NUL\ETX\DC2\ETX*\ESC\FS\n\
+    \R\n\
+    \\EOT\EOT\STX\STX\SOH\DC2\ETX,\EOT \SUBE Total size in bytes of the externally stored or retrieved payloads.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\STX\STX\SOH\ENQ\DC2\ETX,\EOT\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\STX\STX\SOH\SOH\DC2\ETX,\v\ESC\n\
+    \\f\n\
+    \\ENQ\EOT\STX\STX\SOH\ETX\DC2\ETX,\RS\US\n\
+    \H\n\
+    \\EOT\EOT\STX\STX\STX\DC2\ETX.\EOT0\SUB; Wall-clock time spent on the external storage operations.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\STX\STX\STX\ACK\DC2\ETX.\EOT\FS\n\
+    \\f\n\
+    \\ENQ\EOT\STX\STX\STX\SOH\DC2\ETX.\GS+\n\
+    \\f\n\
+    \\ENQ\EOT\STX\STX\STX\ETX\DC2\ETX../\n\
+    \H\n\
+    \\EOT\EOT\STX\STX\ETX\DC2\ETX0\EOT%\SUB; Names of the drivers that participated in the operations.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\STX\STX\ETX\EOT\DC2\ETX0\EOT\f\n\
+    \\f\n\
+    \\ENQ\EOT\STX\STX\ETX\ENQ\DC2\ETX0\r\DC3\n\
+    \\f\n\
+    \\ENQ\EOT\STX\STX\ETX\SOH\DC2\ETX0\DC4 \n\
+    \\f\n\
+    \\ENQ\EOT\STX\STX\ETX\ETX\DC2\ETX0#$b\ACKproto3"

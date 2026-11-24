@@ -28,13 +28,21 @@ import qualified Data.ProtoLens.Runtime.Data.Vector.Generic as Data.Vector.Gener
 import qualified Data.ProtoLens.Runtime.Data.Vector.Unboxed as Data.Vector.Unboxed
 import qualified Data.ProtoLens.Runtime.Text.Read as Text.Read
 import qualified Proto.Google.Protobuf.Duration
+import qualified Proto.Google.Protobuf.Timestamp
 import qualified Proto.Temporal.Api.Enums.V1.Common
+import qualified Proto.Temporal.Api.Enums.V1.Namespace
 import qualified Proto.Temporal.Api.Nexus.V1.Message
 address ::
   forall f s a.
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "address" a) =>
   Lens.Family2.LensLike' f s a
 address = Data.ProtoLens.Field.field @"address"
+closeTime ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "closeTime" a) =>
+  Lens.Family2.LensLike' f s a
+closeTime = Data.ProtoLens.Field.field @"closeTime"
 clusterId ::
   forall f s a.
   (Prelude.Functor f,
@@ -72,6 +80,12 @@ enableRemoteClusterConnection ::
   Lens.Family2.LensLike' f s a
 enableRemoteClusterConnection
   = Data.ProtoLens.Field.field @"enableRemoteClusterConnection"
+enableReplication ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "enableReplication" a) =>
+  Lens.Family2.LensLike' f s a
+enableReplication = Data.ProtoLens.Field.field @"enableReplication"
 endpoint ::
   forall f s a.
   (Prelude.Functor f,
@@ -84,6 +98,13 @@ endpoints ::
    Data.ProtoLens.Field.HasField s "endpoints" a) =>
   Lens.Family2.LensLike' f s a
 endpoints = Data.ProtoLens.Field.field @"endpoints"
+estimatedCompletionTime ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "estimatedCompletionTime" a) =>
+  Lens.Family2.LensLike' f s a
+estimatedCompletionTime
+  = Data.ProtoLens.Field.field @"estimatedCompletionTime"
 frontendAddress ::
   forall f s a.
   (Prelude.Functor f,
@@ -103,6 +124,12 @@ historyShardCount ::
    Data.ProtoLens.Field.HasField s "historyShardCount" a) =>
   Lens.Family2.LensLike' f s a
 historyShardCount = Data.ProtoLens.Field.field @"historyShardCount"
+hostCluster ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "hostCluster" a) =>
+  Lens.Family2.LensLike' f s a
+hostCluster = Data.ProtoLens.Field.field @"hostCluster"
 httpAddress ::
   forall f s a.
   (Prelude.Functor f,
@@ -128,17 +155,37 @@ isConnectionEnabled ::
   Lens.Family2.LensLike' f s a
 isConnectionEnabled
   = Data.ProtoLens.Field.field @"isConnectionEnabled"
+isReplicationEnabled ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "isReplicationEnabled" a) =>
+  Lens.Family2.LensLike' f s a
+isReplicationEnabled
+  = Data.ProtoLens.Field.field @"isReplicationEnabled"
 key ::
   forall f s a.
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "key" a) =>
   Lens.Family2.LensLike' f s a
 key = Data.ProtoLens.Field.field @"key"
+maybe'closeTime ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'closeTime" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'closeTime = Data.ProtoLens.Field.field @"maybe'closeTime"
 maybe'endpoint ::
   forall f s a.
   (Prelude.Functor f,
    Data.ProtoLens.Field.HasField s "maybe'endpoint" a) =>
   Lens.Family2.LensLike' f s a
 maybe'endpoint = Data.ProtoLens.Field.field @"maybe'endpoint"
+maybe'estimatedCompletionTime ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'estimatedCompletionTime" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'estimatedCompletionTime
+  = Data.ProtoLens.Field.field @"maybe'estimatedCompletionTime"
 maybe'namespaceDeleteDelay ::
   forall f s a.
   (Prelude.Functor f,
@@ -152,6 +199,12 @@ maybe'spec ::
    Data.ProtoLens.Field.HasField s "maybe'spec" a) =>
   Lens.Family2.LensLike' f s a
 maybe'spec = Data.ProtoLens.Field.field @"maybe'spec"
+maybe'startTime ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'startTime" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'startTime = Data.ProtoLens.Field.field @"maybe'startTime"
 name ::
   forall f s a.
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "name" a) =>
@@ -188,6 +241,18 @@ pageSize ::
    Data.ProtoLens.Field.HasField s "pageSize" a) =>
   Lens.Family2.LensLike' f s a
 pageSize = Data.ProtoLens.Field.field @"pageSize"
+processedExecutionCount ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "processedExecutionCount" a) =>
+  Lens.Family2.LensLike' f s a
+processedExecutionCount
+  = Data.ProtoLens.Field.field @"processedExecutionCount"
+runId ::
+  forall f s a.
+  (Prelude.Functor f, Data.ProtoLens.Field.HasField s "runId" a) =>
+  Lens.Family2.LensLike' f s a
+runId = Data.ProtoLens.Field.field @"runId"
 searchAttributes ::
   forall f s a.
   (Prelude.Functor f,
@@ -199,6 +264,17 @@ spec ::
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "spec" a) =>
   Lens.Family2.LensLike' f s a
 spec = Data.ProtoLens.Field.field @"spec"
+startTime ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "startTime" a) =>
+  Lens.Family2.LensLike' f s a
+startTime = Data.ProtoLens.Field.field @"startTime"
+state ::
+  forall f s a.
+  (Prelude.Functor f, Data.ProtoLens.Field.HasField s "state" a) =>
+  Lens.Family2.LensLike' f s a
+state = Data.ProtoLens.Field.field @"state"
 storageSchema ::
   forall f s a.
   (Prelude.Functor f,
@@ -211,6 +287,13 @@ systemAttributes ::
    Data.ProtoLens.Field.HasField s "systemAttributes" a) =>
   Lens.Family2.LensLike' f s a
 systemAttributes = Data.ProtoLens.Field.field @"systemAttributes"
+totalExecutionCount ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "totalExecutionCount" a) =>
+  Lens.Family2.LensLike' f s a
+totalExecutionCount
+  = Data.ProtoLens.Field.field @"totalExecutionCount"
 value ::
   forall f s a.
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "value" a) =>

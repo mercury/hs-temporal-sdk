@@ -751,6 +751,8 @@ newtype StartChildWorkflowExecutionFailedCause'UnrecognizedValue
 data StartChildWorkflowExecutionFailedCause
   = START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_UNSPECIFIED |
     START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS |
+    START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND |
+    START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_INVALID_VERSIONING_OVERRIDE |
     StartChildWorkflowExecutionFailedCause'Unrecognized !StartChildWorkflowExecutionFailedCause'UnrecognizedValue
   deriving stock (Prelude.Show, Prelude.Eq, Prelude.Ord)
 instance Data.ProtoLens.MessageEnum StartChildWorkflowExecutionFailedCause where
@@ -760,6 +762,12 @@ instance Data.ProtoLens.MessageEnum StartChildWorkflowExecutionFailedCause where
   maybeToEnum 1
     = Prelude.Just
         START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS
+  maybeToEnum 2
+    = Prelude.Just
+        START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND
+  maybeToEnum 3
+    = Prelude.Just
+        START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_INVALID_VERSIONING_OVERRIDE
   maybeToEnum k
     = Prelude.Just
         (StartChildWorkflowExecutionFailedCause'Unrecognized
@@ -770,6 +778,12 @@ instance Data.ProtoLens.MessageEnum StartChildWorkflowExecutionFailedCause where
   showEnum
     START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS
     = "START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS"
+  showEnum
+    START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND
+    = "START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND"
+  showEnum
+    START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_INVALID_VERSIONING_OVERRIDE
+    = "START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_INVALID_VERSIONING_OVERRIDE"
   showEnum
     (StartChildWorkflowExecutionFailedCause'Unrecognized (StartChildWorkflowExecutionFailedCause'UnrecognizedValue k))
     = Prelude.show k
@@ -783,12 +797,21 @@ instance Data.ProtoLens.MessageEnum StartChildWorkflowExecutionFailedCause where
         "START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS"
     = Prelude.Just
         START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS
+    | (Prelude.==)
+        k "START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND"
+    = Prelude.Just
+        START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND
+    | (Prelude.==)
+        k
+        "START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_INVALID_VERSIONING_OVERRIDE"
+    = Prelude.Just
+        START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_INVALID_VERSIONING_OVERRIDE
     | Prelude.otherwise
     = (Prelude.>>=) (Text.Read.readMaybe k) Data.ProtoLens.maybeToEnum
 instance Prelude.Bounded StartChildWorkflowExecutionFailedCause where
   minBound = START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_UNSPECIFIED
   maxBound
-    = START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS
+    = START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_INVALID_VERSIONING_OVERRIDE
 instance Prelude.Enum StartChildWorkflowExecutionFailedCause where
   toEnum k__
     = Prelude.maybe
@@ -803,14 +826,26 @@ instance Prelude.Enum StartChildWorkflowExecutionFailedCause where
     START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS
     = 1
   fromEnum
+    START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND
+    = 2
+  fromEnum
+    START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_INVALID_VERSIONING_OVERRIDE
+    = 3
+  fromEnum
     (StartChildWorkflowExecutionFailedCause'Unrecognized (StartChildWorkflowExecutionFailedCause'UnrecognizedValue k))
     = Prelude.fromIntegral k
   succ
-    START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS
+    START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_INVALID_VERSIONING_OVERRIDE
     = Prelude.error
-        "StartChildWorkflowExecutionFailedCause.succ: bad argument START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS. This value would be out of bounds."
+        "StartChildWorkflowExecutionFailedCause.succ: bad argument START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_INVALID_VERSIONING_OVERRIDE. This value would be out of bounds."
   succ START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_UNSPECIFIED
     = START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS
+  succ
+    START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS
+    = START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND
+  succ
+    START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND
+    = START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_INVALID_VERSIONING_OVERRIDE
   succ (StartChildWorkflowExecutionFailedCause'Unrecognized _)
     = Prelude.error
         "StartChildWorkflowExecutionFailedCause.succ: bad argument: unrecognized value"
@@ -820,6 +855,12 @@ instance Prelude.Enum StartChildWorkflowExecutionFailedCause where
   pred
     START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS
     = START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_UNSPECIFIED
+  pred
+    START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND
+    = START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS
+  pred
+    START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_INVALID_VERSIONING_OVERRIDE
+    = START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND
   pred (StartChildWorkflowExecutionFailedCause'Unrecognized _)
     = Prelude.error
         "StartChildWorkflowExecutionFailedCause.pred: bad argument: unrecognized value"
@@ -966,17 +1007,19 @@ packedFileDescriptor
     \\USPARENT_CLOSE_POLICY_UNSPECIFIED\DLE\NUL\DC2!\n\
     \\GSPARENT_CLOSE_POLICY_TERMINATE\DLE\SOH\DC2\US\n\
     \\ESCPARENT_CLOSE_POLICY_ABANDON\DLE\STX\DC2&\n\
-    \\"PARENT_CLOSE_POLICY_REQUEST_CANCEL\DLE\ETX*\174\SOH\n\
+    \\"PARENT_CLOSE_POLICY_REQUEST_CANCEL\DLE\ETX*\192\STX\n\
     \&StartChildWorkflowExecutionFailedCause\DC2;\n\
     \7START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_UNSPECIFIED\DLE\NUL\DC2G\n\
-    \CSTART_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS\DLE\SOH*~\n\
+    \CSTART_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS\DLE\SOH\DC2C\n\
+    \?START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND\DLE\STX\DC2K\n\
+    \GSTART_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_INVALID_VERSIONING_OVERRIDE\DLE\ETX*~\n\
     \\GSChildWorkflowCancellationType\DC2\v\n\
     \\aABANDON\DLE\NUL\DC2\SO\n\
     \\n\
     \TRY_CANCEL\DLE\SOH\DC2\US\n\
     \\ESCWAIT_CANCELLATION_COMPLETED\DLE\STX\DC2\US\n\
-    \\ESCWAIT_CANCELLATION_REQUESTED\DLE\ETXB3\234\STX0Temporalio::Internal::Bridge::Api::ChildWorkflowJ\227\DLE\n\
-    \\ACK\DC2\EOT\NUL\NUL@\SOH\n\
+    \\ESCWAIT_CANCELLATION_REQUESTED\DLE\ETXB3\234\STX0Temporalio::Internal::Bridge::Api::ChildWorkflowJ\181\DC1\n\
+    \\ACK\DC2\EOT\NUL\NULB\SOH\n\
     \\b\n\
     \\SOH\f\DC2\ETX\NUL\NUL\DC2\n\
     \\b\n\
@@ -1108,7 +1151,7 @@ packedFileDescriptor
     \\f\n\
     \\ENQ\ENQ\NUL\STX\ETX\STX\DC2\ETX-)*\n\
     \B\n\
-    \\STX\ENQ\SOH\DC2\EOT1\NUL4\SOH\SUB6 Possible causes of failure to start a child workflow\n\
+    \\STX\ENQ\SOH\DC2\EOT1\NUL6\SOH\SUB6 Possible causes of failure to start a child workflow\n\
     \\n\
     \\n\
     \\n\
@@ -1125,37 +1168,49 @@ packedFileDescriptor
     \\ENQ\ENQ\SOH\STX\SOH\SOH\DC2\ETX3\EOTG\n\
     \\f\n\
     \\ENQ\ENQ\SOH\STX\SOH\STX\DC2\ETX3JK\n\
+    \\v\n\
+    \\EOT\ENQ\SOH\STX\STX\DC2\ETX4\EOTH\n\
+    \\f\n\
+    \\ENQ\ENQ\SOH\STX\STX\SOH\DC2\ETX4\EOTC\n\
+    \\f\n\
+    \\ENQ\ENQ\SOH\STX\STX\STX\DC2\ETX4FG\n\
+    \\v\n\
+    \\EOT\ENQ\SOH\STX\ETX\DC2\ETX5\EOTP\n\
+    \\f\n\
+    \\ENQ\ENQ\SOH\STX\ETX\SOH\DC2\ETX5\EOTK\n\
+    \\f\n\
+    \\ENQ\ENQ\SOH\STX\ETX\STX\DC2\ETX5NO\n\
     \_\n\
-    \\STX\ENQ\STX\DC2\EOT7\NUL@\SOH\SUBS Controls at which point to report back to lang when a child workflow is cancelled\n\
+    \\STX\ENQ\STX\DC2\EOT9\NULB\SOH\SUBS Controls at which point to report back to lang when a child workflow is cancelled\n\
     \\n\
     \\n\
     \\n\
-    \\ETX\ENQ\STX\SOH\DC2\ETX7\ENQ\"\n\
+    \\ETX\ENQ\STX\SOH\DC2\ETX9\ENQ\"\n\
     \U\n\
-    \\EOT\ENQ\STX\STX\NUL\DC2\ETX9\EOT\DLE\SUBH Do not request cancellation of the child workflow if already scheduled\n\
+    \\EOT\ENQ\STX\STX\NUL\DC2\ETX;\EOT\DLE\SUBH Do not request cancellation of the child workflow if already scheduled\n\
     \\n\
     \\f\n\
-    \\ENQ\ENQ\STX\STX\NUL\SOH\DC2\ETX9\EOT\v\n\
+    \\ENQ\ENQ\STX\STX\NUL\SOH\DC2\ETX;\EOT\v\n\
     \\f\n\
-    \\ENQ\ENQ\STX\STX\NUL\STX\DC2\ETX9\SO\SI\n\
+    \\ENQ\ENQ\STX\STX\NUL\STX\DC2\ETX;\SO\SI\n\
     \a\n\
-    \\EOT\ENQ\STX\STX\SOH\DC2\ETX;\EOT\DC3\SUBT Initiate a cancellation request and immediately report cancellation to the parent.\n\
+    \\EOT\ENQ\STX\STX\SOH\DC2\ETX=\EOT\DC3\SUBT Initiate a cancellation request and immediately report cancellation to the parent.\n\
     \\n\
     \\f\n\
-    \\ENQ\ENQ\STX\STX\SOH\SOH\DC2\ETX;\EOT\SO\n\
+    \\ENQ\ENQ\STX\STX\SOH\SOH\DC2\ETX=\EOT\SO\n\
     \\f\n\
-    \\ENQ\ENQ\STX\STX\SOH\STX\DC2\ETX;\DC1\DC2\n\
+    \\ENQ\ENQ\STX\STX\SOH\STX\DC2\ETX=\DC1\DC2\n\
     \6\n\
-    \\EOT\ENQ\STX\STX\STX\DC2\ETX=\EOT$\SUB) Wait for child cancellation completion.\n\
+    \\EOT\ENQ\STX\STX\STX\DC2\ETX?\EOT$\SUB) Wait for child cancellation completion.\n\
     \\n\
     \\f\n\
-    \\ENQ\ENQ\STX\STX\STX\SOH\DC2\ETX=\EOT\US\n\
+    \\ENQ\ENQ\STX\STX\STX\SOH\DC2\ETX?\EOT\US\n\
     \\f\n\
-    \\ENQ\ENQ\STX\STX\STX\STX\DC2\ETX=\"#\n\
+    \\ENQ\ENQ\STX\STX\STX\STX\DC2\ETX?\"#\n\
     \i\n\
-    \\EOT\ENQ\STX\STX\ETX\DC2\ETX?\EOT$\SUB\\ Request cancellation of the child and wait for confirmation that the request was received.\n\
+    \\EOT\ENQ\STX\STX\ETX\DC2\ETXA\EOT$\SUB\\ Request cancellation of the child and wait for confirmation that the request was received.\n\
     \\n\
     \\f\n\
-    \\ENQ\ENQ\STX\STX\ETX\SOH\DC2\ETX?\EOT\US\n\
+    \\ENQ\ENQ\STX\STX\ETX\SOH\DC2\ETXA\EOT\US\n\
     \\f\n\
-    \\ENQ\ENQ\STX\STX\ETX\STX\DC2\ETX?\"#b\ACKproto3"
+    \\ENQ\ENQ\STX\STX\ETX\STX\DC2\ETXA\"#b\ACKproto3"

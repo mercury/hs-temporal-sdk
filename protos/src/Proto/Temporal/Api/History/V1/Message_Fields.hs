@@ -36,6 +36,8 @@ import qualified Proto.Temporal.Api.Enums.V1.FailedCause
 import qualified Proto.Temporal.Api.Enums.V1.Update
 import qualified Proto.Temporal.Api.Enums.V1.Workflow
 import qualified Proto.Temporal.Api.Failure.V1.Message
+import qualified Proto.Temporal.Api.Nexus.V1.Message
+import qualified Proto.Temporal.Api.Sdk.V1.EventGroupMarker
 import qualified Proto.Temporal.Api.Sdk.V1.TaskCompleteMetadata
 import qualified Proto.Temporal.Api.Sdk.V1.UserMetadata
 import qualified Proto.Temporal.Api.Taskqueue.V1.Message
@@ -273,6 +275,13 @@ cronSchedule ::
    Data.ProtoLens.Field.HasField s "cronSchedule" a) =>
   Lens.Family2.LensLike' f s a
 cronSchedule = Data.ProtoLens.Field.field @"cronSchedule"
+declinedTargetVersionUpgrade ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "declinedTargetVersionUpgrade" a) =>
+  Lens.Family2.LensLike' f s a
+declinedTargetVersionUpgrade
+  = Data.ProtoLens.Field.field @"declinedTargetVersionUpgrade"
 deployment ::
   forall f s a.
   (Prelude.Functor f,
@@ -290,6 +299,13 @@ details ::
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "details" a) =>
   Lens.Family2.LensLike' f s a
 details = Data.ProtoLens.Field.field @"details"
+disabledAfterFastForward ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "disabledAfterFastForward" a) =>
+  Lens.Family2.LensLike' f s a
+disabledAfterFastForward
+  = Data.ProtoLens.Field.field @"disabledAfterFastForward"
 eagerExecutionAccepted ::
   forall f s a.
   (Prelude.Functor f,
@@ -309,6 +325,12 @@ endpointId ::
    Data.ProtoLens.Field.HasField s "endpointId" a) =>
   Lens.Family2.LensLike' f s a
 endpointId = Data.ProtoLens.Field.field @"endpointId"
+eventGroupMarkers ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "eventGroupMarkers" a) =>
+  Lens.Family2.LensLike' f s a
+eventGroupMarkers = Data.ProtoLens.Field.field @"eventGroupMarkers"
 eventId ::
   forall f s a.
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "eventId" a) =>
@@ -415,6 +437,13 @@ inheritBuildId ::
    Data.ProtoLens.Field.HasField s "inheritBuildId" a) =>
   Lens.Family2.LensLike' f s a
 inheritBuildId = Data.ProtoLens.Field.field @"inheritBuildId"
+inheritedAutoUpgradeInfo ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "inheritedAutoUpgradeInfo" a) =>
+  Lens.Family2.LensLike' f s a
+inheritedAutoUpgradeInfo
+  = Data.ProtoLens.Field.field @"inheritedAutoUpgradeInfo"
 inheritedBuildId ::
   forall f s a.
   (Prelude.Functor f,
@@ -428,6 +457,13 @@ inheritedPinnedVersion ::
   Lens.Family2.LensLike' f s a
 inheritedPinnedVersion
   = Data.ProtoLens.Field.field @"inheritedPinnedVersion"
+initialVersioningBehavior ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "initialVersioningBehavior" a) =>
+  Lens.Family2.LensLike' f s a
+initialVersioningBehavior
+  = Data.ProtoLens.Field.field @"initialVersioningBehavior"
 initiatedEventId ::
   forall f s a.
   (Prelude.Functor f,
@@ -634,6 +670,13 @@ maybe'continuedFailure ::
   Lens.Family2.LensLike' f s a
 maybe'continuedFailure
   = Data.ProtoLens.Field.field @"maybe'continuedFailure"
+maybe'declinedTargetVersionUpgrade ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'declinedTargetVersionUpgrade" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'declinedTargetVersionUpgrade
+  = Data.ProtoLens.Field.field @"maybe'declinedTargetVersionUpgrade"
 maybe'deployment ::
   forall f s a.
   (Prelude.Functor f,
@@ -708,6 +751,13 @@ maybe'heartbeatTimeout ::
   Lens.Family2.LensLike' f s a
 maybe'heartbeatTimeout
   = Data.ProtoLens.Field.field @"maybe'heartbeatTimeout"
+maybe'inheritedAutoUpgradeInfo ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'inheritedAutoUpgradeInfo" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'inheritedAutoUpgradeInfo
+  = Data.ProtoLens.Field.field @"maybe'inheritedAutoUpgradeInfo"
 maybe'inheritedPinnedVersion ::
   forall f s a.
   (Prelude.Functor f,
@@ -880,12 +930,26 @@ maybe'prevAutoResetPoints ::
   Lens.Family2.LensLike' f s a
 maybe'prevAutoResetPoints
   = Data.ProtoLens.Field.field @"maybe'prevAutoResetPoints"
+maybe'principal ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'principal" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'principal = Data.ProtoLens.Field.field @"maybe'principal"
 maybe'priority ::
   forall f s a.
   (Prelude.Functor f,
    Data.ProtoLens.Field.HasField s "maybe'priority" a) =>
   Lens.Family2.LensLike' f s a
 maybe'priority = Data.ProtoLens.Field.field @"maybe'priority"
+maybe'propagatedNexusSerializationContext ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'propagatedNexusSerializationContext" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'propagatedNexusSerializationContext
+  = Data.ProtoLens.Field.field
+      @"maybe'propagatedNexusSerializationContext"
 maybe'rejectedRequest ::
   forall f s a.
   (Prelude.Functor f,
@@ -1014,12 +1078,32 @@ maybe'startToFireTimeout ::
   Lens.Family2.LensLike' f s a
 maybe'startToFireTimeout
   = Data.ProtoLens.Field.field @"maybe'startToFireTimeout"
+maybe'targetTime ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'targetTime" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'targetTime = Data.ProtoLens.Field.field @"maybe'targetTime"
 maybe'taskQueue ::
   forall f s a.
   (Prelude.Functor f,
    Data.ProtoLens.Field.HasField s "maybe'taskQueue" a) =>
   Lens.Family2.LensLike' f s a
 maybe'taskQueue = Data.ProtoLens.Field.field @"maybe'taskQueue"
+maybe'timeSkippingConfig ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'timeSkippingConfig" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'timeSkippingConfig
+  = Data.ProtoLens.Field.field @"maybe'timeSkippingConfig"
+maybe'timeSkippingStatePropagation ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'timeSkippingStatePropagation" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'timeSkippingStatePropagation
+  = Data.ProtoLens.Field.field @"maybe'timeSkippingStatePropagation"
 maybe'timerCanceledEventAttributes ::
   forall f s a.
   (Prelude.Functor f,
@@ -1076,6 +1160,13 @@ maybe'versioningOverride ::
   Lens.Family2.LensLike' f s a
 maybe'versioningOverride
   = Data.ProtoLens.Field.field @"maybe'versioningOverride"
+maybe'wallClockTime ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'wallClockTime" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'wallClockTime
+  = Data.ProtoLens.Field.field @"maybe'wallClockTime"
 maybe'workerVersion ::
   forall f s a.
   (Prelude.Functor f,
@@ -1146,6 +1237,14 @@ maybe'workflowExecutionOptionsUpdatedEventAttributes ::
 maybe'workflowExecutionOptionsUpdatedEventAttributes
   = Data.ProtoLens.Field.field
       @"maybe'workflowExecutionOptionsUpdatedEventAttributes"
+maybe'workflowExecutionPausedEventAttributes ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'workflowExecutionPausedEventAttributes" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'workflowExecutionPausedEventAttributes
+  = Data.ProtoLens.Field.field
+      @"maybe'workflowExecutionPausedEventAttributes"
 maybe'workflowExecutionSignaledEventAttributes ::
   forall f s a.
   (Prelude.Functor f,
@@ -1170,6 +1269,14 @@ maybe'workflowExecutionTerminatedEventAttributes ::
 maybe'workflowExecutionTerminatedEventAttributes
   = Data.ProtoLens.Field.field
       @"maybe'workflowExecutionTerminatedEventAttributes"
+maybe'workflowExecutionTimeSkippingTransitionedEventAttributes ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'workflowExecutionTimeSkippingTransitionedEventAttributes" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'workflowExecutionTimeSkippingTransitionedEventAttributes
+  = Data.ProtoLens.Field.field
+      @"maybe'workflowExecutionTimeSkippingTransitionedEventAttributes"
 maybe'workflowExecutionTimedOutEventAttributes ::
   forall f s a.
   (Prelude.Functor f,
@@ -1185,6 +1292,14 @@ maybe'workflowExecutionTimeout ::
   Lens.Family2.LensLike' f s a
 maybe'workflowExecutionTimeout
   = Data.ProtoLens.Field.field @"maybe'workflowExecutionTimeout"
+maybe'workflowExecutionUnpausedEventAttributes ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'workflowExecutionUnpausedEventAttributes" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'workflowExecutionUnpausedEventAttributes
+  = Data.ProtoLens.Field.field
+      @"maybe'workflowExecutionUnpausedEventAttributes"
 maybe'workflowExecutionUpdateAcceptedEventAttributes ::
   forall f s a.
   (Prelude.Functor f,
@@ -1534,12 +1649,25 @@ prevAutoResetPoints ::
   Lens.Family2.LensLike' f s a
 prevAutoResetPoints
   = Data.ProtoLens.Field.field @"prevAutoResetPoints"
+principal ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "principal" a) =>
+  Lens.Family2.LensLike' f s a
+principal = Data.ProtoLens.Field.field @"principal"
 priority ::
   forall f s a.
   (Prelude.Functor f,
    Data.ProtoLens.Field.HasField s "priority" a) =>
   Lens.Family2.LensLike' f s a
 priority = Data.ProtoLens.Field.field @"priority"
+propagatedNexusSerializationContext ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "propagatedNexusSerializationContext" a) =>
+  Lens.Family2.LensLike' f s a
+propagatedNexusSerializationContext
+  = Data.ProtoLens.Field.field @"propagatedNexusSerializationContext"
 protocolInstanceId ::
   forall f s a.
   (Prelude.Functor f,
@@ -1622,6 +1750,12 @@ retryState ::
    Data.ProtoLens.Field.HasField s "retryState" a) =>
   Lens.Family2.LensLike' f s a
 retryState = Data.ProtoLens.Field.field @"retryState"
+revisionNumber ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "revisionNumber" a) =>
+  Lens.Family2.LensLike' f s a
+revisionNumber = Data.ProtoLens.Field.field @"revisionNumber"
 rootWorkflowExecution ::
   forall f s a.
   (Prelude.Functor f,
@@ -1745,6 +1879,27 @@ suggestContinueAsNew ::
   Lens.Family2.LensLike' f s a
 suggestContinueAsNew
   = Data.ProtoLens.Field.field @"suggestContinueAsNew"
+suggestContinueAsNewReasons ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "suggestContinueAsNewReasons" a) =>
+  Lens.Family2.LensLike' f s a
+suggestContinueAsNewReasons
+  = Data.ProtoLens.Field.field @"suggestContinueAsNewReasons"
+targetTime ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "targetTime" a) =>
+  Lens.Family2.LensLike' f s a
+targetTime = Data.ProtoLens.Field.field @"targetTime"
+targetWorkerDeploymentVersionChanged ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "targetWorkerDeploymentVersionChanged" a) =>
+  Lens.Family2.LensLike' f s a
+targetWorkerDeploymentVersionChanged
+  = Data.ProtoLens.Field.field
+      @"targetWorkerDeploymentVersionChanged"
 taskId ::
   forall f s a.
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "taskId" a) =>
@@ -1756,6 +1911,27 @@ taskQueue ::
    Data.ProtoLens.Field.HasField s "taskQueue" a) =>
   Lens.Family2.LensLike' f s a
 taskQueue = Data.ProtoLens.Field.field @"taskQueue"
+timeSkippingConfig ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "timeSkippingConfig" a) =>
+  Lens.Family2.LensLike' f s a
+timeSkippingConfig
+  = Data.ProtoLens.Field.field @"timeSkippingConfig"
+timeSkippingConfigUpdated ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "timeSkippingConfigUpdated" a) =>
+  Lens.Family2.LensLike' f s a
+timeSkippingConfigUpdated
+  = Data.ProtoLens.Field.field @"timeSkippingConfigUpdated"
+timeSkippingStatePropagation ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "timeSkippingStatePropagation" a) =>
+  Lens.Family2.LensLike' f s a
+timeSkippingStatePropagation
+  = Data.ProtoLens.Field.field @"timeSkippingStatePropagation"
 timeoutType ::
   forall f s a.
   (Prelude.Functor f,
@@ -1795,6 +1971,12 @@ unsetVersioningOverride ::
   Lens.Family2.LensLike' f s a
 unsetVersioningOverride
   = Data.ProtoLens.Field.field @"unsetVersioningOverride"
+updateId ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "updateId" a) =>
+  Lens.Family2.LensLike' f s a
+updateId = Data.ProtoLens.Field.field @"updateId"
 upsertWorkflowSearchAttributesEventAttributes ::
   forall f s a.
   (Prelude.Functor f,
@@ -1841,6 +2023,13 @@ vec'completionCallbacks ::
   Lens.Family2.LensLike' f s a
 vec'completionCallbacks
   = Data.ProtoLens.Field.field @"vec'completionCallbacks"
+vec'eventGroupMarkers ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "vec'eventGroupMarkers" a) =>
+  Lens.Family2.LensLike' f s a
+vec'eventGroupMarkers
+  = Data.ProtoLens.Field.field @"vec'eventGroupMarkers"
 vec'events ::
   forall f s a.
   (Prelude.Functor f,
@@ -1853,6 +2042,20 @@ vec'links ::
    Data.ProtoLens.Field.HasField s "vec'links" a) =>
   Lens.Family2.LensLike' f s a
 vec'links = Data.ProtoLens.Field.field @"vec'links"
+vec'suggestContinueAsNewReasons ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "vec'suggestContinueAsNewReasons" a) =>
+  Lens.Family2.LensLike' f s a
+vec'suggestContinueAsNewReasons
+  = Data.ProtoLens.Field.field @"vec'suggestContinueAsNewReasons"
+vec'workflowUpdateOptions ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "vec'workflowUpdateOptions" a) =>
+  Lens.Family2.LensLike' f s a
+vec'workflowUpdateOptions
+  = Data.ProtoLens.Field.field @"vec'workflowUpdateOptions"
 version ::
   forall f s a.
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "version" a) =>
@@ -1872,6 +2075,12 @@ versioningOverride ::
   Lens.Family2.LensLike' f s a
 versioningOverride
   = Data.ProtoLens.Field.field @"versioningOverride"
+wallClockTime ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "wallClockTime" a) =>
+  Lens.Family2.LensLike' f s a
+wallClockTime = Data.ProtoLens.Field.field @"wallClockTime"
 workerDeploymentName ::
   forall f s a.
   (Prelude.Functor f,
@@ -1959,6 +2168,14 @@ workflowExecutionOptionsUpdatedEventAttributes ::
 workflowExecutionOptionsUpdatedEventAttributes
   = Data.ProtoLens.Field.field
       @"workflowExecutionOptionsUpdatedEventAttributes"
+workflowExecutionPausedEventAttributes ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "workflowExecutionPausedEventAttributes" a) =>
+  Lens.Family2.LensLike' f s a
+workflowExecutionPausedEventAttributes
+  = Data.ProtoLens.Field.field
+      @"workflowExecutionPausedEventAttributes"
 workflowExecutionSignaledEventAttributes ::
   forall f s a.
   (Prelude.Functor f,
@@ -1983,6 +2200,14 @@ workflowExecutionTerminatedEventAttributes ::
 workflowExecutionTerminatedEventAttributes
   = Data.ProtoLens.Field.field
       @"workflowExecutionTerminatedEventAttributes"
+workflowExecutionTimeSkippingTransitionedEventAttributes ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "workflowExecutionTimeSkippingTransitionedEventAttributes" a) =>
+  Lens.Family2.LensLike' f s a
+workflowExecutionTimeSkippingTransitionedEventAttributes
+  = Data.ProtoLens.Field.field
+      @"workflowExecutionTimeSkippingTransitionedEventAttributes"
 workflowExecutionTimedOutEventAttributes ::
   forall f s a.
   (Prelude.Functor f,
@@ -1998,6 +2223,14 @@ workflowExecutionTimeout ::
   Lens.Family2.LensLike' f s a
 workflowExecutionTimeout
   = Data.ProtoLens.Field.field @"workflowExecutionTimeout"
+workflowExecutionUnpausedEventAttributes ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "workflowExecutionUnpausedEventAttributes" a) =>
+  Lens.Family2.LensLike' f s a
+workflowExecutionUnpausedEventAttributes
+  = Data.ProtoLens.Field.field
+      @"workflowExecutionUnpausedEventAttributes"
 workflowExecutionUpdateAcceptedEventAttributes ::
   forall f s a.
   (Prelude.Functor f,
@@ -2123,3 +2356,10 @@ workflowType ::
    Data.ProtoLens.Field.HasField s "workflowType" a) =>
   Lens.Family2.LensLike' f s a
 workflowType = Data.ProtoLens.Field.field @"workflowType"
+workflowUpdateOptions ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "workflowUpdateOptions" a) =>
+  Lens.Family2.LensLike' f s a
+workflowUpdateOptions
+  = Data.ProtoLens.Field.field @"workflowUpdateOptions"

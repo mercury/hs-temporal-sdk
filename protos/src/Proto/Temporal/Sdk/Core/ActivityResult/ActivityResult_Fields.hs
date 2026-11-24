@@ -30,6 +30,7 @@ import qualified Data.ProtoLens.Runtime.Text.Read as Text.Read
 import qualified Proto.Google.Protobuf.Duration
 import qualified Proto.Google.Protobuf.Timestamp
 import qualified Proto.Temporal.Api.Common.V1.Message
+import qualified Proto.Temporal.Api.Enums.V1.FailedCause
 import qualified Proto.Temporal.Api.Failure.V1.Message
 attempt ::
   forall f s a.
@@ -53,6 +54,11 @@ cancelled ::
    Data.ProtoLens.Field.HasField s "cancelled" a) =>
   Lens.Family2.LensLike' f s a
 cancelled = Data.ProtoLens.Field.field @"cancelled"
+cause ::
+  forall f s a.
+  (Prelude.Functor f, Data.ProtoLens.Field.HasField s "cause" a) =>
+  Lens.Family2.LensLike' f s a
+cause = Data.ProtoLens.Field.field @"cause"
 completed ::
   forall f s a.
   (Prelude.Functor f,

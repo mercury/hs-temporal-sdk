@@ -1,19 +1,12 @@
 use crate::client::{CRPCError, ClientRef, RpcCall, TemporalCall, rpc_req, rpc_resp};
 use crate::runtime::{Capability, HsCallback, MVar};
 use ffi_convert::{CArray, CReprOf};
-use temporalio_client::OperatorService;
-use temporalio_client::TestService;
-use temporalio_client::WorkflowService;
+use temporalio_client::grpc::{OperatorService, TestService, WorkflowService};
 
 macro_rules! rpc_call {
     ($retry_client:ident, $call:ident, $call_name:ident) => {{
-        if $call.retry {
-            let req = rpc_req($call).map_err(CRPCError::from)?;
-            rpc_resp($retry_client.$call_name(req).await)
-        } else {
-            let req = rpc_req($call).map_err(CRPCError::from)?;
-            rpc_resp($retry_client.into_inner().$call_name(req).await)
-        }
+        let req = rpc_req($call).map_err(CRPCError::from)?;
+        rpc_resp($retry_client.$call_name(req).await)
     }};
 }
 

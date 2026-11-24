@@ -42,12 +42,15 @@ instance Data.ProtoLens.Service.Types.Service OperatorService where
                                           "createNexusEndpoint",
                                           "deleteNamespace",
                                           "deleteNexusEndpoint",
+                                          "describeNamespaceRestore",
                                           "getNexusEndpoint",
                                           "listClusters",
                                           "listNexusEndpoints",
                                           "listSearchAttributes",
                                           "removeRemoteCluster",
                                           "removeSearchAttributes",
+                                          "restoreNamespace",
+                                          "softDeleteNamespace",
                                           "updateNexusEndpoint"]
   packedServiceDescriptor _
     = "\n\
@@ -55,7 +58,10 @@ instance Data.ProtoLens.Service.Types.Service OperatorService where
       \\DC3AddSearchAttributes\DC2;.temporal.api.operatorservice.v1.AddSearchAttributesRequest\SUB<.temporal.api.operatorservice.v1.AddSearchAttributesResponse\"\NUL\DC2\155\SOH\n\
       \\SYNRemoveSearchAttributes\DC2>.temporal.api.operatorservice.v1.RemoveSearchAttributesRequest\SUB?.temporal.api.operatorservice.v1.RemoveSearchAttributesResponse\"\NUL\DC2\130\STX\n\
       \\DC4ListSearchAttributes\DC2<.temporal.api.operatorservice.v1.ListSearchAttributesRequest\SUB=.temporal.api.operatorservice.v1.ListSearchAttributesResponse\"m\130\211\228\147\STXg\DC21/cluster/namespaces/{namespace}/search-attributesZ2\DC20/api/v1/namespaces/{namespace}/search-attributes\DC2\134\SOH\n\
-      \\SIDeleteNamespace\DC27.temporal.api.operatorservice.v1.DeleteNamespaceRequest\SUB8.temporal.api.operatorservice.v1.DeleteNamespaceResponse\"\NUL\DC2\161\SOH\n\
+      \\SIDeleteNamespace\DC27.temporal.api.operatorservice.v1.DeleteNamespaceRequest\SUB8.temporal.api.operatorservice.v1.DeleteNamespaceResponse\"\NUL\DC2\146\SOH\n\
+      \\DC3SoftDeleteNamespace\DC2;.temporal.api.operatorservice.v1.SoftDeleteNamespaceRequest\SUB<.temporal.api.operatorservice.v1.SoftDeleteNamespaceResponse\"\NUL\DC2\137\SOH\n\
+      \\DLERestoreNamespace\DC28.temporal.api.operatorservice.v1.RestoreNamespaceRequest\SUB9.temporal.api.operatorservice.v1.RestoreNamespaceResponse\"\NUL\DC2\161\SOH\n\
+      \\CANDescribeNamespaceRestore\DC2@.temporal.api.operatorservice.v1.DescribeNamespaceRestoreRequest\SUBA.temporal.api.operatorservice.v1.DescribeNamespaceRestoreResponse\"\NUL\DC2\161\SOH\n\
       \\CANAddOrUpdateRemoteCluster\DC2@.temporal.api.operatorservice.v1.AddOrUpdateRemoteClusterRequest\SUBA.temporal.api.operatorservice.v1.AddOrUpdateRemoteClusterResponse\"\NUL\DC2\146\SOH\n\
       \\DC3RemoveRemoteCluster\DC2;.temporal.api.operatorservice.v1.RemoveRemoteClusterRequest\SUB<.temporal.api.operatorservice.v1.RemoveRemoteClusterResponse\"\NUL\DC2}\n\
       \\fListClusters\DC24.temporal.api.operatorservice.v1.ListClustersRequest\SUB5.temporal.api.operatorservice.v1.ListClustersResponse\"\NUL\DC2\206\SOH\n\
@@ -84,6 +90,21 @@ instance Data.ProtoLens.Service.Types.HasMethodImpl OperatorService "deleteNames
   type MethodInput OperatorService "deleteNamespace" = Proto.Temporal.Api.Operatorservice.V1.RequestResponse.DeleteNamespaceRequest
   type MethodOutput OperatorService "deleteNamespace" = Proto.Temporal.Api.Operatorservice.V1.RequestResponse.DeleteNamespaceResponse
   type MethodStreamingType OperatorService "deleteNamespace" = 'Data.ProtoLens.Service.Types.NonStreaming
+instance Data.ProtoLens.Service.Types.HasMethodImpl OperatorService "softDeleteNamespace" where
+  type MethodName OperatorService "softDeleteNamespace" = "SoftDeleteNamespace"
+  type MethodInput OperatorService "softDeleteNamespace" = Proto.Temporal.Api.Operatorservice.V1.RequestResponse.SoftDeleteNamespaceRequest
+  type MethodOutput OperatorService "softDeleteNamespace" = Proto.Temporal.Api.Operatorservice.V1.RequestResponse.SoftDeleteNamespaceResponse
+  type MethodStreamingType OperatorService "softDeleteNamespace" = 'Data.ProtoLens.Service.Types.NonStreaming
+instance Data.ProtoLens.Service.Types.HasMethodImpl OperatorService "restoreNamespace" where
+  type MethodName OperatorService "restoreNamespace" = "RestoreNamespace"
+  type MethodInput OperatorService "restoreNamespace" = Proto.Temporal.Api.Operatorservice.V1.RequestResponse.RestoreNamespaceRequest
+  type MethodOutput OperatorService "restoreNamespace" = Proto.Temporal.Api.Operatorservice.V1.RequestResponse.RestoreNamespaceResponse
+  type MethodStreamingType OperatorService "restoreNamespace" = 'Data.ProtoLens.Service.Types.NonStreaming
+instance Data.ProtoLens.Service.Types.HasMethodImpl OperatorService "describeNamespaceRestore" where
+  type MethodName OperatorService "describeNamespaceRestore" = "DescribeNamespaceRestore"
+  type MethodInput OperatorService "describeNamespaceRestore" = Proto.Temporal.Api.Operatorservice.V1.RequestResponse.DescribeNamespaceRestoreRequest
+  type MethodOutput OperatorService "describeNamespaceRestore" = Proto.Temporal.Api.Operatorservice.V1.RequestResponse.DescribeNamespaceRestoreResponse
+  type MethodStreamingType OperatorService "describeNamespaceRestore" = 'Data.ProtoLens.Service.Types.NonStreaming
 instance Data.ProtoLens.Service.Types.HasMethodImpl OperatorService "addOrUpdateRemoteCluster" where
   type MethodName OperatorService "addOrUpdateRemoteCluster" = "AddOrUpdateRemoteCluster"
   type MethodInput OperatorService "addOrUpdateRemoteCluster" = Proto.Temporal.Api.Operatorservice.V1.RequestResponse.AddOrUpdateRemoteClusterRequest

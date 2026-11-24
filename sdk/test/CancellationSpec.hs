@@ -5,12 +5,16 @@
 
 module CancellationSpec where
 
-import Control.Concurrent (threadDelay)
+import Control.Concurrent (newEmptyMVar, putMVar, takeMVar, threadDelay, tryPutMVar, yield)
 import Control.Exception (SomeException)
-import Control.Monad (join)
+import Control.Monad (join, void)
 import qualified Control.Monad.Catch as Catch
 import Control.Monad.IO.Class (liftIO)
+import Data.Maybe (isJust, isNothing)
 import Data.Text (Text)
+import Lens.Family2
+import qualified Proto.Temporal.Api.History.V1.Message_Fields as History
+import System.Timeout (timeout)
 import Temporal.Activity
 import qualified Temporal.Client as C
 import Temporal.Duration
@@ -150,6 +154,63 @@ tests = describe "Cancellation" $ do
           `shouldReturn` False
 
   describe "Activity cancellation" $ do
+    specify "an abandoned activity can fail without failing its workflow task" $ \TestEnv {..} -> do
+      started <- newEmptyMVar
+      release <- newEmptyMVar
+      let activity :: Activity () ()
+          activity = liftIO $ do
+            putMVar started ()
+            takeMVar release
+            fail "abandoned activity failed after cancellation"
+          act = provideActivity defaultCodec "abandonedFailureActivity" activity
+          abandonSignal = W.KnownSignal @'[] "abandonActivity" defaultCodec
+          finishSignal = W.KnownSignal @'[] "finishAfterActivityFailure" defaultCodec
+          abandonedQuery :: W.KnownQuery '[] Bool
+          abandonedQuery = W.KnownQuery "activityAbandoned" defaultCodec
+          workflow :: MyWorkflow ()
+          workflow = do
+            requested <- W.newStateVar False
+            abandoned <- W.newStateVar False
+            finished <- W.newStateVar False
+            W.setSignalHandler abandonSignal $ W.writeStateVar requested True
+            W.setSignalHandler finishSignal $ W.writeStateVar finished True
+            W.setQueryHandler abandonedQuery $ W.readStateVar abandoned
+            let options :: W.StartActivityOptions
+                options =
+                  (W.defaultStartActivityOptions $ W.StartToClose $ seconds 30)
+                    { W.cancellationType = W.ActivityCancellationAbandon
+                    , W.retryPolicy = Just $ W.defaultRetryPolicy {W.maximumAttempts = 1}
+                    }
+            h <- W.startActivity act options
+            W.waitCondition $ W.readStateVar requested
+            W.cancel (h :: W.Task ())
+            W.wait h `Catch.catch` \(_ :: ActivityCancelled) -> W.writeStateVar abandoned True
+            W.waitCondition $ W.readStateVar finished
+          wf = W.provideWorkflow defaultCodec "abandonedFailureWorkflow" workflow
+          conf = configure () (wf, act) baseConf
+      withWorker conf $
+        ( do
+            h <- useClient $ C.start wf.reference "abandonedFailure" (defaultStartOptsWithTimeout taskQueue $ seconds 20)
+            timeout 10_000_000 (takeMVar started) `shouldReturn` Just ()
+            C.signal h abandonSignal C.defaultSignalOptions
+            let waitForAbandon = do
+                  acknowledged <- C.query h abandonedQuery C.defaultQueryOptions
+                  if acknowledged == Right True then pure () else yield >> waitForAbandon
+            timeout 10_000_000 waitForAbandon `shouldReturn` Just ()
+            putMVar release ()
+            let waitForFailure = do
+                  history <- C.fetchHistory h
+                  if any (isJust . (^. History.maybe'activityTaskFailedEventAttributes)) (history ^. History.events)
+                    then pure ()
+                    else yield >> waitForFailure
+            timeout 10_000_000 waitForFailure `shouldReturn` Just ()
+            C.signal h finishSignal C.defaultSignalOptions
+            C.waitWorkflowResult h `shouldReturn` ()
+            history <- C.fetchHistory h
+            history ^. History.events `shouldSatisfy` all (isNothing . (^. History.maybe'workflowTaskFailedEventAttributes))
+        )
+          `Catch.finally` void (tryPutMVar release ())
+
     specify "Immediate activity cancellation returns expected result" $ \TestEnv {..} -> do
       let testActivity :: Activity () Int
           testActivity = withHeartbeat JSON $ \heartbeat _readHeartbeat -> do

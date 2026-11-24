@@ -7,7 +7,8 @@ module Proto.Temporal.Api.Enums.V1.Common (
         ApplicationErrorCategory(..), ApplicationErrorCategory(),
         ApplicationErrorCategory'UnrecognizedValue, CallbackState(..),
         CallbackState(), CallbackState'UnrecognizedValue, EncodingType(..),
-        EncodingType(), EncodingType'UnrecognizedValue,
+        EncodingType(), EncodingType'UnrecognizedValue, ExecutionType(..),
+        ExecutionType(), ExecutionType'UnrecognizedValue,
         IndexedValueType(..), IndexedValueType(),
         IndexedValueType'UnrecognizedValue,
         NexusOperationCancellationState(..),
@@ -292,6 +293,88 @@ instance Prelude.Enum EncodingType where
 instance Data.ProtoLens.FieldDefault EncodingType where
   fieldDefault = ENCODING_TYPE_UNSPECIFIED
 instance Control.DeepSeq.NFData EncodingType where
+  rnf x__ = Prelude.seq x__ ()
+newtype ExecutionType'UnrecognizedValue
+  = ExecutionType'UnrecognizedValue Data.Int.Int32
+  deriving stock (Prelude.Eq, Prelude.Ord, Prelude.Show)
+data ExecutionType
+  = EXECUTION_TYPE_UNSPECIFIED |
+    EXECUTION_TYPE_WORKFLOW |
+    EXECUTION_TYPE_ACTIVITY |
+    EXECUTION_TYPE_NEXUS_OPERATION |
+    ExecutionType'Unrecognized !ExecutionType'UnrecognizedValue
+  deriving stock (Prelude.Show, Prelude.Eq, Prelude.Ord)
+instance Data.ProtoLens.MessageEnum ExecutionType where
+  maybeToEnum 0 = Prelude.Just EXECUTION_TYPE_UNSPECIFIED
+  maybeToEnum 1 = Prelude.Just EXECUTION_TYPE_WORKFLOW
+  maybeToEnum 2 = Prelude.Just EXECUTION_TYPE_ACTIVITY
+  maybeToEnum 3 = Prelude.Just EXECUTION_TYPE_NEXUS_OPERATION
+  maybeToEnum k
+    = Prelude.Just
+        (ExecutionType'Unrecognized
+           (ExecutionType'UnrecognizedValue (Prelude.fromIntegral k)))
+  showEnum EXECUTION_TYPE_UNSPECIFIED = "EXECUTION_TYPE_UNSPECIFIED"
+  showEnum EXECUTION_TYPE_WORKFLOW = "EXECUTION_TYPE_WORKFLOW"
+  showEnum EXECUTION_TYPE_ACTIVITY = "EXECUTION_TYPE_ACTIVITY"
+  showEnum EXECUTION_TYPE_NEXUS_OPERATION
+    = "EXECUTION_TYPE_NEXUS_OPERATION"
+  showEnum
+    (ExecutionType'Unrecognized (ExecutionType'UnrecognizedValue k))
+    = Prelude.show k
+  readEnum k
+    | (Prelude.==) k "EXECUTION_TYPE_UNSPECIFIED"
+    = Prelude.Just EXECUTION_TYPE_UNSPECIFIED
+    | (Prelude.==) k "EXECUTION_TYPE_WORKFLOW"
+    = Prelude.Just EXECUTION_TYPE_WORKFLOW
+    | (Prelude.==) k "EXECUTION_TYPE_ACTIVITY"
+    = Prelude.Just EXECUTION_TYPE_ACTIVITY
+    | (Prelude.==) k "EXECUTION_TYPE_NEXUS_OPERATION"
+    = Prelude.Just EXECUTION_TYPE_NEXUS_OPERATION
+    | Prelude.otherwise
+    = (Prelude.>>=) (Text.Read.readMaybe k) Data.ProtoLens.maybeToEnum
+instance Prelude.Bounded ExecutionType where
+  minBound = EXECUTION_TYPE_UNSPECIFIED
+  maxBound = EXECUTION_TYPE_NEXUS_OPERATION
+instance Prelude.Enum ExecutionType where
+  toEnum k__
+    = Prelude.maybe
+        (Prelude.error
+           ((Prelude.++)
+              "toEnum: unknown value for enum ExecutionType: "
+              (Prelude.show k__)))
+        Prelude.id (Data.ProtoLens.maybeToEnum k__)
+  fromEnum EXECUTION_TYPE_UNSPECIFIED = 0
+  fromEnum EXECUTION_TYPE_WORKFLOW = 1
+  fromEnum EXECUTION_TYPE_ACTIVITY = 2
+  fromEnum EXECUTION_TYPE_NEXUS_OPERATION = 3
+  fromEnum
+    (ExecutionType'Unrecognized (ExecutionType'UnrecognizedValue k))
+    = Prelude.fromIntegral k
+  succ EXECUTION_TYPE_NEXUS_OPERATION
+    = Prelude.error
+        "ExecutionType.succ: bad argument EXECUTION_TYPE_NEXUS_OPERATION. This value would be out of bounds."
+  succ EXECUTION_TYPE_UNSPECIFIED = EXECUTION_TYPE_WORKFLOW
+  succ EXECUTION_TYPE_WORKFLOW = EXECUTION_TYPE_ACTIVITY
+  succ EXECUTION_TYPE_ACTIVITY = EXECUTION_TYPE_NEXUS_OPERATION
+  succ (ExecutionType'Unrecognized _)
+    = Prelude.error
+        "ExecutionType.succ: bad argument: unrecognized value"
+  pred EXECUTION_TYPE_UNSPECIFIED
+    = Prelude.error
+        "ExecutionType.pred: bad argument EXECUTION_TYPE_UNSPECIFIED. This value would be out of bounds."
+  pred EXECUTION_TYPE_WORKFLOW = EXECUTION_TYPE_UNSPECIFIED
+  pred EXECUTION_TYPE_ACTIVITY = EXECUTION_TYPE_WORKFLOW
+  pred EXECUTION_TYPE_NEXUS_OPERATION = EXECUTION_TYPE_ACTIVITY
+  pred (ExecutionType'Unrecognized _)
+    = Prelude.error
+        "ExecutionType.pred: bad argument: unrecognized value"
+  enumFrom = Data.ProtoLens.Message.Enum.messageEnumFrom
+  enumFromTo = Data.ProtoLens.Message.Enum.messageEnumFromTo
+  enumFromThen = Data.ProtoLens.Message.Enum.messageEnumFromThen
+  enumFromThenTo = Data.ProtoLens.Message.Enum.messageEnumFromThenTo
+instance Data.ProtoLens.FieldDefault ExecutionType where
+  fieldDefault = EXECUTION_TYPE_UNSPECIFIED
+instance Control.DeepSeq.NFData ExecutionType where
   rnf x__ = Prelude.seq x__ ()
 newtype IndexedValueType'UnrecognizedValue
   = IndexedValueType'UnrecognizedValue Data.Int.Int32

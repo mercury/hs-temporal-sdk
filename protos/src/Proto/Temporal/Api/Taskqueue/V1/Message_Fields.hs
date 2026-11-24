@@ -76,6 +76,18 @@ buildIds ::
    Data.ProtoLens.Field.HasField s "buildIds" a) =>
   Lens.Family2.LensLike' f s a
 buildIds = Data.ProtoLens.Field.field @"buildIds"
+concurrencyLimit ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "concurrencyLimit" a) =>
+  Lens.Family2.LensLike' f s a
+concurrencyLimit = Data.ProtoLens.Field.field @"concurrencyLimit"
+concurrentTasks ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "concurrentTasks" a) =>
+  Lens.Family2.LensLike' f s a
+concurrentTasks = Data.ProtoLens.Field.field @"concurrentTasks"
 createTime ::
   forall f s a.
   (Prelude.Functor f,
@@ -113,6 +125,18 @@ fairnessKeysRateLimitDefault ::
   Lens.Family2.LensLike' f s a
 fairnessKeysRateLimitDefault
   = Data.ProtoLens.Field.field @"fairnessKeysRateLimitDefault"
+fairnessWeightOverrides ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "fairnessWeightOverrides" a) =>
+  Lens.Family2.LensLike' f s a
+fairnessWeightOverrides
+  = Data.ProtoLens.Field.field @"fairnessWeightOverrides"
+id ::
+  forall f s a.
+  (Prelude.Functor f, Data.ProtoLens.Field.HasField s "id" a) =>
+  Lens.Family2.LensLike' f s a
+id = Data.ProtoLens.Field.field @"id"
 identity ::
   forall f s a.
   (Prelude.Functor f,
@@ -148,6 +172,13 @@ maybe'approximateBacklogAge ::
   Lens.Family2.LensLike' f s a
 maybe'approximateBacklogAge
   = Data.ProtoLens.Field.field @"maybe'approximateBacklogAge"
+maybe'concurrencyLimit ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'concurrencyLimit" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'concurrencyLimit
+  = Data.ProtoLens.Field.field @"maybe'concurrencyLimit"
 maybe'createTime ::
   forall f s a.
   (Prelude.Functor f,
@@ -202,6 +233,13 @@ maybe'percentageRamp ::
   Lens.Family2.LensLike' f s a
 maybe'percentageRamp
   = Data.ProtoLens.Field.field @"maybe'percentageRamp"
+maybe'queueConcurrencyLimit ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'queueConcurrencyLimit" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'queueConcurrencyLimit
+  = Data.ProtoLens.Field.field @"maybe'queueConcurrencyLimit"
 maybe'queueRateLimit ::
   forall f s a.
   (Prelude.Functor f,
@@ -315,11 +353,24 @@ pollRequestDeltaSuggestion ::
   Lens.Family2.LensLike' f s a
 pollRequestDeltaSuggestion
   = Data.ProtoLens.Field.field @"pollRequestDeltaSuggestion"
+pollerGroups ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "pollerGroups" a) =>
+  Lens.Family2.LensLike' f s a
+pollerGroups = Data.ProtoLens.Field.field @"pollerGroups"
 pollers ::
   forall f s a.
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "pollers" a) =>
   Lens.Family2.LensLike' f s a
 pollers = Data.ProtoLens.Field.field @"pollers"
+queueConcurrencyLimit ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "queueConcurrencyLimit" a) =>
+  Lens.Family2.LensLike' f s a
+queueConcurrencyLimit
+  = Data.ProtoLens.Field.field @"queueConcurrencyLimit"
 queueRateLimit ::
   forall f s a.
   (Prelude.Functor f,
@@ -358,6 +409,13 @@ rateLimit ::
    Data.ProtoLens.Field.HasField s "rateLimit" a) =>
   Lens.Family2.LensLike' f s a
 rateLimit = Data.ProtoLens.Field.field @"rateLimit"
+rateLimitingActive ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "rateLimitingActive" a) =>
+  Lens.Family2.LensLike' f s a
+rateLimitingActive
+  = Data.ProtoLens.Field.field @"rateLimitingActive"
 ratePerSecond ::
   forall f s a.
   (Prelude.Functor f,
@@ -421,6 +479,12 @@ targetBuildId ::
    Data.ProtoLens.Field.HasField s "targetBuildId" a) =>
   Lens.Family2.LensLike' f s a
 targetBuildId = Data.ProtoLens.Field.field @"targetBuildId"
+targetPollers ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "targetPollers" a) =>
+  Lens.Family2.LensLike' f s a
+targetPollers = Data.ProtoLens.Field.field @"targetPollers"
 taskIdBlock ::
   forall f s a.
   (Prelude.Functor f,
@@ -493,6 +557,12 @@ vec'buildIds ::
    Data.ProtoLens.Field.HasField s "vec'buildIds" a) =>
   Lens.Family2.LensLike' f s a
 vec'buildIds = Data.ProtoLens.Field.field @"vec'buildIds"
+vec'pollerGroups ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "vec'pollerGroups" a) =>
+  Lens.Family2.LensLike' f s a
+vec'pollerGroups = Data.ProtoLens.Field.field @"vec'pollerGroups"
 vec'pollers ::
   forall f s a.
   (Prelude.Functor f,
@@ -512,6 +582,16 @@ vec'taskQueueReachability ::
   Lens.Family2.LensLike' f s a
 vec'taskQueueReachability
   = Data.ProtoLens.Field.field @"vec'taskQueueReachability"
+version ::
+  forall f s a.
+  (Prelude.Functor f, Data.ProtoLens.Field.HasField s "version" a) =>
+  Lens.Family2.LensLike' f s a
+version = Data.ProtoLens.Field.field @"version"
+weight ::
+  forall f s a.
+  (Prelude.Functor f, Data.ProtoLens.Field.HasField s "weight" a) =>
+  Lens.Family2.LensLike' f s a
+weight = Data.ProtoLens.Field.field @"weight"
 workerTaskQueue ::
   forall f s a.
   (Prelude.Functor f,

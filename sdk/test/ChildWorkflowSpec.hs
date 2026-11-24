@@ -7,6 +7,8 @@ module ChildWorkflowSpec where
 
 import Control.Exception (SomeException)
 import qualified Control.Monad.Catch as Catch
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Lens.Family2
@@ -19,7 +21,7 @@ import Temporal.Exception
 import Temporal.Payload
 import Temporal.SearchAttributes
 import Temporal.Worker
-import Temporal.Workflow (StartChildWorkflowOptions (priority, timeoutOptions, workflowId, workflowIdReusePolicy))
+import Temporal.Workflow (StartChildWorkflowOptions (priority, searchAttributes, timeoutOptions, workflowId, workflowIdReusePolicy))
 import qualified Temporal.Workflow as W
 import Test.Hspec
 import TestHelpers
@@ -45,6 +47,23 @@ tests = describe "Child Workflows" $ do
       let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
       useClient (C.execute parentWf.reference "childInvoke" opts)
         `shouldReturn` True
+
+  specify "child workflow receives its search attributes" $ \TestEnv {..} -> do
+    let expected = Map.singleton "attr1" (toSearchAttribute True)
+        child :: W.Workflow (Map SearchAttributeKey SearchAttributeType)
+        child = (.searchAttributes) <$> W.info
+        childWf = W.provideWorkflow defaultCodec "searchAttributesChild" child
+        parent :: MyWorkflow (Map SearchAttributeKey SearchAttributeType)
+        parent = do
+          let opts = W.defaultChildWorkflowOptions {searchAttributes = expected}
+          ch <- W.startChildWorkflow childWf.reference opts
+          W.waitChildWorkflowResult ch
+        parentWf = W.provideWorkflow defaultCodec "searchAttributesParent" parent
+        conf = configure () (childWf, parentWf) baseConf
+    withWorker conf $ do
+      let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
+      useClient (C.execute parentWf.reference "childSearchAttributes" opts)
+        `shouldReturn` expected
 
   specify "child workflow with different args" $ \TestEnv {..} -> do
     let child :: Int -> Text -> W.Workflow Text

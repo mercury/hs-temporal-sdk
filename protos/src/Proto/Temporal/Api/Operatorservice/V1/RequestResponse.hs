@@ -11,15 +11,19 @@ module Proto.Temporal.Api.Operatorservice.V1.RequestResponse (
         CreateNexusEndpointRequest(), CreateNexusEndpointResponse(),
         DeleteNamespaceRequest(), DeleteNamespaceResponse(),
         DeleteNexusEndpointRequest(), DeleteNexusEndpointResponse(),
-        GetNexusEndpointRequest(), GetNexusEndpointResponse(),
-        ListClustersRequest(), ListClustersResponse(),
-        ListNexusEndpointsRequest(), ListNexusEndpointsResponse(),
-        ListSearchAttributesRequest(), ListSearchAttributesResponse(),
+        DescribeNamespaceRestoreRequest(),
+        DescribeNamespaceRestoreResponse(), GetNexusEndpointRequest(),
+        GetNexusEndpointResponse(), ListClustersRequest(),
+        ListClustersResponse(), ListNexusEndpointsRequest(),
+        ListNexusEndpointsResponse(), ListSearchAttributesRequest(),
+        ListSearchAttributesResponse(),
         ListSearchAttributesResponse'CustomAttributesEntry(),
         ListSearchAttributesResponse'StorageSchemaEntry(),
         ListSearchAttributesResponse'SystemAttributesEntry(),
         RemoveRemoteClusterRequest(), RemoveRemoteClusterResponse(),
         RemoveSearchAttributesRequest(), RemoveSearchAttributesResponse(),
+        RestoreNamespaceRequest(), RestoreNamespaceResponse(),
+        SoftDeleteNamespaceRequest(), SoftDeleteNamespaceResponse(),
         UpdateNexusEndpointRequest(), UpdateNexusEndpointResponse()
     ) where
 import qualified Data.ProtoLens.Runtime.Control.DeepSeq as Control.DeepSeq
@@ -48,17 +52,21 @@ import qualified Data.ProtoLens.Runtime.Data.Vector.Generic as Data.Vector.Gener
 import qualified Data.ProtoLens.Runtime.Data.Vector.Unboxed as Data.Vector.Unboxed
 import qualified Data.ProtoLens.Runtime.Text.Read as Text.Read
 import qualified Proto.Google.Protobuf.Duration
+import qualified Proto.Google.Protobuf.Timestamp
 import qualified Proto.Temporal.Api.Enums.V1.Common
+import qualified Proto.Temporal.Api.Enums.V1.Namespace
 import qualified Proto.Temporal.Api.Nexus.V1.Message
 {- | Fields :
      
          * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.frontendAddress' @:: Lens' AddOrUpdateRemoteClusterRequest Data.Text.Text@
          * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.enableRemoteClusterConnection' @:: Lens' AddOrUpdateRemoteClusterRequest Prelude.Bool@
-         * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.frontendHttpAddress' @:: Lens' AddOrUpdateRemoteClusterRequest Data.Text.Text@ -}
+         * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.frontendHttpAddress' @:: Lens' AddOrUpdateRemoteClusterRequest Data.Text.Text@
+         * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.enableReplication' @:: Lens' AddOrUpdateRemoteClusterRequest Prelude.Bool@ -}
 data AddOrUpdateRemoteClusterRequest
   = AddOrUpdateRemoteClusterRequest'_constructor {_AddOrUpdateRemoteClusterRequest'frontendAddress :: !Data.Text.Text,
                                                   _AddOrUpdateRemoteClusterRequest'enableRemoteClusterConnection :: !Prelude.Bool,
                                                   _AddOrUpdateRemoteClusterRequest'frontendHttpAddress :: !Data.Text.Text,
+                                                  _AddOrUpdateRemoteClusterRequest'enableReplication :: !Prelude.Bool,
                                                   _AddOrUpdateRemoteClusterRequest'_unknownFields :: !Data.ProtoLens.FieldSet}
   deriving stock (Prelude.Eq, Prelude.Ord)
 instance Prelude.Show AddOrUpdateRemoteClusterRequest where
@@ -93,6 +101,14 @@ instance Data.ProtoLens.Field.HasField AddOrUpdateRemoteClusterRequest "frontend
               -> x__
                    {_AddOrUpdateRemoteClusterRequest'frontendHttpAddress = y__}))
         Prelude.id
+instance Data.ProtoLens.Field.HasField AddOrUpdateRemoteClusterRequest "enableReplication" Prelude.Bool where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _AddOrUpdateRemoteClusterRequest'enableReplication
+           (\ x__ y__
+              -> x__ {_AddOrUpdateRemoteClusterRequest'enableReplication = y__}))
+        Prelude.id
 instance Data.ProtoLens.Message AddOrUpdateRemoteClusterRequest where
   messageName _
     = Data.Text.pack
@@ -102,7 +118,8 @@ instance Data.ProtoLens.Message AddOrUpdateRemoteClusterRequest where
       \\USAddOrUpdateRemoteClusterRequest\DC2)\n\
       \\DLEfrontend_address\CAN\SOH \SOH(\tR\SIfrontendAddress\DC2G\n\
       \ enable_remote_cluster_connection\CAN\STX \SOH(\bR\GSenableRemoteClusterConnection\DC22\n\
-      \\NAKfrontend_http_address\CAN\ETX \SOH(\tR\DC3frontendHttpAddress"
+      \\NAKfrontend_http_address\CAN\ETX \SOH(\tR\DC3frontendHttpAddress\DC2-\n\
+      \\DC2enable_replication\CAN\EOT \SOH(\bR\DC1enableReplication"
   packedFileDescriptor _ = packedFileDescriptor
   fieldsByTag
     = let
@@ -133,12 +150,22 @@ instance Data.ProtoLens.Message AddOrUpdateRemoteClusterRequest where
                  Data.ProtoLens.Optional
                  (Data.ProtoLens.Field.field @"frontendHttpAddress")) ::
               Data.ProtoLens.FieldDescriptor AddOrUpdateRemoteClusterRequest
+        enableReplication__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "enable_replication"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.BoolField ::
+                 Data.ProtoLens.FieldTypeDescriptor Prelude.Bool)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"enableReplication")) ::
+              Data.ProtoLens.FieldDescriptor AddOrUpdateRemoteClusterRequest
       in
         Data.Map.fromList
           [(Data.ProtoLens.Tag 1, frontendAddress__field_descriptor),
            (Data.ProtoLens.Tag 2, 
             enableRemoteClusterConnection__field_descriptor),
-           (Data.ProtoLens.Tag 3, frontendHttpAddress__field_descriptor)]
+           (Data.ProtoLens.Tag 3, frontendHttpAddress__field_descriptor),
+           (Data.ProtoLens.Tag 4, enableReplication__field_descriptor)]
   unknownFields
     = Lens.Family2.Unchecked.lens
         _AddOrUpdateRemoteClusterRequest'_unknownFields
@@ -149,6 +176,7 @@ instance Data.ProtoLens.Message AddOrUpdateRemoteClusterRequest where
         {_AddOrUpdateRemoteClusterRequest'frontendAddress = Data.ProtoLens.fieldDefault,
          _AddOrUpdateRemoteClusterRequest'enableRemoteClusterConnection = Data.ProtoLens.fieldDefault,
          _AddOrUpdateRemoteClusterRequest'frontendHttpAddress = Data.ProtoLens.fieldDefault,
+         _AddOrUpdateRemoteClusterRequest'enableReplication = Data.ProtoLens.fieldDefault,
          _AddOrUpdateRemoteClusterRequest'_unknownFields = []}
   parseMessage
     = let
@@ -200,6 +228,14 @@ instance Data.ProtoLens.Message AddOrUpdateRemoteClusterRequest where
                                 loop
                                   (Lens.Family2.set
                                      (Data.ProtoLens.Field.field @"frontendHttpAddress") y x)
+                        32
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (Prelude.fmap
+                                          ((Prelude./=) 0) Data.ProtoLens.Encoding.Bytes.getVarInt)
+                                       "enable_replication"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field @"enableReplication") y x)
                         wire
                           -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
                                         wire
@@ -262,8 +298,22 @@ instance Data.ProtoLens.Message AddOrUpdateRemoteClusterRequest where
                                           (Prelude.fromIntegral (Data.ByteString.length bs)))
                                        (Data.ProtoLens.Encoding.Bytes.putBytes bs))
                                Data.Text.Encoding.encodeUtf8 _v))
-                   (Data.ProtoLens.Encoding.Wire.buildFieldSet
-                      (Lens.Family2.view Data.ProtoLens.unknownFields _x))))
+                   ((Data.Monoid.<>)
+                      (let
+                         _v
+                           = Lens.Family2.view
+                               (Data.ProtoLens.Field.field @"enableReplication") _x
+                       in
+                         if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                             Data.Monoid.mempty
+                         else
+                             (Data.Monoid.<>)
+                               (Data.ProtoLens.Encoding.Bytes.putVarInt 32)
+                               ((Prelude..)
+                                  Data.ProtoLens.Encoding.Bytes.putVarInt
+                                  (\ b -> if b then 1 else 0) _v))
+                      (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                         (Lens.Family2.view Data.ProtoLens.unknownFields _x)))))
 instance Control.DeepSeq.NFData AddOrUpdateRemoteClusterRequest where
   rnf
     = \ x__
@@ -275,7 +325,9 @@ instance Control.DeepSeq.NFData AddOrUpdateRemoteClusterRequest where
                    (_AddOrUpdateRemoteClusterRequest'enableRemoteClusterConnection
                       x__)
                    (Control.DeepSeq.deepseq
-                      (_AddOrUpdateRemoteClusterRequest'frontendHttpAddress x__) ())))
+                      (_AddOrUpdateRemoteClusterRequest'frontendHttpAddress x__)
+                      (Control.DeepSeq.deepseq
+                         (_AddOrUpdateRemoteClusterRequest'enableReplication x__) ()))))
 {- | Fields :
       -}
 data AddOrUpdateRemoteClusterResponse
@@ -775,7 +827,8 @@ instance Control.DeepSeq.NFData AddSearchAttributesResponse where
          * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.httpAddress' @:: Lens' ClusterMetadata Data.Text.Text@
          * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.initialFailoverVersion' @:: Lens' ClusterMetadata Data.Int.Int64@
          * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.historyShardCount' @:: Lens' ClusterMetadata Data.Int.Int32@
-         * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.isConnectionEnabled' @:: Lens' ClusterMetadata Prelude.Bool@ -}
+         * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.isConnectionEnabled' @:: Lens' ClusterMetadata Prelude.Bool@
+         * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.isReplicationEnabled' @:: Lens' ClusterMetadata Prelude.Bool@ -}
 data ClusterMetadata
   = ClusterMetadata'_constructor {_ClusterMetadata'clusterName :: !Data.Text.Text,
                                   _ClusterMetadata'clusterId :: !Data.Text.Text,
@@ -784,6 +837,7 @@ data ClusterMetadata
                                   _ClusterMetadata'initialFailoverVersion :: !Data.Int.Int64,
                                   _ClusterMetadata'historyShardCount :: !Data.Int.Int32,
                                   _ClusterMetadata'isConnectionEnabled :: !Prelude.Bool,
+                                  _ClusterMetadata'isReplicationEnabled :: !Prelude.Bool,
                                   _ClusterMetadata'_unknownFields :: !Data.ProtoLens.FieldSet}
   deriving stock (Prelude.Eq, Prelude.Ord)
 instance Prelude.Show ClusterMetadata where
@@ -841,6 +895,13 @@ instance Data.ProtoLens.Field.HasField ClusterMetadata "isConnectionEnabled" Pre
            _ClusterMetadata'isConnectionEnabled
            (\ x__ y__ -> x__ {_ClusterMetadata'isConnectionEnabled = y__}))
         Prelude.id
+instance Data.ProtoLens.Field.HasField ClusterMetadata "isReplicationEnabled" Prelude.Bool where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _ClusterMetadata'isReplicationEnabled
+           (\ x__ y__ -> x__ {_ClusterMetadata'isReplicationEnabled = y__}))
+        Prelude.id
 instance Data.ProtoLens.Message ClusterMetadata where
   messageName _
     = Data.Text.pack "temporal.api.operatorservice.v1.ClusterMetadata"
@@ -854,7 +915,8 @@ instance Data.ProtoLens.Message ClusterMetadata where
       \\fhttp_address\CAN\a \SOH(\tR\vhttpAddress\DC28\n\
       \\CANinitial_failover_version\CAN\EOT \SOH(\ETXR\SYNinitialFailoverVersion\DC2.\n\
       \\DC3history_shard_count\CAN\ENQ \SOH(\ENQR\DC1historyShardCount\DC22\n\
-      \\NAKis_connection_enabled\CAN\ACK \SOH(\bR\DC3isConnectionEnabled"
+      \\NAKis_connection_enabled\CAN\ACK \SOH(\bR\DC3isConnectionEnabled\DC24\n\
+      \\SYNis_replication_enabled\CAN\b \SOH(\bR\DC4isReplicationEnabled"
   packedFileDescriptor _ = packedFileDescriptor
   fieldsByTag
     = let
@@ -920,6 +982,15 @@ instance Data.ProtoLens.Message ClusterMetadata where
                  Data.ProtoLens.Optional
                  (Data.ProtoLens.Field.field @"isConnectionEnabled")) ::
               Data.ProtoLens.FieldDescriptor ClusterMetadata
+        isReplicationEnabled__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "is_replication_enabled"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.BoolField ::
+                 Data.ProtoLens.FieldTypeDescriptor Prelude.Bool)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"isReplicationEnabled")) ::
+              Data.ProtoLens.FieldDescriptor ClusterMetadata
       in
         Data.Map.fromList
           [(Data.ProtoLens.Tag 1, clusterName__field_descriptor),
@@ -928,7 +999,8 @@ instance Data.ProtoLens.Message ClusterMetadata where
            (Data.ProtoLens.Tag 7, httpAddress__field_descriptor),
            (Data.ProtoLens.Tag 4, initialFailoverVersion__field_descriptor),
            (Data.ProtoLens.Tag 5, historyShardCount__field_descriptor),
-           (Data.ProtoLens.Tag 6, isConnectionEnabled__field_descriptor)]
+           (Data.ProtoLens.Tag 6, isConnectionEnabled__field_descriptor),
+           (Data.ProtoLens.Tag 8, isReplicationEnabled__field_descriptor)]
   unknownFields
     = Lens.Family2.Unchecked.lens
         _ClusterMetadata'_unknownFields
@@ -942,6 +1014,7 @@ instance Data.ProtoLens.Message ClusterMetadata where
          _ClusterMetadata'initialFailoverVersion = Data.ProtoLens.fieldDefault,
          _ClusterMetadata'historyShardCount = Data.ProtoLens.fieldDefault,
          _ClusterMetadata'isConnectionEnabled = Data.ProtoLens.fieldDefault,
+         _ClusterMetadata'isReplicationEnabled = Data.ProtoLens.fieldDefault,
          _ClusterMetadata'_unknownFields = []}
   parseMessage
     = let
@@ -1023,6 +1096,14 @@ instance Data.ProtoLens.Message ClusterMetadata where
                                 loop
                                   (Lens.Family2.set
                                      (Data.ProtoLens.Field.field @"isConnectionEnabled") y x)
+                        64
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (Prelude.fmap
+                                          ((Prelude./=) 0) Data.ProtoLens.Encoding.Bytes.getVarInt)
+                                       "is_replication_enabled"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field @"isReplicationEnabled") y x)
                         wire
                           -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
                                         wire
@@ -1142,8 +1223,22 @@ instance Data.ProtoLens.Message ClusterMetadata where
                                         ((Prelude..)
                                            Data.ProtoLens.Encoding.Bytes.putVarInt
                                            (\ b -> if b then 1 else 0) _v))
-                               (Data.ProtoLens.Encoding.Wire.buildFieldSet
-                                  (Lens.Family2.view Data.ProtoLens.unknownFields _x))))))))
+                               ((Data.Monoid.<>)
+                                  (let
+                                     _v
+                                       = Lens.Family2.view
+                                           (Data.ProtoLens.Field.field @"isReplicationEnabled") _x
+                                   in
+                                     if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                                         Data.Monoid.mempty
+                                     else
+                                         (Data.Monoid.<>)
+                                           (Data.ProtoLens.Encoding.Bytes.putVarInt 64)
+                                           ((Prelude..)
+                                              Data.ProtoLens.Encoding.Bytes.putVarInt
+                                              (\ b -> if b then 1 else 0) _v))
+                                  (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                                     (Lens.Family2.view Data.ProtoLens.unknownFields _x)))))))))
 instance Control.DeepSeq.NFData ClusterMetadata where
   rnf
     = \ x__
@@ -1162,7 +1257,9 @@ instance Control.DeepSeq.NFData ClusterMetadata where
                             (Control.DeepSeq.deepseq
                                (_ClusterMetadata'historyShardCount x__)
                                (Control.DeepSeq.deepseq
-                                  (_ClusterMetadata'isConnectionEnabled x__) ())))))))
+                                  (_ClusterMetadata'isConnectionEnabled x__)
+                                  (Control.DeepSeq.deepseq
+                                     (_ClusterMetadata'isReplicationEnabled x__) ()))))))))
 {- | Fields :
      
          * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.spec' @:: Lens' CreateNexusEndpointRequest Proto.Temporal.Api.Nexus.V1.Message.EndpointSpec@
@@ -1980,6 +2077,659 @@ instance Control.DeepSeq.NFData DeleteNexusEndpointResponse where
     = \ x__
         -> Control.DeepSeq.deepseq
              (_DeleteNexusEndpointResponse'_unknownFields x__) ()
+{- | Fields :
+     
+         * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.namespace' @:: Lens' DescribeNamespaceRestoreRequest Data.Text.Text@
+         * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.namespaceId' @:: Lens' DescribeNamespaceRestoreRequest Data.Text.Text@ -}
+data DescribeNamespaceRestoreRequest
+  = DescribeNamespaceRestoreRequest'_constructor {_DescribeNamespaceRestoreRequest'namespace :: !Data.Text.Text,
+                                                  _DescribeNamespaceRestoreRequest'namespaceId :: !Data.Text.Text,
+                                                  _DescribeNamespaceRestoreRequest'_unknownFields :: !Data.ProtoLens.FieldSet}
+  deriving stock (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show DescribeNamespaceRestoreRequest where
+  showsPrec _ __x __s
+    = Prelude.showChar
+        '{'
+        (Prelude.showString
+           (Data.ProtoLens.showMessageShort __x) (Prelude.showChar '}' __s))
+instance Data.ProtoLens.Field.HasField DescribeNamespaceRestoreRequest "namespace" Data.Text.Text where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _DescribeNamespaceRestoreRequest'namespace
+           (\ x__ y__
+              -> x__ {_DescribeNamespaceRestoreRequest'namespace = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField DescribeNamespaceRestoreRequest "namespaceId" Data.Text.Text where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _DescribeNamespaceRestoreRequest'namespaceId
+           (\ x__ y__
+              -> x__ {_DescribeNamespaceRestoreRequest'namespaceId = y__}))
+        Prelude.id
+instance Data.ProtoLens.Message DescribeNamespaceRestoreRequest where
+  messageName _
+    = Data.Text.pack
+        "temporal.api.operatorservice.v1.DescribeNamespaceRestoreRequest"
+  packedMessageDescriptor _
+    = "\n\
+      \\USDescribeNamespaceRestoreRequest\DC2\FS\n\
+      \\tnamespace\CAN\SOH \SOH(\tR\tnamespace\DC2!\n\
+      \\fnamespace_id\CAN\STX \SOH(\tR\vnamespaceId"
+  packedFileDescriptor _ = packedFileDescriptor
+  fieldsByTag
+    = let
+        namespace__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "namespace"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.StringField ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Text.Text)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"namespace")) ::
+              Data.ProtoLens.FieldDescriptor DescribeNamespaceRestoreRequest
+        namespaceId__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "namespace_id"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.StringField ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Text.Text)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"namespaceId")) ::
+              Data.ProtoLens.FieldDescriptor DescribeNamespaceRestoreRequest
+      in
+        Data.Map.fromList
+          [(Data.ProtoLens.Tag 1, namespace__field_descriptor),
+           (Data.ProtoLens.Tag 2, namespaceId__field_descriptor)]
+  unknownFields
+    = Lens.Family2.Unchecked.lens
+        _DescribeNamespaceRestoreRequest'_unknownFields
+        (\ x__ y__
+           -> x__ {_DescribeNamespaceRestoreRequest'_unknownFields = y__})
+  defMessage
+    = DescribeNamespaceRestoreRequest'_constructor
+        {_DescribeNamespaceRestoreRequest'namespace = Data.ProtoLens.fieldDefault,
+         _DescribeNamespaceRestoreRequest'namespaceId = Data.ProtoLens.fieldDefault,
+         _DescribeNamespaceRestoreRequest'_unknownFields = []}
+  parseMessage
+    = let
+        loop ::
+          DescribeNamespaceRestoreRequest
+          -> Data.ProtoLens.Encoding.Bytes.Parser DescribeNamespaceRestoreRequest
+        loop x
+          = do end <- Data.ProtoLens.Encoding.Bytes.atEnd
+               if end then
+                   do (let missing = []
+                       in
+                         if Prelude.null missing then
+                             Prelude.return ()
+                         else
+                             Prelude.fail
+                               ((Prelude.++)
+                                  "Missing required fields: "
+                                  (Prelude.show (missing :: [Prelude.String]))))
+                      Prelude.return
+                        (Lens.Family2.over
+                           Data.ProtoLens.unknownFields (\ !t -> Prelude.reverse t) x)
+               else
+                   do tag <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                      case tag of
+                        10
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.getText
+                                             (Prelude.fromIntegral len))
+                                       "namespace"
+                                loop
+                                  (Lens.Family2.set (Data.ProtoLens.Field.field @"namespace") y x)
+                        18
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.getText
+                                             (Prelude.fromIntegral len))
+                                       "namespace_id"
+                                loop
+                                  (Lens.Family2.set (Data.ProtoLens.Field.field @"namespaceId") y x)
+                        wire
+                          -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
+                                        wire
+                                loop
+                                  (Lens.Family2.over
+                                     Data.ProtoLens.unknownFields (\ !t -> (:) y t) x)
+      in
+        (Data.ProtoLens.Encoding.Bytes.<?>)
+          (do loop Data.ProtoLens.defMessage)
+          "DescribeNamespaceRestoreRequest"
+  buildMessage
+    = \ _x
+        -> (Data.Monoid.<>)
+             (let
+                _v = Lens.Family2.view (Data.ProtoLens.Field.field @"namespace") _x
+              in
+                if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                    Data.Monoid.mempty
+                else
+                    (Data.Monoid.<>)
+                      (Data.ProtoLens.Encoding.Bytes.putVarInt 10)
+                      ((Prelude..)
+                         (\ bs
+                            -> (Data.Monoid.<>)
+                                 (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                    (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                 (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                         Data.Text.Encoding.encodeUtf8 _v))
+             ((Data.Monoid.<>)
+                (let
+                   _v
+                     = Lens.Family2.view (Data.ProtoLens.Field.field @"namespaceId") _x
+                 in
+                   if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                       Data.Monoid.mempty
+                   else
+                       (Data.Monoid.<>)
+                         (Data.ProtoLens.Encoding.Bytes.putVarInt 18)
+                         ((Prelude..)
+                            (\ bs
+                               -> (Data.Monoid.<>)
+                                    (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                       (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                    (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                            Data.Text.Encoding.encodeUtf8 _v))
+                (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                   (Lens.Family2.view Data.ProtoLens.unknownFields _x)))
+instance Control.DeepSeq.NFData DescribeNamespaceRestoreRequest where
+  rnf
+    = \ x__
+        -> Control.DeepSeq.deepseq
+             (_DescribeNamespaceRestoreRequest'_unknownFields x__)
+             (Control.DeepSeq.deepseq
+                (_DescribeNamespaceRestoreRequest'namespace x__)
+                (Control.DeepSeq.deepseq
+                   (_DescribeNamespaceRestoreRequest'namespaceId x__) ()))
+{- | Fields :
+     
+         * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.state' @:: Lens' DescribeNamespaceRestoreResponse Proto.Temporal.Api.Enums.V1.Namespace.NamespaceRestoreState@
+         * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.hostCluster' @:: Lens' DescribeNamespaceRestoreResponse Data.Text.Text@
+         * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.startTime' @:: Lens' DescribeNamespaceRestoreResponse Proto.Google.Protobuf.Timestamp.Timestamp@
+         * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.maybe'startTime' @:: Lens' DescribeNamespaceRestoreResponse (Prelude.Maybe Proto.Google.Protobuf.Timestamp.Timestamp)@
+         * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.closeTime' @:: Lens' DescribeNamespaceRestoreResponse Proto.Google.Protobuf.Timestamp.Timestamp@
+         * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.maybe'closeTime' @:: Lens' DescribeNamespaceRestoreResponse (Prelude.Maybe Proto.Google.Protobuf.Timestamp.Timestamp)@
+         * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.runId' @:: Lens' DescribeNamespaceRestoreResponse Data.Text.Text@
+         * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.totalExecutionCount' @:: Lens' DescribeNamespaceRestoreResponse Data.Int.Int64@
+         * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.processedExecutionCount' @:: Lens' DescribeNamespaceRestoreResponse Data.Int.Int64@
+         * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.estimatedCompletionTime' @:: Lens' DescribeNamespaceRestoreResponse Proto.Google.Protobuf.Timestamp.Timestamp@
+         * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.maybe'estimatedCompletionTime' @:: Lens' DescribeNamespaceRestoreResponse (Prelude.Maybe Proto.Google.Protobuf.Timestamp.Timestamp)@ -}
+data DescribeNamespaceRestoreResponse
+  = DescribeNamespaceRestoreResponse'_constructor {_DescribeNamespaceRestoreResponse'state :: !Proto.Temporal.Api.Enums.V1.Namespace.NamespaceRestoreState,
+                                                   _DescribeNamespaceRestoreResponse'hostCluster :: !Data.Text.Text,
+                                                   _DescribeNamespaceRestoreResponse'startTime :: !(Prelude.Maybe Proto.Google.Protobuf.Timestamp.Timestamp),
+                                                   _DescribeNamespaceRestoreResponse'closeTime :: !(Prelude.Maybe Proto.Google.Protobuf.Timestamp.Timestamp),
+                                                   _DescribeNamespaceRestoreResponse'runId :: !Data.Text.Text,
+                                                   _DescribeNamespaceRestoreResponse'totalExecutionCount :: !Data.Int.Int64,
+                                                   _DescribeNamespaceRestoreResponse'processedExecutionCount :: !Data.Int.Int64,
+                                                   _DescribeNamespaceRestoreResponse'estimatedCompletionTime :: !(Prelude.Maybe Proto.Google.Protobuf.Timestamp.Timestamp),
+                                                   _DescribeNamespaceRestoreResponse'_unknownFields :: !Data.ProtoLens.FieldSet}
+  deriving stock (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show DescribeNamespaceRestoreResponse where
+  showsPrec _ __x __s
+    = Prelude.showChar
+        '{'
+        (Prelude.showString
+           (Data.ProtoLens.showMessageShort __x) (Prelude.showChar '}' __s))
+instance Data.ProtoLens.Field.HasField DescribeNamespaceRestoreResponse "state" Proto.Temporal.Api.Enums.V1.Namespace.NamespaceRestoreState where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _DescribeNamespaceRestoreResponse'state
+           (\ x__ y__ -> x__ {_DescribeNamespaceRestoreResponse'state = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField DescribeNamespaceRestoreResponse "hostCluster" Data.Text.Text where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _DescribeNamespaceRestoreResponse'hostCluster
+           (\ x__ y__
+              -> x__ {_DescribeNamespaceRestoreResponse'hostCluster = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField DescribeNamespaceRestoreResponse "startTime" Proto.Google.Protobuf.Timestamp.Timestamp where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _DescribeNamespaceRestoreResponse'startTime
+           (\ x__ y__
+              -> x__ {_DescribeNamespaceRestoreResponse'startTime = y__}))
+        (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
+instance Data.ProtoLens.Field.HasField DescribeNamespaceRestoreResponse "maybe'startTime" (Prelude.Maybe Proto.Google.Protobuf.Timestamp.Timestamp) where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _DescribeNamespaceRestoreResponse'startTime
+           (\ x__ y__
+              -> x__ {_DescribeNamespaceRestoreResponse'startTime = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField DescribeNamespaceRestoreResponse "closeTime" Proto.Google.Protobuf.Timestamp.Timestamp where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _DescribeNamespaceRestoreResponse'closeTime
+           (\ x__ y__
+              -> x__ {_DescribeNamespaceRestoreResponse'closeTime = y__}))
+        (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
+instance Data.ProtoLens.Field.HasField DescribeNamespaceRestoreResponse "maybe'closeTime" (Prelude.Maybe Proto.Google.Protobuf.Timestamp.Timestamp) where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _DescribeNamespaceRestoreResponse'closeTime
+           (\ x__ y__
+              -> x__ {_DescribeNamespaceRestoreResponse'closeTime = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField DescribeNamespaceRestoreResponse "runId" Data.Text.Text where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _DescribeNamespaceRestoreResponse'runId
+           (\ x__ y__ -> x__ {_DescribeNamespaceRestoreResponse'runId = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField DescribeNamespaceRestoreResponse "totalExecutionCount" Data.Int.Int64 where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _DescribeNamespaceRestoreResponse'totalExecutionCount
+           (\ x__ y__
+              -> x__
+                   {_DescribeNamespaceRestoreResponse'totalExecutionCount = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField DescribeNamespaceRestoreResponse "processedExecutionCount" Data.Int.Int64 where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _DescribeNamespaceRestoreResponse'processedExecutionCount
+           (\ x__ y__
+              -> x__
+                   {_DescribeNamespaceRestoreResponse'processedExecutionCount = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField DescribeNamespaceRestoreResponse "estimatedCompletionTime" Proto.Google.Protobuf.Timestamp.Timestamp where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _DescribeNamespaceRestoreResponse'estimatedCompletionTime
+           (\ x__ y__
+              -> x__
+                   {_DescribeNamespaceRestoreResponse'estimatedCompletionTime = y__}))
+        (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
+instance Data.ProtoLens.Field.HasField DescribeNamespaceRestoreResponse "maybe'estimatedCompletionTime" (Prelude.Maybe Proto.Google.Protobuf.Timestamp.Timestamp) where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _DescribeNamespaceRestoreResponse'estimatedCompletionTime
+           (\ x__ y__
+              -> x__
+                   {_DescribeNamespaceRestoreResponse'estimatedCompletionTime = y__}))
+        Prelude.id
+instance Data.ProtoLens.Message DescribeNamespaceRestoreResponse where
+  messageName _
+    = Data.Text.pack
+        "temporal.api.operatorservice.v1.DescribeNamespaceRestoreResponse"
+  packedMessageDescriptor _
+    = "\n\
+      \ DescribeNamespaceRestoreResponse\DC2B\n\
+      \\ENQstate\CAN\SOH \SOH(\SO2,.temporal.api.enums.v1.NamespaceRestoreStateR\ENQstate\DC2!\n\
+      \\fhost_cluster\CAN\STX \SOH(\tR\vhostCluster\DC29\n\
+      \\n\
+      \start_time\CAN\ETX \SOH(\v2\SUB.google.protobuf.TimestampR\tstartTime\DC29\n\
+      \\n\
+      \close_time\CAN\EOT \SOH(\v2\SUB.google.protobuf.TimestampR\tcloseTime\DC2\NAK\n\
+      \\ACKrun_id\CAN\ENQ \SOH(\tR\ENQrunId\DC22\n\
+      \\NAKtotal_execution_count\CAN\ACK \SOH(\ETXR\DC3totalExecutionCount\DC2:\n\
+      \\EMprocessed_execution_count\CAN\a \SOH(\ETXR\ETBprocessedExecutionCount\DC2V\n\
+      \\EMestimated_completion_time\CAN\b \SOH(\v2\SUB.google.protobuf.TimestampR\ETBestimatedCompletionTime"
+  packedFileDescriptor _ = packedFileDescriptor
+  fieldsByTag
+    = let
+        state__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "state"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.EnumField ::
+                 Data.ProtoLens.FieldTypeDescriptor Proto.Temporal.Api.Enums.V1.Namespace.NamespaceRestoreState)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional (Data.ProtoLens.Field.field @"state")) ::
+              Data.ProtoLens.FieldDescriptor DescribeNamespaceRestoreResponse
+        hostCluster__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "host_cluster"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.StringField ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Text.Text)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"hostCluster")) ::
+              Data.ProtoLens.FieldDescriptor DescribeNamespaceRestoreResponse
+        startTime__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "start_time"
+              (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                 Data.ProtoLens.FieldTypeDescriptor Proto.Google.Protobuf.Timestamp.Timestamp)
+              (Data.ProtoLens.OptionalField
+                 (Data.ProtoLens.Field.field @"maybe'startTime")) ::
+              Data.ProtoLens.FieldDescriptor DescribeNamespaceRestoreResponse
+        closeTime__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "close_time"
+              (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                 Data.ProtoLens.FieldTypeDescriptor Proto.Google.Protobuf.Timestamp.Timestamp)
+              (Data.ProtoLens.OptionalField
+                 (Data.ProtoLens.Field.field @"maybe'closeTime")) ::
+              Data.ProtoLens.FieldDescriptor DescribeNamespaceRestoreResponse
+        runId__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "run_id"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.StringField ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Text.Text)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional (Data.ProtoLens.Field.field @"runId")) ::
+              Data.ProtoLens.FieldDescriptor DescribeNamespaceRestoreResponse
+        totalExecutionCount__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "total_execution_count"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.Int64Field ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Int.Int64)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"totalExecutionCount")) ::
+              Data.ProtoLens.FieldDescriptor DescribeNamespaceRestoreResponse
+        processedExecutionCount__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "processed_execution_count"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.Int64Field ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Int.Int64)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"processedExecutionCount")) ::
+              Data.ProtoLens.FieldDescriptor DescribeNamespaceRestoreResponse
+        estimatedCompletionTime__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "estimated_completion_time"
+              (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                 Data.ProtoLens.FieldTypeDescriptor Proto.Google.Protobuf.Timestamp.Timestamp)
+              (Data.ProtoLens.OptionalField
+                 (Data.ProtoLens.Field.field @"maybe'estimatedCompletionTime")) ::
+              Data.ProtoLens.FieldDescriptor DescribeNamespaceRestoreResponse
+      in
+        Data.Map.fromList
+          [(Data.ProtoLens.Tag 1, state__field_descriptor),
+           (Data.ProtoLens.Tag 2, hostCluster__field_descriptor),
+           (Data.ProtoLens.Tag 3, startTime__field_descriptor),
+           (Data.ProtoLens.Tag 4, closeTime__field_descriptor),
+           (Data.ProtoLens.Tag 5, runId__field_descriptor),
+           (Data.ProtoLens.Tag 6, totalExecutionCount__field_descriptor),
+           (Data.ProtoLens.Tag 7, processedExecutionCount__field_descriptor),
+           (Data.ProtoLens.Tag 8, estimatedCompletionTime__field_descriptor)]
+  unknownFields
+    = Lens.Family2.Unchecked.lens
+        _DescribeNamespaceRestoreResponse'_unknownFields
+        (\ x__ y__
+           -> x__ {_DescribeNamespaceRestoreResponse'_unknownFields = y__})
+  defMessage
+    = DescribeNamespaceRestoreResponse'_constructor
+        {_DescribeNamespaceRestoreResponse'state = Data.ProtoLens.fieldDefault,
+         _DescribeNamespaceRestoreResponse'hostCluster = Data.ProtoLens.fieldDefault,
+         _DescribeNamespaceRestoreResponse'startTime = Prelude.Nothing,
+         _DescribeNamespaceRestoreResponse'closeTime = Prelude.Nothing,
+         _DescribeNamespaceRestoreResponse'runId = Data.ProtoLens.fieldDefault,
+         _DescribeNamespaceRestoreResponse'totalExecutionCount = Data.ProtoLens.fieldDefault,
+         _DescribeNamespaceRestoreResponse'processedExecutionCount = Data.ProtoLens.fieldDefault,
+         _DescribeNamespaceRestoreResponse'estimatedCompletionTime = Prelude.Nothing,
+         _DescribeNamespaceRestoreResponse'_unknownFields = []}
+  parseMessage
+    = let
+        loop ::
+          DescribeNamespaceRestoreResponse
+          -> Data.ProtoLens.Encoding.Bytes.Parser DescribeNamespaceRestoreResponse
+        loop x
+          = do end <- Data.ProtoLens.Encoding.Bytes.atEnd
+               if end then
+                   do (let missing = []
+                       in
+                         if Prelude.null missing then
+                             Prelude.return ()
+                         else
+                             Prelude.fail
+                               ((Prelude.++)
+                                  "Missing required fields: "
+                                  (Prelude.show (missing :: [Prelude.String]))))
+                      Prelude.return
+                        (Lens.Family2.over
+                           Data.ProtoLens.unknownFields (\ !t -> Prelude.reverse t) x)
+               else
+                   do tag <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                      case tag of
+                        8 -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (Prelude.fmap
+                                          Prelude.toEnum
+                                          (Prelude.fmap
+                                             Prelude.fromIntegral
+                                             Data.ProtoLens.Encoding.Bytes.getVarInt))
+                                       "state"
+                                loop (Lens.Family2.set (Data.ProtoLens.Field.field @"state") y x)
+                        18
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.getText
+                                             (Prelude.fromIntegral len))
+                                       "host_cluster"
+                                loop
+                                  (Lens.Family2.set (Data.ProtoLens.Field.field @"hostCluster") y x)
+                        26
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.isolate
+                                             (Prelude.fromIntegral len) Data.ProtoLens.parseMessage)
+                                       "start_time"
+                                loop
+                                  (Lens.Family2.set (Data.ProtoLens.Field.field @"startTime") y x)
+                        34
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.isolate
+                                             (Prelude.fromIntegral len) Data.ProtoLens.parseMessage)
+                                       "close_time"
+                                loop
+                                  (Lens.Family2.set (Data.ProtoLens.Field.field @"closeTime") y x)
+                        42
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.getText
+                                             (Prelude.fromIntegral len))
+                                       "run_id"
+                                loop (Lens.Family2.set (Data.ProtoLens.Field.field @"runId") y x)
+                        48
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (Prelude.fmap
+                                          Prelude.fromIntegral
+                                          Data.ProtoLens.Encoding.Bytes.getVarInt)
+                                       "total_execution_count"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field @"totalExecutionCount") y x)
+                        56
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (Prelude.fmap
+                                          Prelude.fromIntegral
+                                          Data.ProtoLens.Encoding.Bytes.getVarInt)
+                                       "processed_execution_count"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field @"processedExecutionCount") y x)
+                        66
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.isolate
+                                             (Prelude.fromIntegral len) Data.ProtoLens.parseMessage)
+                                       "estimated_completion_time"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field @"estimatedCompletionTime") y x)
+                        wire
+                          -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
+                                        wire
+                                loop
+                                  (Lens.Family2.over
+                                     Data.ProtoLens.unknownFields (\ !t -> (:) y t) x)
+      in
+        (Data.ProtoLens.Encoding.Bytes.<?>)
+          (do loop Data.ProtoLens.defMessage)
+          "DescribeNamespaceRestoreResponse"
+  buildMessage
+    = \ _x
+        -> (Data.Monoid.<>)
+             (let
+                _v = Lens.Family2.view (Data.ProtoLens.Field.field @"state") _x
+              in
+                if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                    Data.Monoid.mempty
+                else
+                    (Data.Monoid.<>)
+                      (Data.ProtoLens.Encoding.Bytes.putVarInt 8)
+                      ((Prelude..)
+                         ((Prelude..)
+                            Data.ProtoLens.Encoding.Bytes.putVarInt Prelude.fromIntegral)
+                         Prelude.fromEnum _v))
+             ((Data.Monoid.<>)
+                (let
+                   _v
+                     = Lens.Family2.view (Data.ProtoLens.Field.field @"hostCluster") _x
+                 in
+                   if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                       Data.Monoid.mempty
+                   else
+                       (Data.Monoid.<>)
+                         (Data.ProtoLens.Encoding.Bytes.putVarInt 18)
+                         ((Prelude..)
+                            (\ bs
+                               -> (Data.Monoid.<>)
+                                    (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                       (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                    (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                            Data.Text.Encoding.encodeUtf8 _v))
+                ((Data.Monoid.<>)
+                   (case
+                        Lens.Family2.view
+                          (Data.ProtoLens.Field.field @"maybe'startTime") _x
+                    of
+                      Prelude.Nothing -> Data.Monoid.mempty
+                      (Prelude.Just _v)
+                        -> (Data.Monoid.<>)
+                             (Data.ProtoLens.Encoding.Bytes.putVarInt 26)
+                             ((Prelude..)
+                                (\ bs
+                                   -> (Data.Monoid.<>)
+                                        (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                           (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                        (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                                Data.ProtoLens.encodeMessage _v))
+                   ((Data.Monoid.<>)
+                      (case
+                           Lens.Family2.view
+                             (Data.ProtoLens.Field.field @"maybe'closeTime") _x
+                       of
+                         Prelude.Nothing -> Data.Monoid.mempty
+                         (Prelude.Just _v)
+                           -> (Data.Monoid.<>)
+                                (Data.ProtoLens.Encoding.Bytes.putVarInt 34)
+                                ((Prelude..)
+                                   (\ bs
+                                      -> (Data.Monoid.<>)
+                                           (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                              (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                           (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                                   Data.ProtoLens.encodeMessage _v))
+                      ((Data.Monoid.<>)
+                         (let
+                            _v = Lens.Family2.view (Data.ProtoLens.Field.field @"runId") _x
+                          in
+                            if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                                Data.Monoid.mempty
+                            else
+                                (Data.Monoid.<>)
+                                  (Data.ProtoLens.Encoding.Bytes.putVarInt 42)
+                                  ((Prelude..)
+                                     (\ bs
+                                        -> (Data.Monoid.<>)
+                                             (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                                (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                             (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                                     Data.Text.Encoding.encodeUtf8 _v))
+                         ((Data.Monoid.<>)
+                            (let
+                               _v
+                                 = Lens.Family2.view
+                                     (Data.ProtoLens.Field.field @"totalExecutionCount") _x
+                             in
+                               if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                                   Data.Monoid.mempty
+                               else
+                                   (Data.Monoid.<>)
+                                     (Data.ProtoLens.Encoding.Bytes.putVarInt 48)
+                                     ((Prelude..)
+                                        Data.ProtoLens.Encoding.Bytes.putVarInt Prelude.fromIntegral
+                                        _v))
+                            ((Data.Monoid.<>)
+                               (let
+                                  _v
+                                    = Lens.Family2.view
+                                        (Data.ProtoLens.Field.field @"processedExecutionCount") _x
+                                in
+                                  if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                                      Data.Monoid.mempty
+                                  else
+                                      (Data.Monoid.<>)
+                                        (Data.ProtoLens.Encoding.Bytes.putVarInt 56)
+                                        ((Prelude..)
+                                           Data.ProtoLens.Encoding.Bytes.putVarInt
+                                           Prelude.fromIntegral _v))
+                               ((Data.Monoid.<>)
+                                  (case
+                                       Lens.Family2.view
+                                         (Data.ProtoLens.Field.field
+                                            @"maybe'estimatedCompletionTime")
+                                         _x
+                                   of
+                                     Prelude.Nothing -> Data.Monoid.mempty
+                                     (Prelude.Just _v)
+                                       -> (Data.Monoid.<>)
+                                            (Data.ProtoLens.Encoding.Bytes.putVarInt 66)
+                                            ((Prelude..)
+                                               (\ bs
+                                                  -> (Data.Monoid.<>)
+                                                       (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                                          (Prelude.fromIntegral
+                                                             (Data.ByteString.length bs)))
+                                                       (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                                               Data.ProtoLens.encodeMessage _v))
+                                  (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                                     (Lens.Family2.view Data.ProtoLens.unknownFields _x)))))))))
+instance Control.DeepSeq.NFData DescribeNamespaceRestoreResponse where
+  rnf
+    = \ x__
+        -> Control.DeepSeq.deepseq
+             (_DescribeNamespaceRestoreResponse'_unknownFields x__)
+             (Control.DeepSeq.deepseq
+                (_DescribeNamespaceRestoreResponse'state x__)
+                (Control.DeepSeq.deepseq
+                   (_DescribeNamespaceRestoreResponse'hostCluster x__)
+                   (Control.DeepSeq.deepseq
+                      (_DescribeNamespaceRestoreResponse'startTime x__)
+                      (Control.DeepSeq.deepseq
+                         (_DescribeNamespaceRestoreResponse'closeTime x__)
+                         (Control.DeepSeq.deepseq
+                            (_DescribeNamespaceRestoreResponse'runId x__)
+                            (Control.DeepSeq.deepseq
+                               (_DescribeNamespaceRestoreResponse'totalExecutionCount x__)
+                               (Control.DeepSeq.deepseq
+                                  (_DescribeNamespaceRestoreResponse'processedExecutionCount x__)
+                                  (Control.DeepSeq.deepseq
+                                     (_DescribeNamespaceRestoreResponse'estimatedCompletionTime x__)
+                                     ()))))))))
 {- | Fields :
      
          * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.id' @:: Lens' GetNexusEndpointRequest Data.Text.Text@ -}
@@ -4307,6 +5057,476 @@ instance Control.DeepSeq.NFData RemoveSearchAttributesResponse where
              (_RemoveSearchAttributesResponse'_unknownFields x__) ()
 {- | Fields :
      
+         * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.namespace' @:: Lens' RestoreNamespaceRequest Data.Text.Text@
+         * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.namespaceId' @:: Lens' RestoreNamespaceRequest Data.Text.Text@ -}
+data RestoreNamespaceRequest
+  = RestoreNamespaceRequest'_constructor {_RestoreNamespaceRequest'namespace :: !Data.Text.Text,
+                                          _RestoreNamespaceRequest'namespaceId :: !Data.Text.Text,
+                                          _RestoreNamespaceRequest'_unknownFields :: !Data.ProtoLens.FieldSet}
+  deriving stock (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show RestoreNamespaceRequest where
+  showsPrec _ __x __s
+    = Prelude.showChar
+        '{'
+        (Prelude.showString
+           (Data.ProtoLens.showMessageShort __x) (Prelude.showChar '}' __s))
+instance Data.ProtoLens.Field.HasField RestoreNamespaceRequest "namespace" Data.Text.Text where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _RestoreNamespaceRequest'namespace
+           (\ x__ y__ -> x__ {_RestoreNamespaceRequest'namespace = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField RestoreNamespaceRequest "namespaceId" Data.Text.Text where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _RestoreNamespaceRequest'namespaceId
+           (\ x__ y__ -> x__ {_RestoreNamespaceRequest'namespaceId = y__}))
+        Prelude.id
+instance Data.ProtoLens.Message RestoreNamespaceRequest where
+  messageName _
+    = Data.Text.pack
+        "temporal.api.operatorservice.v1.RestoreNamespaceRequest"
+  packedMessageDescriptor _
+    = "\n\
+      \\ETBRestoreNamespaceRequest\DC2\FS\n\
+      \\tnamespace\CAN\SOH \SOH(\tR\tnamespace\DC2!\n\
+      \\fnamespace_id\CAN\STX \SOH(\tR\vnamespaceId"
+  packedFileDescriptor _ = packedFileDescriptor
+  fieldsByTag
+    = let
+        namespace__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "namespace"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.StringField ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Text.Text)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"namespace")) ::
+              Data.ProtoLens.FieldDescriptor RestoreNamespaceRequest
+        namespaceId__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "namespace_id"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.StringField ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Text.Text)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"namespaceId")) ::
+              Data.ProtoLens.FieldDescriptor RestoreNamespaceRequest
+      in
+        Data.Map.fromList
+          [(Data.ProtoLens.Tag 1, namespace__field_descriptor),
+           (Data.ProtoLens.Tag 2, namespaceId__field_descriptor)]
+  unknownFields
+    = Lens.Family2.Unchecked.lens
+        _RestoreNamespaceRequest'_unknownFields
+        (\ x__ y__ -> x__ {_RestoreNamespaceRequest'_unknownFields = y__})
+  defMessage
+    = RestoreNamespaceRequest'_constructor
+        {_RestoreNamespaceRequest'namespace = Data.ProtoLens.fieldDefault,
+         _RestoreNamespaceRequest'namespaceId = Data.ProtoLens.fieldDefault,
+         _RestoreNamespaceRequest'_unknownFields = []}
+  parseMessage
+    = let
+        loop ::
+          RestoreNamespaceRequest
+          -> Data.ProtoLens.Encoding.Bytes.Parser RestoreNamespaceRequest
+        loop x
+          = do end <- Data.ProtoLens.Encoding.Bytes.atEnd
+               if end then
+                   do (let missing = []
+                       in
+                         if Prelude.null missing then
+                             Prelude.return ()
+                         else
+                             Prelude.fail
+                               ((Prelude.++)
+                                  "Missing required fields: "
+                                  (Prelude.show (missing :: [Prelude.String]))))
+                      Prelude.return
+                        (Lens.Family2.over
+                           Data.ProtoLens.unknownFields (\ !t -> Prelude.reverse t) x)
+               else
+                   do tag <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                      case tag of
+                        10
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.getText
+                                             (Prelude.fromIntegral len))
+                                       "namespace"
+                                loop
+                                  (Lens.Family2.set (Data.ProtoLens.Field.field @"namespace") y x)
+                        18
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.getText
+                                             (Prelude.fromIntegral len))
+                                       "namespace_id"
+                                loop
+                                  (Lens.Family2.set (Data.ProtoLens.Field.field @"namespaceId") y x)
+                        wire
+                          -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
+                                        wire
+                                loop
+                                  (Lens.Family2.over
+                                     Data.ProtoLens.unknownFields (\ !t -> (:) y t) x)
+      in
+        (Data.ProtoLens.Encoding.Bytes.<?>)
+          (do loop Data.ProtoLens.defMessage) "RestoreNamespaceRequest"
+  buildMessage
+    = \ _x
+        -> (Data.Monoid.<>)
+             (let
+                _v = Lens.Family2.view (Data.ProtoLens.Field.field @"namespace") _x
+              in
+                if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                    Data.Monoid.mempty
+                else
+                    (Data.Monoid.<>)
+                      (Data.ProtoLens.Encoding.Bytes.putVarInt 10)
+                      ((Prelude..)
+                         (\ bs
+                            -> (Data.Monoid.<>)
+                                 (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                    (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                 (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                         Data.Text.Encoding.encodeUtf8 _v))
+             ((Data.Monoid.<>)
+                (let
+                   _v
+                     = Lens.Family2.view (Data.ProtoLens.Field.field @"namespaceId") _x
+                 in
+                   if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                       Data.Monoid.mempty
+                   else
+                       (Data.Monoid.<>)
+                         (Data.ProtoLens.Encoding.Bytes.putVarInt 18)
+                         ((Prelude..)
+                            (\ bs
+                               -> (Data.Monoid.<>)
+                                    (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                       (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                    (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                            Data.Text.Encoding.encodeUtf8 _v))
+                (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                   (Lens.Family2.view Data.ProtoLens.unknownFields _x)))
+instance Control.DeepSeq.NFData RestoreNamespaceRequest where
+  rnf
+    = \ x__
+        -> Control.DeepSeq.deepseq
+             (_RestoreNamespaceRequest'_unknownFields x__)
+             (Control.DeepSeq.deepseq
+                (_RestoreNamespaceRequest'namespace x__)
+                (Control.DeepSeq.deepseq
+                   (_RestoreNamespaceRequest'namespaceId x__) ()))
+{- | Fields :
+      -}
+data RestoreNamespaceResponse
+  = RestoreNamespaceResponse'_constructor {_RestoreNamespaceResponse'_unknownFields :: !Data.ProtoLens.FieldSet}
+  deriving stock (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show RestoreNamespaceResponse where
+  showsPrec _ __x __s
+    = Prelude.showChar
+        '{'
+        (Prelude.showString
+           (Data.ProtoLens.showMessageShort __x) (Prelude.showChar '}' __s))
+instance Data.ProtoLens.Message RestoreNamespaceResponse where
+  messageName _
+    = Data.Text.pack
+        "temporal.api.operatorservice.v1.RestoreNamespaceResponse"
+  packedMessageDescriptor _
+    = "\n\
+      \\CANRestoreNamespaceResponse"
+  packedFileDescriptor _ = packedFileDescriptor
+  fieldsByTag = let in Data.Map.fromList []
+  unknownFields
+    = Lens.Family2.Unchecked.lens
+        _RestoreNamespaceResponse'_unknownFields
+        (\ x__ y__ -> x__ {_RestoreNamespaceResponse'_unknownFields = y__})
+  defMessage
+    = RestoreNamespaceResponse'_constructor
+        {_RestoreNamespaceResponse'_unknownFields = []}
+  parseMessage
+    = let
+        loop ::
+          RestoreNamespaceResponse
+          -> Data.ProtoLens.Encoding.Bytes.Parser RestoreNamespaceResponse
+        loop x
+          = do end <- Data.ProtoLens.Encoding.Bytes.atEnd
+               if end then
+                   do (let missing = []
+                       in
+                         if Prelude.null missing then
+                             Prelude.return ()
+                         else
+                             Prelude.fail
+                               ((Prelude.++)
+                                  "Missing required fields: "
+                                  (Prelude.show (missing :: [Prelude.String]))))
+                      Prelude.return
+                        (Lens.Family2.over
+                           Data.ProtoLens.unknownFields (\ !t -> Prelude.reverse t) x)
+               else
+                   do tag <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                      case tag of
+                        wire
+                          -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
+                                        wire
+                                loop
+                                  (Lens.Family2.over
+                                     Data.ProtoLens.unknownFields (\ !t -> (:) y t) x)
+      in
+        (Data.ProtoLens.Encoding.Bytes.<?>)
+          (do loop Data.ProtoLens.defMessage) "RestoreNamespaceResponse"
+  buildMessage
+    = \ _x
+        -> Data.ProtoLens.Encoding.Wire.buildFieldSet
+             (Lens.Family2.view Data.ProtoLens.unknownFields _x)
+instance Control.DeepSeq.NFData RestoreNamespaceResponse where
+  rnf
+    = \ x__
+        -> Control.DeepSeq.deepseq
+             (_RestoreNamespaceResponse'_unknownFields x__) ()
+{- | Fields :
+     
+         * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.namespace' @:: Lens' SoftDeleteNamespaceRequest Data.Text.Text@
+         * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.namespaceId' @:: Lens' SoftDeleteNamespaceRequest Data.Text.Text@ -}
+data SoftDeleteNamespaceRequest
+  = SoftDeleteNamespaceRequest'_constructor {_SoftDeleteNamespaceRequest'namespace :: !Data.Text.Text,
+                                             _SoftDeleteNamespaceRequest'namespaceId :: !Data.Text.Text,
+                                             _SoftDeleteNamespaceRequest'_unknownFields :: !Data.ProtoLens.FieldSet}
+  deriving stock (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show SoftDeleteNamespaceRequest where
+  showsPrec _ __x __s
+    = Prelude.showChar
+        '{'
+        (Prelude.showString
+           (Data.ProtoLens.showMessageShort __x) (Prelude.showChar '}' __s))
+instance Data.ProtoLens.Field.HasField SoftDeleteNamespaceRequest "namespace" Data.Text.Text where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _SoftDeleteNamespaceRequest'namespace
+           (\ x__ y__ -> x__ {_SoftDeleteNamespaceRequest'namespace = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField SoftDeleteNamespaceRequest "namespaceId" Data.Text.Text where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _SoftDeleteNamespaceRequest'namespaceId
+           (\ x__ y__ -> x__ {_SoftDeleteNamespaceRequest'namespaceId = y__}))
+        Prelude.id
+instance Data.ProtoLens.Message SoftDeleteNamespaceRequest where
+  messageName _
+    = Data.Text.pack
+        "temporal.api.operatorservice.v1.SoftDeleteNamespaceRequest"
+  packedMessageDescriptor _
+    = "\n\
+      \\SUBSoftDeleteNamespaceRequest\DC2\FS\n\
+      \\tnamespace\CAN\SOH \SOH(\tR\tnamespace\DC2!\n\
+      \\fnamespace_id\CAN\STX \SOH(\tR\vnamespaceId"
+  packedFileDescriptor _ = packedFileDescriptor
+  fieldsByTag
+    = let
+        namespace__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "namespace"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.StringField ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Text.Text)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"namespace")) ::
+              Data.ProtoLens.FieldDescriptor SoftDeleteNamespaceRequest
+        namespaceId__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "namespace_id"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.StringField ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Text.Text)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"namespaceId")) ::
+              Data.ProtoLens.FieldDescriptor SoftDeleteNamespaceRequest
+      in
+        Data.Map.fromList
+          [(Data.ProtoLens.Tag 1, namespace__field_descriptor),
+           (Data.ProtoLens.Tag 2, namespaceId__field_descriptor)]
+  unknownFields
+    = Lens.Family2.Unchecked.lens
+        _SoftDeleteNamespaceRequest'_unknownFields
+        (\ x__ y__
+           -> x__ {_SoftDeleteNamespaceRequest'_unknownFields = y__})
+  defMessage
+    = SoftDeleteNamespaceRequest'_constructor
+        {_SoftDeleteNamespaceRequest'namespace = Data.ProtoLens.fieldDefault,
+         _SoftDeleteNamespaceRequest'namespaceId = Data.ProtoLens.fieldDefault,
+         _SoftDeleteNamespaceRequest'_unknownFields = []}
+  parseMessage
+    = let
+        loop ::
+          SoftDeleteNamespaceRequest
+          -> Data.ProtoLens.Encoding.Bytes.Parser SoftDeleteNamespaceRequest
+        loop x
+          = do end <- Data.ProtoLens.Encoding.Bytes.atEnd
+               if end then
+                   do (let missing = []
+                       in
+                         if Prelude.null missing then
+                             Prelude.return ()
+                         else
+                             Prelude.fail
+                               ((Prelude.++)
+                                  "Missing required fields: "
+                                  (Prelude.show (missing :: [Prelude.String]))))
+                      Prelude.return
+                        (Lens.Family2.over
+                           Data.ProtoLens.unknownFields (\ !t -> Prelude.reverse t) x)
+               else
+                   do tag <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                      case tag of
+                        10
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.getText
+                                             (Prelude.fromIntegral len))
+                                       "namespace"
+                                loop
+                                  (Lens.Family2.set (Data.ProtoLens.Field.field @"namespace") y x)
+                        18
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.getText
+                                             (Prelude.fromIntegral len))
+                                       "namespace_id"
+                                loop
+                                  (Lens.Family2.set (Data.ProtoLens.Field.field @"namespaceId") y x)
+                        wire
+                          -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
+                                        wire
+                                loop
+                                  (Lens.Family2.over
+                                     Data.ProtoLens.unknownFields (\ !t -> (:) y t) x)
+      in
+        (Data.ProtoLens.Encoding.Bytes.<?>)
+          (do loop Data.ProtoLens.defMessage) "SoftDeleteNamespaceRequest"
+  buildMessage
+    = \ _x
+        -> (Data.Monoid.<>)
+             (let
+                _v = Lens.Family2.view (Data.ProtoLens.Field.field @"namespace") _x
+              in
+                if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                    Data.Monoid.mempty
+                else
+                    (Data.Monoid.<>)
+                      (Data.ProtoLens.Encoding.Bytes.putVarInt 10)
+                      ((Prelude..)
+                         (\ bs
+                            -> (Data.Monoid.<>)
+                                 (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                    (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                 (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                         Data.Text.Encoding.encodeUtf8 _v))
+             ((Data.Monoid.<>)
+                (let
+                   _v
+                     = Lens.Family2.view (Data.ProtoLens.Field.field @"namespaceId") _x
+                 in
+                   if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                       Data.Monoid.mempty
+                   else
+                       (Data.Monoid.<>)
+                         (Data.ProtoLens.Encoding.Bytes.putVarInt 18)
+                         ((Prelude..)
+                            (\ bs
+                               -> (Data.Monoid.<>)
+                                    (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                       (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                    (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                            Data.Text.Encoding.encodeUtf8 _v))
+                (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                   (Lens.Family2.view Data.ProtoLens.unknownFields _x)))
+instance Control.DeepSeq.NFData SoftDeleteNamespaceRequest where
+  rnf
+    = \ x__
+        -> Control.DeepSeq.deepseq
+             (_SoftDeleteNamespaceRequest'_unknownFields x__)
+             (Control.DeepSeq.deepseq
+                (_SoftDeleteNamespaceRequest'namespace x__)
+                (Control.DeepSeq.deepseq
+                   (_SoftDeleteNamespaceRequest'namespaceId x__) ()))
+{- | Fields :
+      -}
+data SoftDeleteNamespaceResponse
+  = SoftDeleteNamespaceResponse'_constructor {_SoftDeleteNamespaceResponse'_unknownFields :: !Data.ProtoLens.FieldSet}
+  deriving stock (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show SoftDeleteNamespaceResponse where
+  showsPrec _ __x __s
+    = Prelude.showChar
+        '{'
+        (Prelude.showString
+           (Data.ProtoLens.showMessageShort __x) (Prelude.showChar '}' __s))
+instance Data.ProtoLens.Message SoftDeleteNamespaceResponse where
+  messageName _
+    = Data.Text.pack
+        "temporal.api.operatorservice.v1.SoftDeleteNamespaceResponse"
+  packedMessageDescriptor _
+    = "\n\
+      \\ESCSoftDeleteNamespaceResponse"
+  packedFileDescriptor _ = packedFileDescriptor
+  fieldsByTag = let in Data.Map.fromList []
+  unknownFields
+    = Lens.Family2.Unchecked.lens
+        _SoftDeleteNamespaceResponse'_unknownFields
+        (\ x__ y__
+           -> x__ {_SoftDeleteNamespaceResponse'_unknownFields = y__})
+  defMessage
+    = SoftDeleteNamespaceResponse'_constructor
+        {_SoftDeleteNamespaceResponse'_unknownFields = []}
+  parseMessage
+    = let
+        loop ::
+          SoftDeleteNamespaceResponse
+          -> Data.ProtoLens.Encoding.Bytes.Parser SoftDeleteNamespaceResponse
+        loop x
+          = do end <- Data.ProtoLens.Encoding.Bytes.atEnd
+               if end then
+                   do (let missing = []
+                       in
+                         if Prelude.null missing then
+                             Prelude.return ()
+                         else
+                             Prelude.fail
+                               ((Prelude.++)
+                                  "Missing required fields: "
+                                  (Prelude.show (missing :: [Prelude.String]))))
+                      Prelude.return
+                        (Lens.Family2.over
+                           Data.ProtoLens.unknownFields (\ !t -> Prelude.reverse t) x)
+               else
+                   do tag <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                      case tag of
+                        wire
+                          -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
+                                        wire
+                                loop
+                                  (Lens.Family2.over
+                                     Data.ProtoLens.unknownFields (\ !t -> (:) y t) x)
+      in
+        (Data.ProtoLens.Encoding.Bytes.<?>)
+          (do loop Data.ProtoLens.defMessage) "SoftDeleteNamespaceResponse"
+  buildMessage
+    = \ _x
+        -> Data.ProtoLens.Encoding.Wire.buildFieldSet
+             (Lens.Family2.view Data.ProtoLens.unknownFields _x)
+instance Control.DeepSeq.NFData SoftDeleteNamespaceResponse where
+  rnf
+    = \ x__
+        -> Control.DeepSeq.deepseq
+             (_SoftDeleteNamespaceResponse'_unknownFields x__) ()
+{- | Fields :
+     
          * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.id' @:: Lens' UpdateNexusEndpointRequest Data.Text.Text@
          * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.version' @:: Lens' UpdateNexusEndpointRequest Data.Int.Int64@
          * 'Proto.Temporal.Api.Operatorservice.V1.RequestResponse_Fields.spec' @:: Lens' UpdateNexusEndpointRequest Proto.Temporal.Api.Nexus.V1.Message.EndpointSpec@
@@ -4641,7 +5861,7 @@ instance Control.DeepSeq.NFData UpdateNexusEndpointResponse where
 packedFileDescriptor :: Data.ByteString.ByteString
 packedFileDescriptor
   = "\n\
-    \6temporal/api/operatorservice/v1/request_response.proto\DC2\UStemporal.api.operatorservice.v1\SUB\"temporal/api/enums/v1/common.proto\SUB#temporal/api/nexus/v1/message.proto\SUB\RSgoogle/protobuf/duration.proto\"\168\STX\n\
+    \6temporal/api/operatorservice/v1/request_response.proto\DC2\UStemporal.api.operatorservice.v1\SUB\"temporal/api/enums/v1/common.proto\SUB%temporal/api/enums/v1/namespace.proto\SUB#temporal/api/nexus/v1/message.proto\SUB\RSgoogle/protobuf/duration.proto\SUB\USgoogle/protobuf/timestamp.proto\"\168\STX\n\
     \\SUBAddSearchAttributesRequest\DC2~\n\
     \\DC1search_attributes\CAN\SOH \ETX(\v2Q.temporal.api.operatorservice.v1.AddSearchAttributesRequest.SearchAttributesEntryR\DLEsearchAttributes\DC2\FS\n\
     \\tnamespace\CAN\STX \SOH(\tR\tnamespace\SUBl\n\
@@ -4673,11 +5893,34 @@ packedFileDescriptor
     \\fnamespace_id\CAN\STX \SOH(\tR\vnamespaceId\DC2O\n\
     \\SYNnamespace_delete_delay\CAN\ETX \SOH(\v2\EM.google.protobuf.DurationR\DC4namespaceDeleteDelay\"F\n\
     \\ETBDeleteNamespaceResponse\DC2+\n\
-    \\DC1deleted_namespace\CAN\SOH \SOH(\tR\DLEdeletedNamespace\"\201\SOH\n\
+    \\DC1deleted_namespace\CAN\SOH \SOH(\tR\DLEdeletedNamespace\"]\n\
+    \\SUBSoftDeleteNamespaceRequest\DC2\FS\n\
+    \\tnamespace\CAN\SOH \SOH(\tR\tnamespace\DC2!\n\
+    \\fnamespace_id\CAN\STX \SOH(\tR\vnamespaceId\"\GS\n\
+    \\ESCSoftDeleteNamespaceResponse\"Z\n\
+    \\ETBRestoreNamespaceRequest\DC2\FS\n\
+    \\tnamespace\CAN\SOH \SOH(\tR\tnamespace\DC2!\n\
+    \\fnamespace_id\CAN\STX \SOH(\tR\vnamespaceId\"\SUB\n\
+    \\CANRestoreNamespaceResponse\"b\n\
+    \\USDescribeNamespaceRestoreRequest\DC2\FS\n\
+    \\tnamespace\CAN\SOH \SOH(\tR\tnamespace\DC2!\n\
+    \\fnamespace_id\CAN\STX \SOH(\tR\vnamespaceId\"\222\ETX\n\
+    \ DescribeNamespaceRestoreResponse\DC2B\n\
+    \\ENQstate\CAN\SOH \SOH(\SO2,.temporal.api.enums.v1.NamespaceRestoreStateR\ENQstate\DC2!\n\
+    \\fhost_cluster\CAN\STX \SOH(\tR\vhostCluster\DC29\n\
+    \\n\
+    \start_time\CAN\ETX \SOH(\v2\SUB.google.protobuf.TimestampR\tstartTime\DC29\n\
+    \\n\
+    \close_time\CAN\EOT \SOH(\v2\SUB.google.protobuf.TimestampR\tcloseTime\DC2\NAK\n\
+    \\ACKrun_id\CAN\ENQ \SOH(\tR\ENQrunId\DC22\n\
+    \\NAKtotal_execution_count\CAN\ACK \SOH(\ETXR\DC3totalExecutionCount\DC2:\n\
+    \\EMprocessed_execution_count\CAN\a \SOH(\ETXR\ETBprocessedExecutionCount\DC2V\n\
+    \\EMestimated_completion_time\CAN\b \SOH(\v2\SUB.google.protobuf.TimestampR\ETBestimatedCompletionTime\"\248\SOH\n\
     \\USAddOrUpdateRemoteClusterRequest\DC2)\n\
     \\DLEfrontend_address\CAN\SOH \SOH(\tR\SIfrontendAddress\DC2G\n\
     \ enable_remote_cluster_connection\CAN\STX \SOH(\bR\GSenableRemoteClusterConnection\DC22\n\
-    \\NAKfrontend_http_address\CAN\ETX \SOH(\tR\DC3frontendHttpAddress\"\"\n\
+    \\NAKfrontend_http_address\CAN\ETX \SOH(\tR\DC3frontendHttpAddress\DC2-\n\
+    \\DC2enable_replication\CAN\EOT \SOH(\bR\DC1enableReplication\"\"\n\
     \ AddOrUpdateRemoteClusterResponse\"?\n\
     \\SUBRemoveRemoteClusterRequest\DC2!\n\
     \\fcluster_name\CAN\SOH \SOH(\tR\vclusterName\"\GS\n\
@@ -4687,7 +5930,7 @@ packedFileDescriptor
     \\SInext_page_token\CAN\STX \SOH(\fR\rnextPageToken\"\140\SOH\n\
     \\DC4ListClustersResponse\DC2L\n\
     \\bclusters\CAN\SOH \ETX(\v20.temporal.api.operatorservice.v1.ClusterMetadataR\bclusters\DC2&\n\
-    \\SInext_page_token\CAN\EOT \SOH(\fR\rnextPageToken\"\174\STX\n\
+    \\SInext_page_token\CAN\EOT \SOH(\fR\rnextPageToken\"\228\STX\n\
     \\SIClusterMetadata\DC2!\n\
     \\fcluster_name\CAN\SOH \SOH(\tR\vclusterName\DC2\GS\n\
     \\n\
@@ -4696,7 +5939,8 @@ packedFileDescriptor
     \\fhttp_address\CAN\a \SOH(\tR\vhttpAddress\DC28\n\
     \\CANinitial_failover_version\CAN\EOT \SOH(\ETXR\SYNinitialFailoverVersion\DC2.\n\
     \\DC3history_shard_count\CAN\ENQ \SOH(\ENQR\DC1historyShardCount\DC22\n\
-    \\NAKis_connection_enabled\CAN\ACK \SOH(\bR\DC3isConnectionEnabled\")\n\
+    \\NAKis_connection_enabled\CAN\ACK \SOH(\bR\DC3isConnectionEnabled\DC24\n\
+    \\SYNis_replication_enabled\CAN\b \SOH(\bR\DC4isReplicationEnabled\")\n\
     \\ETBGetNexusEndpointRequest\DC2\SO\n\
     \\STXid\CAN\SOH \SOH(\tR\STXid\"W\n\
     \\CANGetNexusEndpointResponse\DC2;\n\
@@ -4722,8 +5966,8 @@ packedFileDescriptor
     \\SUBListNexusEndpointsResponse\DC2&\n\
     \\SInext_page_token\CAN\SOH \SOH(\fR\rnextPageToken\DC2=\n\
     \\tendpoints\CAN\STX \ETX(\v2\US.temporal.api.nexus.v1.EndpointR\tendpointsB\190\SOH\n\
-    \\"io.temporal.api.operatorservice.v1B\DC4RequestResponseProtoP\SOHZ5go.temporal.io/api/operatorservice/v1;operatorservice\170\STX!Temporalio.Api.OperatorService.V1\234\STX$Temporalio::Api::OperatorService::V1J\188+\n\
-    \\a\DC2\ENQ\NUL\NUL\170\SOH\SOH\n\
+    \\"io.temporal.api.operatorservice.v1B\DC4RequestResponseProtoP\SOHZ5go.temporal.io/api/operatorservice/v1;operatorservice\170\STX!Temporalio.Api.OperatorService.V1\234\STX$Temporalio::Api::OperatorService::V1J\187\&8\n\
+    \\a\DC2\ENQ\NUL\NUL\216\SOH\SOH\n\
     \\b\n\
     \\SOH\f\DC2\ETX\NUL\NUL\DC2\n\
     \\b\n\
@@ -4756,555 +6000,735 @@ packedFileDescriptor
     \\t\n\
     \\STX\ETX\NUL\DC2\ETX\v\NUL,\n\
     \\t\n\
-    \\STX\ETX\SOH\DC2\ETX\f\NUL-\n\
+    \\STX\ETX\SOH\DC2\ETX\f\NUL/\n\
     \\t\n\
-    \\STX\ETX\STX\DC2\ETX\r\NUL(\n\
+    \\STX\ETX\STX\DC2\ETX\r\NUL-\n\
+    \\t\n\
+    \\STX\ETX\ETX\DC2\ETX\SO\NUL(\n\
+    \\t\n\
+    \\STX\ETX\EOT\DC2\ETX\SI\NUL)\n\
     \&\n\
-    \\STX\EOT\NUL\DC2\EOT\DC1\NUL\NAK\SOH2\SUB (-- Search Attribute --)\n\
+    \\STX\EOT\NUL\DC2\EOT\DC3\NUL\ETB\SOH2\SUB (-- Search Attribute --)\n\
     \\n\
     \\n\
     \\n\
-    \\ETX\EOT\NUL\SOH\DC2\ETX\DC1\b\"\n\
+    \\ETX\EOT\NUL\SOH\DC2\ETX\DC3\b\"\n\
     \N\n\
-    \\EOT\EOT\NUL\STX\NUL\DC2\ETX\DC3\EOTN\SUBA Mapping between search attribute name and its IndexedValueType.\n\
+    \\EOT\EOT\NUL\STX\NUL\DC2\ETX\NAK\EOTN\SUBA Mapping between search attribute name and its IndexedValueType.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\NUL\ACK\DC2\ETX\DC3\EOT7\n\
+    \\ENQ\EOT\NUL\STX\NUL\ACK\DC2\ETX\NAK\EOT7\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\NUL\SOH\DC2\ETX\DC38I\n\
+    \\ENQ\EOT\NUL\STX\NUL\SOH\DC2\ETX\NAK8I\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\NUL\ETX\DC2\ETX\DC3LM\n\
+    \\ENQ\EOT\NUL\STX\NUL\ETX\DC2\ETX\NAKLM\n\
     \\v\n\
-    \\EOT\EOT\NUL\STX\SOH\DC2\ETX\DC4\EOT\EM\n\
+    \\EOT\EOT\NUL\STX\SOH\DC2\ETX\SYN\EOT\EM\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\SOH\ENQ\DC2\ETX\DC4\EOT\n\
+    \\ENQ\EOT\NUL\STX\SOH\ENQ\DC2\ETX\SYN\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\SOH\SOH\DC2\ETX\DC4\v\DC4\n\
+    \\ENQ\EOT\NUL\STX\SOH\SOH\DC2\ETX\SYN\v\DC4\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\SOH\ETX\DC2\ETX\DC4\ETB\CAN\n\
+    \\ENQ\EOT\NUL\STX\SOH\ETX\DC2\ETX\SYN\ETB\CAN\n\
     \\n\
     \\n\
-    \\STX\EOT\SOH\DC2\EOT\ETB\NUL\CAN\SOH\n\
+    \\STX\EOT\SOH\DC2\EOT\EM\NUL\SUB\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\SOH\SOH\DC2\ETX\ETB\b#\n\
+    \\ETX\EOT\SOH\SOH\DC2\ETX\EM\b#\n\
     \\n\
     \\n\
-    \\STX\EOT\STX\DC2\EOT\SUB\NUL\RS\SOH\n\
+    \\STX\EOT\STX\DC2\EOT\FS\NUL \SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\STX\SOH\DC2\ETX\SUB\b%\n\
+    \\ETX\EOT\STX\SOH\DC2\ETX\FS\b%\n\
     \0\n\
-    \\EOT\EOT\STX\STX\NUL\DC2\ETX\FS\EOT*\SUB# Search attribute names to delete.\n\
+    \\EOT\EOT\STX\STX\NUL\DC2\ETX\RS\EOT*\SUB# Search attribute names to delete.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\NUL\EOT\DC2\ETX\FS\EOT\f\n\
+    \\ENQ\EOT\STX\STX\NUL\EOT\DC2\ETX\RS\EOT\f\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\NUL\ENQ\DC2\ETX\FS\r\DC3\n\
+    \\ENQ\EOT\STX\STX\NUL\ENQ\DC2\ETX\RS\r\DC3\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\NUL\SOH\DC2\ETX\FS\DC4%\n\
+    \\ENQ\EOT\STX\STX\NUL\SOH\DC2\ETX\RS\DC4%\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\NUL\ETX\DC2\ETX\FS()\n\
+    \\ENQ\EOT\STX\STX\NUL\ETX\DC2\ETX\RS()\n\
     \\v\n\
-    \\EOT\EOT\STX\STX\SOH\DC2\ETX\GS\EOT\EM\n\
+    \\EOT\EOT\STX\STX\SOH\DC2\ETX\US\EOT\EM\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\SOH\ENQ\DC2\ETX\GS\EOT\n\
+    \\ENQ\EOT\STX\STX\SOH\ENQ\DC2\ETX\US\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\SOH\SOH\DC2\ETX\GS\v\DC4\n\
+    \\ENQ\EOT\STX\STX\SOH\SOH\DC2\ETX\US\v\DC4\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\SOH\ETX\DC2\ETX\GS\ETB\CAN\n\
+    \\ENQ\EOT\STX\STX\SOH\ETX\DC2\ETX\US\ETB\CAN\n\
     \\n\
     \\n\
-    \\STX\EOT\ETX\DC2\EOT \NUL!\SOH\n\
+    \\STX\EOT\ETX\DC2\EOT\"\NUL#\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\ETX\SOH\DC2\ETX \b&\n\
+    \\ETX\EOT\ETX\SOH\DC2\ETX\"\b&\n\
     \\n\
     \\n\
-    \\STX\EOT\EOT\DC2\EOT#\NUL%\SOH\n\
+    \\STX\EOT\EOT\DC2\EOT%\NUL'\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\EOT\SOH\DC2\ETX#\b#\n\
+    \\ETX\EOT\EOT\SOH\DC2\ETX%\b#\n\
     \\v\n\
-    \\EOT\EOT\EOT\STX\NUL\DC2\ETX$\EOT\EM\n\
+    \\EOT\EOT\EOT\STX\NUL\DC2\ETX&\EOT\EM\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\NUL\ENQ\DC2\ETX$\EOT\n\
+    \\ENQ\EOT\EOT\STX\NUL\ENQ\DC2\ETX&\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\NUL\SOH\DC2\ETX$\v\DC4\n\
+    \\ENQ\EOT\EOT\STX\NUL\SOH\DC2\ETX&\v\DC4\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\NUL\ETX\DC2\ETX$\ETB\CAN\n\
+    \\ENQ\EOT\EOT\STX\NUL\ETX\DC2\ETX&\ETB\CAN\n\
     \\n\
     \\n\
-    \\STX\EOT\ENQ\DC2\EOT'\NUL.\SOH\n\
+    \\STX\EOT\ENQ\DC2\EOT)\NUL0\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\ENQ\SOH\DC2\ETX'\b$\n\
+    \\ETX\EOT\ENQ\SOH\DC2\ETX)\b$\n\
     \f\n\
-    \\EOT\EOT\ENQ\STX\NUL\DC2\ETX)\EOTN\SUBY Mapping between custom (user-registered) search attribute name to its IndexedValueType.\n\
+    \\EOT\EOT\ENQ\STX\NUL\DC2\ETX+\EOTN\SUBY Mapping between custom (user-registered) search attribute name to its IndexedValueType.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\NUL\ACK\DC2\ETX)\EOT7\n\
+    \\ENQ\EOT\ENQ\STX\NUL\ACK\DC2\ETX+\EOT7\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\NUL\SOH\DC2\ETX)8I\n\
+    \\ENQ\EOT\ENQ\STX\NUL\SOH\DC2\ETX+8I\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\NUL\ETX\DC2\ETX)LM\n\
+    \\ENQ\EOT\ENQ\STX\NUL\ETX\DC2\ETX+LM\n\
     \a\n\
-    \\EOT\EOT\ENQ\STX\SOH\DC2\ETX+\EOTN\SUBT Mapping between system (predefined) search attribute name to its IndexedValueType.\n\
+    \\EOT\EOT\ENQ\STX\SOH\DC2\ETX-\EOTN\SUBT Mapping between system (predefined) search attribute name to its IndexedValueType.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\SOH\ACK\DC2\ETX+\EOT7\n\
+    \\ENQ\EOT\ENQ\STX\SOH\ACK\DC2\ETX-\EOT7\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\SOH\SOH\DC2\ETX+8I\n\
+    \\ENQ\EOT\ENQ\STX\SOH\SOH\DC2\ETX-8I\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\SOH\ETX\DC2\ETX+LM\n\
+    \\ENQ\EOT\ENQ\STX\SOH\ETX\DC2\ETX-LM\n\
     \U\n\
-    \\EOT\EOT\ENQ\STX\STX\DC2\ETX-\EOT+\SUBH Mapping from the attribute name to the visibility storage native type.\n\
+    \\EOT\EOT\ENQ\STX\STX\DC2\ETX/\EOT+\SUBH Mapping from the attribute name to the visibility storage native type.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\STX\ACK\DC2\ETX-\EOT\ETB\n\
+    \\ENQ\EOT\ENQ\STX\STX\ACK\DC2\ETX/\EOT\ETB\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\STX\SOH\DC2\ETX-\CAN&\n\
+    \\ENQ\EOT\ENQ\STX\STX\SOH\DC2\ETX/\CAN&\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\STX\ETX\DC2\ETX-)*\n\
+    \\ENQ\EOT\ENQ\STX\STX\ETX\DC2\ETX/)*\n\
     \\n\
     \\n\
-    \\STX\EOT\ACK\DC2\EOT0\NUL7\SOH\n\
+    \\STX\EOT\ACK\DC2\EOT2\NUL9\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\ACK\SOH\DC2\ETX0\b\RS\n\
+    \\ETX\EOT\ACK\SOH\DC2\ETX2\b\RS\n\
     \]\n\
-    \\EOT\EOT\ACK\STX\NUL\DC2\ETX2\EOT\EM\SUBP Only one of namespace or namespace_id must be specified to identify namespace.\n\
+    \\EOT\EOT\ACK\STX\NUL\DC2\ETX4\EOT\EM\SUBP Only one of namespace or namespace_id must be specified to identify namespace.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\NUL\ENQ\DC2\ETX2\EOT\n\
+    \\ENQ\EOT\ACK\STX\NUL\ENQ\DC2\ETX4\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\NUL\SOH\DC2\ETX2\v\DC4\n\
+    \\ENQ\EOT\ACK\STX\NUL\SOH\DC2\ETX4\v\DC4\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\NUL\ETX\DC2\ETX2\ETB\CAN\n\
+    \\ENQ\EOT\ACK\STX\NUL\ETX\DC2\ETX4\ETB\CAN\n\
     \\v\n\
-    \\EOT\EOT\ACK\STX\SOH\DC2\ETX3\EOT\FS\n\
+    \\EOT\EOT\ACK\STX\SOH\DC2\ETX5\EOT\FS\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\SOH\ENQ\DC2\ETX3\EOT\n\
+    \\ENQ\EOT\ACK\STX\SOH\ENQ\DC2\ETX5\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\SOH\SOH\DC2\ETX3\v\ETB\n\
+    \\ENQ\EOT\ACK\STX\SOH\SOH\DC2\ETX5\v\ETB\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\SOH\ETX\DC2\ETX3\SUB\ESC\n\
+    \\ENQ\EOT\ACK\STX\SOH\ETX\DC2\ETX5\SUB\ESC\n\
     \\194\SOH\n\
-    \\EOT\EOT\ACK\STX\STX\DC2\ETX6\EOT8\SUB\180\SOH If provided, the deletion of namespace info will be delayed for the given duration (0 means no delay).\n\
+    \\EOT\EOT\ACK\STX\STX\DC2\ETX8\EOT8\SUB\180\SOH If provided, the deletion of namespace info will be delayed for the given duration (0 means no delay).\n\
     \ If not provided, the default delay configured in the cluster will be used.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\STX\ACK\DC2\ETX6\EOT\FS\n\
+    \\ENQ\EOT\ACK\STX\STX\ACK\DC2\ETX8\EOT\FS\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\STX\SOH\DC2\ETX6\GS3\n\
+    \\ENQ\EOT\ACK\STX\STX\SOH\DC2\ETX8\GS3\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\STX\ETX\DC2\ETX667\n\
+    \\ENQ\EOT\ACK\STX\STX\ETX\DC2\ETX867\n\
     \\n\
     \\n\
-    \\STX\EOT\a\DC2\EOT9\NUL<\SOH\n\
+    \\STX\EOT\a\DC2\EOT;\NUL>\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\a\SOH\DC2\ETX9\b\US\n\
+    \\ETX\EOT\a\SOH\DC2\ETX;\b\US\n\
     \S\n\
-    \\EOT\EOT\a\STX\NUL\DC2\ETX;\EOT!\SUBF Temporary namespace name that is used during reclaim resources step.\n\
+    \\EOT\EOT\a\STX\NUL\DC2\ETX=\EOT!\SUBF Temporary namespace name that is used during reclaim resources step.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\NUL\ENQ\DC2\ETX;\EOT\n\
+    \\ENQ\EOT\a\STX\NUL\ENQ\DC2\ETX=\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\NUL\SOH\DC2\ETX;\v\FS\n\
+    \\ENQ\EOT\a\STX\NUL\SOH\DC2\ETX=\v\FS\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\NUL\ETX\DC2\ETX;\US \n\
+    \\ENQ\EOT\a\STX\NUL\ETX\DC2\ETX=\US \n\
     \\n\
     \\n\
-    \\STX\EOT\b\DC2\EOT>\NULF\SOH\n\
+    \\STX\EOT\b\DC2\EOT@\NULD\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\b\SOH\DC2\ETX>\b'\n\
-    \o\n\
-    \\EOT\EOT\b\STX\NUL\DC2\ETX@\EOT \SUBb Frontend Address is a cross cluster accessible address for gRPC traffic. This field is required.\n\
-    \\n\
-    \\f\n\
-    \\ENQ\EOT\b\STX\NUL\ENQ\DC2\ETX@\EOT\n\
+    \\ETX\EOT\b\SOH\DC2\ETX@\b\"\n\
+    \]\n\
+    \\EOT\EOT\b\STX\NUL\DC2\ETXB\EOT\EM\SUBP Only one of namespace or namespace_id must be specified to identify namespace.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\NUL\SOH\DC2\ETX@\v\ESC\n\
-    \\f\n\
-    \\ENQ\EOT\b\STX\NUL\ETX\DC2\ETX@\RS\US\n\
-    \E\n\
-    \\EOT\EOT\b\STX\SOH\DC2\ETXB\EOT.\SUB8 Flag to enable / disable the cross cluster connection.\n\
+    \\ENQ\EOT\b\STX\NUL\ENQ\DC2\ETXB\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\SOH\ENQ\DC2\ETXB\EOT\b\n\
+    \\ENQ\EOT\b\STX\NUL\SOH\DC2\ETXB\v\DC4\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\SOH\SOH\DC2\ETXB\t)\n\
+    \\ENQ\EOT\b\STX\NUL\ETX\DC2\ETXB\ETB\CAN\n\
+    \\v\n\
+    \\EOT\EOT\b\STX\SOH\DC2\ETXC\EOT\FS\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\SOH\ETX\DC2\ETXB,-\n\
-    \\189\SOH\n\
-    \\EOT\EOT\b\STX\STX\DC2\ETXE\EOT%\SUB\175\SOH Frontend HTTP Address is a cross cluster accessible address for HTTP traffic. This field is optional. If not provided\n\
-    \  on update, the existing HTTP address will be removed.\n\
-    \\n\
-    \\f\n\
-    \\ENQ\EOT\b\STX\STX\ENQ\DC2\ETXE\EOT\n\
+    \\ENQ\EOT\b\STX\SOH\ENQ\DC2\ETXC\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\STX\SOH\DC2\ETXE\v \n\
+    \\ENQ\EOT\b\STX\SOH\SOH\DC2\ETXC\v\ETB\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\STX\ETX\DC2\ETXE#$\n\
+    \\ENQ\EOT\b\STX\SOH\ETX\DC2\ETXC\SUB\ESC\n\
     \\n\
     \\n\
-    \\STX\EOT\t\DC2\EOTH\NULI\SOH\n\
+    \\STX\EOT\t\DC2\EOTF\NULG\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\t\SOH\DC2\ETXH\b(\n\
+    \\ETX\EOT\t\SOH\DC2\ETXF\b#\n\
     \\n\
     \\n\
     \\STX\EOT\n\
-    \\DC2\EOTK\NULN\SOH\n\
+    \\DC2\EOTI\NULM\SOH\n\
     \\n\
     \\n\
     \\ETX\EOT\n\
-    \\SOH\DC2\ETXK\b\"\n\
-    \1\n\
-    \\EOT\EOT\n\
-    \\STX\NUL\DC2\ETXM\EOT\FS\SUB$ Remote cluster name to be removed.\n\
-    \\n\
-    \\f\n\
-    \\ENQ\EOT\n\
-    \\STX\NUL\ENQ\DC2\ETXM\EOT\n\
-    \\n\
-    \\f\n\
-    \\ENQ\EOT\n\
-    \\STX\NUL\SOH\DC2\ETXM\v\ETB\n\
-    \\f\n\
-    \\ENQ\EOT\n\
-    \\STX\NUL\ETX\DC2\ETXM\SUB\ESC\n\
-    \\n\
-    \\n\
-    \\STX\EOT\v\DC2\EOTP\NULQ\SOH\n\
-    \\n\
-    \\n\
-    \\ETX\EOT\v\SOH\DC2\ETXP\b#\n\
-    \\n\
-    \\n\
-    \\STX\EOT\f\DC2\EOTS\NULV\SOH\n\
-    \\n\
-    \\n\
-    \\ETX\EOT\f\SOH\DC2\ETXS\b\ESC\n\
-    \\v\n\
-    \\EOT\EOT\f\STX\NUL\DC2\ETXT\EOT\CAN\n\
-    \\f\n\
-    \\ENQ\EOT\f\STX\NUL\ENQ\DC2\ETXT\EOT\t\n\
-    \\f\n\
-    \\ENQ\EOT\f\STX\NUL\SOH\DC2\ETXT\n\
-    \\DC3\n\
-    \\f\n\
-    \\ENQ\EOT\f\STX\NUL\ETX\DC2\ETXT\SYN\ETB\n\
-    \\v\n\
-    \\EOT\EOT\f\STX\SOH\DC2\ETXU\EOT\RS\n\
-    \\f\n\
-    \\ENQ\EOT\f\STX\SOH\ENQ\DC2\ETXU\EOT\t\n\
-    \\f\n\
-    \\ENQ\EOT\f\STX\SOH\SOH\DC2\ETXU\n\
-    \\EM\n\
-    \\f\n\
-    \\ENQ\EOT\f\STX\SOH\ETX\DC2\ETXU\FS\GS\n\
-    \\n\
-    \\n\
-    \\STX\EOT\r\DC2\EOTX\NUL\\\SOH\n\
-    \\n\
-    \\n\
-    \\ETX\EOT\r\SOH\DC2\ETXX\b\FS\n\
-    \.\n\
-    \\EOT\EOT\r\STX\NUL\DC2\ETXZ\EOT*\SUB! List of all cluster information\n\
-    \\n\
-    \\f\n\
-    \\ENQ\EOT\r\STX\NUL\EOT\DC2\ETXZ\EOT\f\n\
-    \\f\n\
-    \\ENQ\EOT\r\STX\NUL\ACK\DC2\ETXZ\r\FS\n\
-    \\f\n\
-    \\ENQ\EOT\r\STX\NUL\SOH\DC2\ETXZ\GS%\n\
-    \\f\n\
-    \\ENQ\EOT\r\STX\NUL\ETX\DC2\ETXZ()\n\
-    \\v\n\
-    \\EOT\EOT\r\STX\SOH\DC2\ETX[\EOT\RS\n\
-    \\f\n\
-    \\ENQ\EOT\r\STX\SOH\ENQ\DC2\ETX[\EOT\t\n\
-    \\f\n\
-    \\ENQ\EOT\r\STX\SOH\SOH\DC2\ETX[\n\
-    \\EM\n\
-    \\f\n\
-    \\ENQ\EOT\r\STX\SOH\ETX\DC2\ETX[\FS\GS\n\
-    \\n\
-    \\n\
-    \\STX\EOT\SO\DC2\EOT^\NULm\SOH\n\
-    \\n\
-    \\n\
-    \\ETX\EOT\SO\SOH\DC2\ETX^\b\ETB\n\
-    \(\n\
-    \\EOT\EOT\SO\STX\NUL\DC2\ETX`\EOT\FS\SUB\ESC Name of the cluster name.\n\
-    \\n\
-    \\f\n\
-    \\ENQ\EOT\SO\STX\NUL\ENQ\DC2\ETX`\EOT\n\
-    \\n\
-    \\f\n\
-    \\ENQ\EOT\SO\STX\NUL\SOH\DC2\ETX`\v\ETB\n\
-    \\f\n\
-    \\ENQ\EOT\SO\STX\NUL\ETX\DC2\ETX`\SUB\ESC\n\
-    \!\n\
-    \\EOT\EOT\SO\STX\SOH\DC2\ETXb\EOT\SUB\SUB\DC4 Id of the cluster.\n\
-    \\n\
-    \\f\n\
-    \\ENQ\EOT\SO\STX\SOH\ENQ\DC2\ETXb\EOT\n\
-    \\n\
-    \\f\n\
-    \\ENQ\EOT\SO\STX\SOH\SOH\DC2\ETXb\v\NAK\n\
-    \\f\n\
-    \\ENQ\EOT\SO\STX\SOH\ETX\DC2\ETXb\CAN\EM\n\
-    \\FS\n\
-    \\EOT\EOT\SO\STX\STX\DC2\ETXd\EOT\ETB\SUB\SI gRPC address.\n\
-    \\n\
-    \\f\n\
-    \\ENQ\EOT\SO\STX\STX\ENQ\DC2\ETXd\EOT\n\
-    \\n\
-    \\f\n\
-    \\ENQ\EOT\SO\STX\STX\SOH\DC2\ETXd\v\DC2\n\
-    \\f\n\
-    \\ENQ\EOT\SO\STX\STX\ETX\DC2\ETXd\NAK\SYN\n\
-    \+\n\
-    \\EOT\EOT\SO\STX\ETX\DC2\ETXf\EOT\FS\SUB\RS HTTP address, if one exists.\n\
-    \\n\
-    \\f\n\
-    \\ENQ\EOT\SO\STX\ETX\ENQ\DC2\ETXf\EOT\n\
-    \\n\
-    \\f\n\
-    \\ENQ\EOT\SO\STX\ETX\SOH\DC2\ETXf\v\ETB\n\
-    \\f\n\
-    \\ENQ\EOT\SO\STX\ETX\ETX\DC2\ETXf\SUB\ESC\n\
-    \G\n\
-    \\EOT\EOT\SO\STX\EOT\DC2\ETXh\EOT'\SUB: A unique failover version across all connected clusters.\n\
-    \\n\
-    \\f\n\
-    \\ENQ\EOT\SO\STX\EOT\ENQ\DC2\ETXh\EOT\t\n\
-    \\f\n\
-    \\ENQ\EOT\SO\STX\EOT\SOH\DC2\ETXh\n\
-    \\"\n\
-    \\f\n\
-    \\ENQ\EOT\SO\STX\EOT\ETX\DC2\ETXh%&\n\
-    \,\n\
-    \\EOT\EOT\SO\STX\ENQ\DC2\ETXj\EOT\"\SUB\US History service shard number.\n\
-    \\n\
-    \\f\n\
-    \\ENQ\EOT\SO\STX\ENQ\ENQ\DC2\ETXj\EOT\t\n\
-    \\f\n\
-    \\ENQ\EOT\SO\STX\ENQ\SOH\DC2\ETXj\n\
-    \\GS\n\
-    \\f\n\
-    \\ENQ\EOT\SO\STX\ENQ\ETX\DC2\ETXj !\n\
-    \<\n\
-    \\EOT\EOT\SO\STX\ACK\DC2\ETXl\EOT#\SUB/ A flag to indicate if a connection is active.\n\
-    \\n\
-    \\f\n\
-    \\ENQ\EOT\SO\STX\ACK\ENQ\DC2\ETXl\EOT\b\n\
-    \\f\n\
-    \\ENQ\EOT\SO\STX\ACK\SOH\DC2\ETXl\t\RS\n\
-    \\f\n\
-    \\ENQ\EOT\SO\STX\ACK\ETX\DC2\ETXl!\"\n\
-    \\n\
-    \\n\
-    \\STX\EOT\SI\DC2\EOTo\NULr\SOH\n\
-    \\n\
-    \\n\
-    \\ETX\EOT\SI\SOH\DC2\ETXo\b\US\n\
-    \3\n\
-    \\EOT\EOT\SI\STX\NUL\DC2\ETXq\EOT\DC2\SUB& Server-generated unique endpoint ID.\n\
-    \\n\
-    \\f\n\
-    \\ENQ\EOT\SI\STX\NUL\ENQ\DC2\ETXq\EOT\n\
-    \\n\
-    \\f\n\
-    \\ENQ\EOT\SI\STX\NUL\SOH\DC2\ETXq\v\r\n\
-    \\f\n\
-    \\ENQ\EOT\SI\STX\NUL\ETX\DC2\ETXq\DLE\DC1\n\
-    \\n\
-    \\n\
-    \\STX\EOT\DLE\DC2\EOTt\NULv\SOH\n\
-    \\n\
-    \\n\
-    \\ETX\EOT\DLE\SOH\DC2\ETXt\b \n\
-    \\v\n\
-    \\EOT\EOT\DLE\STX\NUL\DC2\ETXu\EOT0\n\
-    \\f\n\
-    \\ENQ\EOT\DLE\STX\NUL\ACK\DC2\ETXu\EOT\"\n\
-    \\f\n\
-    \\ENQ\EOT\DLE\STX\NUL\SOH\DC2\ETXu#+\n\
-    \\f\n\
-    \\ENQ\EOT\DLE\STX\NUL\ETX\DC2\ETXu./\n\
-    \\n\
-    \\n\
-    \\STX\EOT\DC1\DC2\EOTx\NUL{\SOH\n\
-    \\n\
-    \\n\
-    \\ETX\EOT\DC1\SOH\DC2\ETXx\b\"\n\
-    \-\n\
-    \\EOT\EOT\DC1\STX\NUL\DC2\ETXz\EOT0\SUB  Endpoint definition to create.\n\
-    \\n\
-    \\f\n\
-    \\ENQ\EOT\DC1\STX\NUL\ACK\DC2\ETXz\EOT&\n\
-    \\f\n\
-    \\ENQ\EOT\DC1\STX\NUL\SOH\DC2\ETXz'+\n\
-    \\f\n\
-    \\ENQ\EOT\DC1\STX\NUL\ETX\DC2\ETXz./\n\
-    \\v\n\
-    \\STX\EOT\DC2\DC2\ENQ}\NUL\128\SOH\SOH\n\
-    \\n\
-    \\n\
-    \\ETX\EOT\DC2\SOH\DC2\ETX}\b#\n\
-    \\\\n\
-    \\EOT\EOT\DC2\STX\NUL\DC2\ETX\DEL\EOT0\SUBO Data post acceptance. Can be used to issue additional updates to this record.\n\
-    \\n\
-    \\f\n\
-    \\ENQ\EOT\DC2\STX\NUL\ACK\DC2\ETX\DEL\EOT\"\n\
-    \\f\n\
-    \\ENQ\EOT\DC2\STX\NUL\SOH\DC2\ETX\DEL#+\n\
-    \\f\n\
-    \\ENQ\EOT\DC2\STX\NUL\ETX\DC2\ETX\DEL./\n\
-    \\f\n\
-    \\STX\EOT\DC3\DC2\ACK\130\SOH\NUL\137\SOH\SOH\n\
-    \\v\n\
-    \\ETX\EOT\DC3\SOH\DC2\EOT\130\SOH\b\"\n\
-    \4\n\
-    \\EOT\EOT\DC3\STX\NUL\DC2\EOT\132\SOH\EOT\DC2\SUB& Server-generated unique endpoint ID.\n\
-    \\n\
-    \\r\n\
-    \\ENQ\EOT\DC3\STX\NUL\ENQ\DC2\EOT\132\SOH\EOT\n\
-    \\n\
-    \\r\n\
-    \\ENQ\EOT\DC3\STX\NUL\SOH\DC2\EOT\132\SOH\v\r\n\
-    \\r\n\
-    \\ENQ\EOT\DC3\STX\NUL\ETX\DC2\EOT\132\SOH\DLE\DC1\n\
-    \K\n\
-    \\EOT\EOT\DC3\STX\SOH\DC2\EOT\134\SOH\EOT\SYN\SUB= Data version for this endpoint. Must match current version.\n\
-    \\n\
-    \\r\n\
-    \\ENQ\EOT\DC3\STX\SOH\ENQ\DC2\EOT\134\SOH\EOT\t\n\
-    \\r\n\
-    \\ENQ\EOT\DC3\STX\SOH\SOH\DC2\EOT\134\SOH\n\
-    \\DC1\n\
-    \\r\n\
-    \\ENQ\EOT\DC3\STX\SOH\ETX\DC2\EOT\134\SOH\DC4\NAK\n\
-    \\f\n\
-    \\EOT\EOT\DC3\STX\STX\DC2\EOT\136\SOH\EOT0\n\
-    \\r\n\
-    \\ENQ\EOT\DC3\STX\STX\ACK\DC2\EOT\136\SOH\EOT&\n\
-    \\r\n\
-    \\ENQ\EOT\DC3\STX\STX\SOH\DC2\EOT\136\SOH'+\n\
-    \\r\n\
-    \\ENQ\EOT\DC3\STX\STX\ETX\DC2\EOT\136\SOH./\n\
-    \\f\n\
-    \\STX\EOT\DC4\DC2\ACK\139\SOH\NUL\142\SOH\SOH\n\
-    \\v\n\
-    \\ETX\EOT\DC4\SOH\DC2\EOT\139\SOH\b#\n\
+    \\SOH\DC2\ETXI\b\US\n\
     \]\n\
-    \\EOT\EOT\DC4\STX\NUL\DC2\EOT\141\SOH\EOT0\SUBO Data post acceptance. Can be used to issue additional updates to this record.\n\
+    \\EOT\EOT\n\
+    \\STX\NUL\DC2\ETXK\EOT\EM\SUBP Only one of namespace or namespace_id must be specified to identify namespace.\n\
     \\n\
-    \\r\n\
-    \\ENQ\EOT\DC4\STX\NUL\ACK\DC2\EOT\141\SOH\EOT\"\n\
-    \\r\n\
-    \\ENQ\EOT\DC4\STX\NUL\SOH\DC2\EOT\141\SOH#+\n\
-    \\r\n\
-    \\ENQ\EOT\DC4\STX\NUL\ETX\DC2\EOT\141\SOH./\n\
     \\f\n\
-    \\STX\EOT\NAK\DC2\ACK\144\SOH\NUL\149\SOH\SOH\n\
+    \\ENQ\EOT\n\
+    \\STX\NUL\ENQ\DC2\ETXK\EOT\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\n\
+    \\STX\NUL\SOH\DC2\ETXK\v\DC4\n\
+    \\f\n\
+    \\ENQ\EOT\n\
+    \\STX\NUL\ETX\DC2\ETXK\ETB\CAN\n\
     \\v\n\
-    \\ETX\EOT\NAK\SOH\DC2\EOT\144\SOH\b\"\n\
-    \4\n\
-    \\EOT\EOT\NAK\STX\NUL\DC2\EOT\146\SOH\EOT\DC2\SUB& Server-generated unique endpoint ID.\n\
-    \\n\
-    \\r\n\
-    \\ENQ\EOT\NAK\STX\NUL\ENQ\DC2\EOT\146\SOH\EOT\n\
-    \\n\
-    \\r\n\
-    \\ENQ\EOT\NAK\STX\NUL\SOH\DC2\EOT\146\SOH\v\r\n\
-    \\r\n\
-    \\ENQ\EOT\NAK\STX\NUL\ETX\DC2\EOT\146\SOH\DLE\DC1\n\
-    \K\n\
-    \\EOT\EOT\NAK\STX\SOH\DC2\EOT\148\SOH\EOT\SYN\SUB= Data version for this endpoint. Must match current version.\n\
-    \\n\
-    \\r\n\
-    \\ENQ\EOT\NAK\STX\SOH\ENQ\DC2\EOT\148\SOH\EOT\t\n\
-    \\r\n\
-    \\ENQ\EOT\NAK\STX\SOH\SOH\DC2\EOT\148\SOH\n\
-    \\DC1\n\
-    \\r\n\
-    \\ENQ\EOT\NAK\STX\SOH\ETX\DC2\EOT\148\SOH\DC4\NAK\n\
+    \\EOT\EOT\n\
+    \\STX\SOH\DC2\ETXL\EOT\FS\n\
     \\f\n\
-    \\STX\EOT\SYN\DC2\ACK\151\SOH\NUL\152\SOH\SOH\n\
+    \\ENQ\EOT\n\
+    \\STX\SOH\ENQ\DC2\ETXL\EOT\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\n\
+    \\STX\SOH\SOH\DC2\ETXL\v\ETB\n\
+    \\f\n\
+    \\ENQ\EOT\n\
+    \\STX\SOH\ETX\DC2\ETXL\SUB\ESC\n\
+    \\n\
+    \\n\
+    \\STX\EOT\v\DC2\EOTO\NULP\SOH\n\
+    \\n\
+    \\n\
+    \\ETX\EOT\v\SOH\DC2\ETXO\b \n\
+    \\n\
+    \\n\
+    \\STX\EOT\f\DC2\EOTR\NULV\SOH\n\
+    \\n\
+    \\n\
+    \\ETX\EOT\f\SOH\DC2\ETXR\b'\n\
+    \]\n\
+    \\EOT\EOT\f\STX\NUL\DC2\ETXT\EOT\EM\SUBP Only one of namespace or namespace_id must be specified to identify namespace.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\f\STX\NUL\ENQ\DC2\ETXT\EOT\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\f\STX\NUL\SOH\DC2\ETXT\v\DC4\n\
+    \\f\n\
+    \\ENQ\EOT\f\STX\NUL\ETX\DC2\ETXT\ETB\CAN\n\
     \\v\n\
-    \\ETX\EOT\SYN\SOH\DC2\EOT\151\SOH\b#\n\
+    \\EOT\EOT\f\STX\SOH\DC2\ETXU\EOT\FS\n\
     \\f\n\
-    \\STX\EOT\ETB\DC2\ACK\154\SOH\NUL\164\SOH\SOH\n\
+    \\ENQ\EOT\f\STX\SOH\ENQ\DC2\ETXU\EOT\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\f\STX\SOH\SOH\DC2\ETXU\v\ETB\n\
+    \\f\n\
+    \\ENQ\EOT\f\STX\SOH\ETX\DC2\ETXU\SUB\ESC\n\
+    \\n\
+    \\n\
+    \\STX\EOT\r\DC2\EOTX\NULf\SOH\n\
+    \\n\
+    \\n\
+    \\ETX\EOT\r\SOH\DC2\ETXX\b(\n\
     \\v\n\
-    \\ETX\EOT\ETB\SOH\DC2\EOT\154\SOH\b!\n\
+    \\EOT\EOT\r\STX\NUL\DC2\ETXY\EOT:\n\
     \\f\n\
-    \\EOT\EOT\ETB\STX\NUL\DC2\EOT\155\SOH\EOT\CAN\n\
+    \\ENQ\EOT\r\STX\NUL\ACK\DC2\ETXY\EOT/\n\
+    \\f\n\
+    \\ENQ\EOT\r\STX\NUL\SOH\DC2\ETXY05\n\
+    \\f\n\
+    \\ENQ\EOT\r\STX\NUL\ETX\DC2\ETXY89\n\
+    \1\n\
+    \\EOT\EOT\r\STX\SOH\DC2\ETX[\EOT\FS\SUB$ Cluster that runs the restore job.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\r\STX\SOH\ENQ\DC2\ETX[\EOT\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\r\STX\SOH\SOH\DC2\ETX[\v\ETB\n\
+    \\f\n\
+    \\ENQ\EOT\r\STX\SOH\ETX\DC2\ETX[\SUB\ESC\n\
+    \\v\n\
+    \\EOT\EOT\r\STX\STX\DC2\ETX\\\EOT-\n\
+    \\f\n\
+    \\ENQ\EOT\r\STX\STX\ACK\DC2\ETX\\\EOT\GS\n\
+    \\f\n\
+    \\ENQ\EOT\r\STX\STX\SOH\DC2\ETX\\\RS(\n\
+    \\f\n\
+    \\ENQ\EOT\r\STX\STX\ETX\DC2\ETX\\+,\n\
+    \2\n\
+    \\EOT\EOT\r\STX\ETX\DC2\ETX^\EOT-\SUB% Unset while the restore is running.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\r\STX\ETX\ACK\DC2\ETX^\EOT\GS\n\
+    \\f\n\
+    \\ENQ\EOT\r\STX\ETX\SOH\DC2\ETX^\RS(\n\
+    \\f\n\
+    \\ENQ\EOT\r\STX\ETX\ETX\DC2\ETX^+,\n\
+    \)\n\
+    \\EOT\EOT\r\STX\EOT\DC2\ETX`\EOT\SYN\SUB\FS Run ID of the restore job.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\r\STX\EOT\ENQ\DC2\ETX`\EOT\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\r\STX\EOT\SOH\DC2\ETX`\v\DC1\n\
+    \\f\n\
+    \\ENQ\EOT\r\STX\EOT\ETX\DC2\ETX`\DC4\NAK\n\
+    \1\n\
+    \\EOT\EOT\r\STX\ENQ\DC2\ETXb\EOT$\SUB$ Estimated when the refresh starts.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\r\STX\ENQ\ENQ\DC2\ETXb\EOT\t\n\
+    \\f\n\
+    \\ENQ\EOT\r\STX\ENQ\SOH\DC2\ETXb\n\
+    \\US\n\
+    \\f\n\
+    \\ENQ\EOT\r\STX\ENQ\ETX\DC2\ETXb\"#\n\
+    \5\n\
+    \\EOT\EOT\r\STX\ACK\DC2\ETXd\EOT(\SUB( Executions processed on every cluster.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\r\STX\ACK\ENQ\DC2\ETXd\EOT\t\n\
+    \\f\n\
+    \\ENQ\EOT\r\STX\ACK\SOH\DC2\ETXd\n\
+    \#\n\
+    \\f\n\
+    \\ENQ\EOT\r\STX\ACK\ETX\DC2\ETXd&'\n\
+    \\v\n\
+    \\EOT\EOT\r\STX\a\DC2\ETXe\EOT<\n\
+    \\f\n\
+    \\ENQ\EOT\r\STX\a\ACK\DC2\ETXe\EOT\GS\n\
+    \\f\n\
+    \\ENQ\EOT\r\STX\a\SOH\DC2\ETXe\RS7\n\
+    \\f\n\
+    \\ENQ\EOT\r\STX\a\ETX\DC2\ETXe:;\n\
+    \\n\
+    \\n\
+    \\STX\EOT\SO\DC2\EOTh\NULr\SOH\n\
+    \\n\
+    \\n\
+    \\ETX\EOT\SO\SOH\DC2\ETXh\b'\n\
+    \o\n\
+    \\EOT\EOT\SO\STX\NUL\DC2\ETXj\EOT \SUBb Frontend Address is a cross cluster accessible address for gRPC traffic. This field is required.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\SO\STX\NUL\ENQ\DC2\ETXj\EOT\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\SO\STX\NUL\SOH\DC2\ETXj\v\ESC\n\
+    \\f\n\
+    \\ENQ\EOT\SO\STX\NUL\ETX\DC2\ETXj\RS\US\n\
+    \E\n\
+    \\EOT\EOT\SO\STX\SOH\DC2\ETXl\EOT.\SUB8 Flag to enable / disable the cross cluster connection.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\SO\STX\SOH\ENQ\DC2\ETXl\EOT\b\n\
+    \\f\n\
+    \\ENQ\EOT\SO\STX\SOH\SOH\DC2\ETXl\t)\n\
+    \\f\n\
+    \\ENQ\EOT\SO\STX\SOH\ETX\DC2\ETXl,-\n\
+    \\189\SOH\n\
+    \\EOT\EOT\SO\STX\STX\DC2\ETXo\EOT%\SUB\175\SOH Frontend HTTP Address is a cross cluster accessible address for HTTP traffic. This field is optional. If not provided\n\
+    \  on update, the existing HTTP address will be removed.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\SO\STX\STX\ENQ\DC2\ETXo\EOT\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\SO\STX\STX\SOH\DC2\ETXo\v \n\
+    \\f\n\
+    \\ENQ\EOT\SO\STX\STX\ETX\DC2\ETXo#$\n\
+    \?\n\
+    \\EOT\EOT\SO\STX\ETX\DC2\ETXq\EOT \SUB2 Controls whether replication streams are active.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\SO\STX\ETX\ENQ\DC2\ETXq\EOT\b\n\
+    \\f\n\
+    \\ENQ\EOT\SO\STX\ETX\SOH\DC2\ETXq\t\ESC\n\
+    \\f\n\
+    \\ENQ\EOT\SO\STX\ETX\ETX\DC2\ETXq\RS\US\n\
+    \\n\
+    \\n\
+    \\STX\EOT\SI\DC2\EOTt\NULu\SOH\n\
+    \\n\
+    \\n\
+    \\ETX\EOT\SI\SOH\DC2\ETXt\b(\n\
+    \\n\
+    \\n\
+    \\STX\EOT\DLE\DC2\EOTw\NULz\SOH\n\
+    \\n\
+    \\n\
+    \\ETX\EOT\DLE\SOH\DC2\ETXw\b\"\n\
+    \1\n\
+    \\EOT\EOT\DLE\STX\NUL\DC2\ETXy\EOT\FS\SUB$ Remote cluster name to be removed.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\DLE\STX\NUL\ENQ\DC2\ETXy\EOT\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\DLE\STX\NUL\SOH\DC2\ETXy\v\ETB\n\
+    \\f\n\
+    \\ENQ\EOT\DLE\STX\NUL\ETX\DC2\ETXy\SUB\ESC\n\
+    \\n\
+    \\n\
+    \\STX\EOT\DC1\DC2\EOT|\NUL}\SOH\n\
+    \\n\
+    \\n\
+    \\ETX\EOT\DC1\SOH\DC2\ETX|\b#\n\
+    \\v\n\
+    \\STX\EOT\DC2\DC2\ENQ\DEL\NUL\130\SOH\SOH\n\
+    \\n\
+    \\n\
+    \\ETX\EOT\DC2\SOH\DC2\ETX\DEL\b\ESC\n\
+    \\f\n\
+    \\EOT\EOT\DC2\STX\NUL\DC2\EOT\128\SOH\EOT\CAN\n\
     \\r\n\
-    \\ENQ\EOT\ETB\STX\NUL\ENQ\DC2\EOT\155\SOH\EOT\t\n\
+    \\ENQ\EOT\DC2\STX\NUL\ENQ\DC2\EOT\128\SOH\EOT\t\n\
     \\r\n\
-    \\ENQ\EOT\ETB\STX\NUL\SOH\DC2\EOT\155\SOH\n\
+    \\ENQ\EOT\DC2\STX\NUL\SOH\DC2\EOT\128\SOH\n\
     \\DC3\n\
     \\r\n\
-    \\ENQ\EOT\ETB\STX\NUL\ETX\DC2\EOT\155\SOH\SYN\ETB\n\
+    \\ENQ\EOT\DC2\STX\NUL\ETX\DC2\EOT\128\SOH\SYN\ETB\n\
+    \\f\n\
+    \\EOT\EOT\DC2\STX\SOH\DC2\EOT\129\SOH\EOT\RS\n\
+    \\r\n\
+    \\ENQ\EOT\DC2\STX\SOH\ENQ\DC2\EOT\129\SOH\EOT\t\n\
+    \\r\n\
+    \\ENQ\EOT\DC2\STX\SOH\SOH\DC2\EOT\129\SOH\n\
+    \\EM\n\
+    \\r\n\
+    \\ENQ\EOT\DC2\STX\SOH\ETX\DC2\EOT\129\SOH\FS\GS\n\
+    \\f\n\
+    \\STX\EOT\DC3\DC2\ACK\132\SOH\NUL\136\SOH\SOH\n\
+    \\v\n\
+    \\ETX\EOT\DC3\SOH\DC2\EOT\132\SOH\b\FS\n\
+    \/\n\
+    \\EOT\EOT\DC3\STX\NUL\DC2\EOT\134\SOH\EOT*\SUB! List of all cluster information\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\DC3\STX\NUL\EOT\DC2\EOT\134\SOH\EOT\f\n\
+    \\r\n\
+    \\ENQ\EOT\DC3\STX\NUL\ACK\DC2\EOT\134\SOH\r\FS\n\
+    \\r\n\
+    \\ENQ\EOT\DC3\STX\NUL\SOH\DC2\EOT\134\SOH\GS%\n\
+    \\r\n\
+    \\ENQ\EOT\DC3\STX\NUL\ETX\DC2\EOT\134\SOH()\n\
+    \\f\n\
+    \\EOT\EOT\DC3\STX\SOH\DC2\EOT\135\SOH\EOT\RS\n\
+    \\r\n\
+    \\ENQ\EOT\DC3\STX\SOH\ENQ\DC2\EOT\135\SOH\EOT\t\n\
+    \\r\n\
+    \\ENQ\EOT\DC3\STX\SOH\SOH\DC2\EOT\135\SOH\n\
+    \\EM\n\
+    \\r\n\
+    \\ENQ\EOT\DC3\STX\SOH\ETX\DC2\EOT\135\SOH\FS\GS\n\
+    \\f\n\
+    \\STX\EOT\DC4\DC2\ACK\138\SOH\NUL\155\SOH\SOH\n\
+    \\v\n\
+    \\ETX\EOT\DC4\SOH\DC2\EOT\138\SOH\b\ETB\n\
+    \)\n\
+    \\EOT\EOT\DC4\STX\NUL\DC2\EOT\140\SOH\EOT\FS\SUB\ESC Name of the cluster name.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\DC4\STX\NUL\ENQ\DC2\EOT\140\SOH\EOT\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\DC4\STX\NUL\SOH\DC2\EOT\140\SOH\v\ETB\n\
+    \\r\n\
+    \\ENQ\EOT\DC4\STX\NUL\ETX\DC2\EOT\140\SOH\SUB\ESC\n\
+    \\"\n\
+    \\EOT\EOT\DC4\STX\SOH\DC2\EOT\142\SOH\EOT\SUB\SUB\DC4 Id of the cluster.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\DC4\STX\SOH\ENQ\DC2\EOT\142\SOH\EOT\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\DC4\STX\SOH\SOH\DC2\EOT\142\SOH\v\NAK\n\
+    \\r\n\
+    \\ENQ\EOT\DC4\STX\SOH\ETX\DC2\EOT\142\SOH\CAN\EM\n\
+    \\GS\n\
+    \\EOT\EOT\DC4\STX\STX\DC2\EOT\144\SOH\EOT\ETB\SUB\SI gRPC address.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\DC4\STX\STX\ENQ\DC2\EOT\144\SOH\EOT\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\DC4\STX\STX\SOH\DC2\EOT\144\SOH\v\DC2\n\
+    \\r\n\
+    \\ENQ\EOT\DC4\STX\STX\ETX\DC2\EOT\144\SOH\NAK\SYN\n\
+    \,\n\
+    \\EOT\EOT\DC4\STX\ETX\DC2\EOT\146\SOH\EOT\FS\SUB\RS HTTP address, if one exists.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\DC4\STX\ETX\ENQ\DC2\EOT\146\SOH\EOT\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\DC4\STX\ETX\SOH\DC2\EOT\146\SOH\v\ETB\n\
+    \\r\n\
+    \\ENQ\EOT\DC4\STX\ETX\ETX\DC2\EOT\146\SOH\SUB\ESC\n\
+    \H\n\
+    \\EOT\EOT\DC4\STX\EOT\DC2\EOT\148\SOH\EOT'\SUB: A unique failover version across all connected clusters.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\DC4\STX\EOT\ENQ\DC2\EOT\148\SOH\EOT\t\n\
+    \\r\n\
+    \\ENQ\EOT\DC4\STX\EOT\SOH\DC2\EOT\148\SOH\n\
+    \\"\n\
+    \\r\n\
+    \\ENQ\EOT\DC4\STX\EOT\ETX\DC2\EOT\148\SOH%&\n\
+    \-\n\
+    \\EOT\EOT\DC4\STX\ENQ\DC2\EOT\150\SOH\EOT\"\SUB\US History service shard number.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\DC4\STX\ENQ\ENQ\DC2\EOT\150\SOH\EOT\t\n\
+    \\r\n\
+    \\ENQ\EOT\DC4\STX\ENQ\SOH\DC2\EOT\150\SOH\n\
+    \\GS\n\
+    \\r\n\
+    \\ENQ\EOT\DC4\STX\ENQ\ETX\DC2\EOT\150\SOH !\n\
+    \=\n\
+    \\EOT\EOT\DC4\STX\ACK\DC2\EOT\152\SOH\EOT#\SUB/ A flag to indicate if a connection is active.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\DC4\STX\ACK\ENQ\DC2\EOT\152\SOH\EOT\b\n\
+    \\r\n\
+    \\ENQ\EOT\DC4\STX\ACK\SOH\DC2\EOT\152\SOH\t\RS\n\
+    \\r\n\
+    \\ENQ\EOT\DC4\STX\ACK\ETX\DC2\EOT\152\SOH!\"\n\
+    \=\n\
+    \\EOT\EOT\DC4\STX\a\DC2\EOT\154\SOH\EOT$\SUB/ A flag to indicate if replication is enabled.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\DC4\STX\a\ENQ\DC2\EOT\154\SOH\EOT\b\n\
+    \\r\n\
+    \\ENQ\EOT\DC4\STX\a\SOH\DC2\EOT\154\SOH\t\US\n\
+    \\r\n\
+    \\ENQ\EOT\DC4\STX\a\ETX\DC2\EOT\154\SOH\"#\n\
+    \\f\n\
+    \\STX\EOT\NAK\DC2\ACK\157\SOH\NUL\160\SOH\SOH\n\
+    \\v\n\
+    \\ETX\EOT\NAK\SOH\DC2\EOT\157\SOH\b\US\n\
+    \4\n\
+    \\EOT\EOT\NAK\STX\NUL\DC2\EOT\159\SOH\EOT\DC2\SUB& Server-generated unique endpoint ID.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\NAK\STX\NUL\ENQ\DC2\EOT\159\SOH\EOT\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\NAK\STX\NUL\SOH\DC2\EOT\159\SOH\v\r\n\
+    \\r\n\
+    \\ENQ\EOT\NAK\STX\NUL\ETX\DC2\EOT\159\SOH\DLE\DC1\n\
+    \\f\n\
+    \\STX\EOT\SYN\DC2\ACK\162\SOH\NUL\164\SOH\SOH\n\
+    \\v\n\
+    \\ETX\EOT\SYN\SOH\DC2\EOT\162\SOH\b \n\
+    \\f\n\
+    \\EOT\EOT\SYN\STX\NUL\DC2\EOT\163\SOH\EOT0\n\
+    \\r\n\
+    \\ENQ\EOT\SYN\STX\NUL\ACK\DC2\EOT\163\SOH\EOT\"\n\
+    \\r\n\
+    \\ENQ\EOT\SYN\STX\NUL\SOH\DC2\EOT\163\SOH#+\n\
+    \\r\n\
+    \\ENQ\EOT\SYN\STX\NUL\ETX\DC2\EOT\163\SOH./\n\
+    \\f\n\
+    \\STX\EOT\ETB\DC2\ACK\166\SOH\NUL\169\SOH\SOH\n\
+    \\v\n\
+    \\ETX\EOT\ETB\SOH\DC2\EOT\166\SOH\b\"\n\
+    \.\n\
+    \\EOT\EOT\ETB\STX\NUL\DC2\EOT\168\SOH\EOT0\SUB  Endpoint definition to create.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\ETB\STX\NUL\ACK\DC2\EOT\168\SOH\EOT&\n\
+    \\r\n\
+    \\ENQ\EOT\ETB\STX\NUL\SOH\DC2\EOT\168\SOH'+\n\
+    \\r\n\
+    \\ENQ\EOT\ETB\STX\NUL\ETX\DC2\EOT\168\SOH./\n\
+    \\f\n\
+    \\STX\EOT\CAN\DC2\ACK\171\SOH\NUL\174\SOH\SOH\n\
+    \\v\n\
+    \\ETX\EOT\CAN\SOH\DC2\EOT\171\SOH\b#\n\
+    \]\n\
+    \\EOT\EOT\CAN\STX\NUL\DC2\EOT\173\SOH\EOT0\SUBO Data post acceptance. Can be used to issue additional updates to this record.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\CAN\STX\NUL\ACK\DC2\EOT\173\SOH\EOT\"\n\
+    \\r\n\
+    \\ENQ\EOT\CAN\STX\NUL\SOH\DC2\EOT\173\SOH#+\n\
+    \\r\n\
+    \\ENQ\EOT\CAN\STX\NUL\ETX\DC2\EOT\173\SOH./\n\
+    \\f\n\
+    \\STX\EOT\EM\DC2\ACK\176\SOH\NUL\183\SOH\SOH\n\
+    \\v\n\
+    \\ETX\EOT\EM\SOH\DC2\EOT\176\SOH\b\"\n\
+    \4\n\
+    \\EOT\EOT\EM\STX\NUL\DC2\EOT\178\SOH\EOT\DC2\SUB& Server-generated unique endpoint ID.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\EM\STX\NUL\ENQ\DC2\EOT\178\SOH\EOT\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\EM\STX\NUL\SOH\DC2\EOT\178\SOH\v\r\n\
+    \\r\n\
+    \\ENQ\EOT\EM\STX\NUL\ETX\DC2\EOT\178\SOH\DLE\DC1\n\
+    \K\n\
+    \\EOT\EOT\EM\STX\SOH\DC2\EOT\180\SOH\EOT\SYN\SUB= Data version for this endpoint. Must match current version.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\EM\STX\SOH\ENQ\DC2\EOT\180\SOH\EOT\t\n\
+    \\r\n\
+    \\ENQ\EOT\EM\STX\SOH\SOH\DC2\EOT\180\SOH\n\
+    \\DC1\n\
+    \\r\n\
+    \\ENQ\EOT\EM\STX\SOH\ETX\DC2\EOT\180\SOH\DC4\NAK\n\
+    \\f\n\
+    \\EOT\EOT\EM\STX\STX\DC2\EOT\182\SOH\EOT0\n\
+    \\r\n\
+    \\ENQ\EOT\EM\STX\STX\ACK\DC2\EOT\182\SOH\EOT&\n\
+    \\r\n\
+    \\ENQ\EOT\EM\STX\STX\SOH\DC2\EOT\182\SOH'+\n\
+    \\r\n\
+    \\ENQ\EOT\EM\STX\STX\ETX\DC2\EOT\182\SOH./\n\
+    \\f\n\
+    \\STX\EOT\SUB\DC2\ACK\185\SOH\NUL\188\SOH\SOH\n\
+    \\v\n\
+    \\ETX\EOT\SUB\SOH\DC2\EOT\185\SOH\b#\n\
+    \]\n\
+    \\EOT\EOT\SUB\STX\NUL\DC2\EOT\187\SOH\EOT0\SUBO Data post acceptance. Can be used to issue additional updates to this record.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\SUB\STX\NUL\ACK\DC2\EOT\187\SOH\EOT\"\n\
+    \\r\n\
+    \\ENQ\EOT\SUB\STX\NUL\SOH\DC2\EOT\187\SOH#+\n\
+    \\r\n\
+    \\ENQ\EOT\SUB\STX\NUL\ETX\DC2\EOT\187\SOH./\n\
+    \\f\n\
+    \\STX\EOT\ESC\DC2\ACK\190\SOH\NUL\195\SOH\SOH\n\
+    \\v\n\
+    \\ETX\EOT\ESC\SOH\DC2\EOT\190\SOH\b\"\n\
+    \4\n\
+    \\EOT\EOT\ESC\STX\NUL\DC2\EOT\192\SOH\EOT\DC2\SUB& Server-generated unique endpoint ID.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\ESC\STX\NUL\ENQ\DC2\EOT\192\SOH\EOT\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\ESC\STX\NUL\SOH\DC2\EOT\192\SOH\v\r\n\
+    \\r\n\
+    \\ENQ\EOT\ESC\STX\NUL\ETX\DC2\EOT\192\SOH\DLE\DC1\n\
+    \K\n\
+    \\EOT\EOT\ESC\STX\SOH\DC2\EOT\194\SOH\EOT\SYN\SUB= Data version for this endpoint. Must match current version.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\ESC\STX\SOH\ENQ\DC2\EOT\194\SOH\EOT\t\n\
+    \\r\n\
+    \\ENQ\EOT\ESC\STX\SOH\SOH\DC2\EOT\194\SOH\n\
+    \\DC1\n\
+    \\r\n\
+    \\ENQ\EOT\ESC\STX\SOH\ETX\DC2\EOT\194\SOH\DC4\NAK\n\
+    \\f\n\
+    \\STX\EOT\FS\DC2\ACK\197\SOH\NUL\198\SOH\SOH\n\
+    \\v\n\
+    \\ETX\EOT\FS\SOH\DC2\EOT\197\SOH\b#\n\
+    \\f\n\
+    \\STX\EOT\GS\DC2\ACK\200\SOH\NUL\210\SOH\SOH\n\
+    \\v\n\
+    \\ETX\EOT\GS\SOH\DC2\EOT\200\SOH\b!\n\
+    \\f\n\
+    \\EOT\EOT\GS\STX\NUL\DC2\EOT\201\SOH\EOT\CAN\n\
+    \\r\n\
+    \\ENQ\EOT\GS\STX\NUL\ENQ\DC2\EOT\201\SOH\EOT\t\n\
+    \\r\n\
+    \\ENQ\EOT\GS\STX\NUL\SOH\DC2\EOT\201\SOH\n\
+    \\DC3\n\
+    \\r\n\
+    \\ENQ\EOT\GS\STX\NUL\ETX\DC2\EOT\201\SOH\SYN\ETB\n\
     \\159\STX\n\
-    \\EOT\EOT\ETB\STX\SOH\DC2\EOT\159\SOH\EOT\RS\SUB\144\STX To get the next page, pass in `ListNexusEndpointsResponse.next_page_token` from the previous page's\n\
+    \\EOT\EOT\GS\STX\SOH\DC2\EOT\205\SOH\EOT\RS\SUB\144\STX To get the next page, pass in `ListNexusEndpointsResponse.next_page_token` from the previous page's\n\
     \ response, the token will be empty if there's no other page.\n\
     \ Note: the last page may be empty if the total number of endpoints registered is a multiple of the page size.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\ETB\STX\SOH\ENQ\DC2\EOT\159\SOH\EOT\t\n\
+    \\ENQ\EOT\GS\STX\SOH\ENQ\DC2\EOT\205\SOH\EOT\t\n\
     \\r\n\
-    \\ENQ\EOT\ETB\STX\SOH\SOH\DC2\EOT\159\SOH\n\
+    \\ENQ\EOT\GS\STX\SOH\SOH\DC2\EOT\205\SOH\n\
     \\EM\n\
     \\r\n\
-    \\ENQ\EOT\ETB\STX\SOH\ETX\DC2\EOT\159\SOH\FS\GS\n\
+    \\ENQ\EOT\GS\STX\SOH\ETX\DC2\EOT\205\SOH\FS\GS\n\
     \\244\SOH\n\
-    \\EOT\EOT\ETB\STX\STX\DC2\EOT\163\SOH\EOT\DC4\SUB\229\SOH Name of the incoming endpoint to filter on - optional. Specifying this will result in zero or one results.\n\
+    \\EOT\EOT\GS\STX\STX\DC2\EOT\209\SOH\EOT\DC4\SUB\229\SOH Name of the incoming endpoint to filter on - optional. Specifying this will result in zero or one results.\n\
     \ (-- api-linter: core::203::field-behavior-required=disabled\n\
     \     aip.dev/not-precedent: Not following linter rules. --)\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\ETB\STX\STX\ENQ\DC2\EOT\163\SOH\EOT\n\
+    \\ENQ\EOT\GS\STX\STX\ENQ\DC2\EOT\209\SOH\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\ETB\STX\STX\SOH\DC2\EOT\163\SOH\v\SI\n\
+    \\ENQ\EOT\GS\STX\STX\SOH\DC2\EOT\209\SOH\v\SI\n\
     \\r\n\
-    \\ENQ\EOT\ETB\STX\STX\ETX\DC2\EOT\163\SOH\DC2\DC3\n\
+    \\ENQ\EOT\GS\STX\STX\ETX\DC2\EOT\209\SOH\DC2\DC3\n\
     \\f\n\
-    \\STX\EOT\CAN\DC2\ACK\166\SOH\NUL\170\SOH\SOH\n\
+    \\STX\EOT\RS\DC2\ACK\212\SOH\NUL\216\SOH\SOH\n\
     \\v\n\
-    \\ETX\EOT\CAN\SOH\DC2\EOT\166\SOH\b\"\n\
+    \\ETX\EOT\RS\SOH\DC2\EOT\212\SOH\b\"\n\
     \0\n\
-    \\EOT\EOT\CAN\STX\NUL\DC2\EOT\168\SOH\EOT\RS\SUB\" Token for getting the next page.\n\
+    \\EOT\EOT\RS\STX\NUL\DC2\EOT\214\SOH\EOT\RS\SUB\" Token for getting the next page.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\CAN\STX\NUL\ENQ\DC2\EOT\168\SOH\EOT\t\n\
+    \\ENQ\EOT\RS\STX\NUL\ENQ\DC2\EOT\214\SOH\EOT\t\n\
     \\r\n\
-    \\ENQ\EOT\CAN\STX\NUL\SOH\DC2\EOT\168\SOH\n\
+    \\ENQ\EOT\RS\STX\NUL\SOH\DC2\EOT\214\SOH\n\
     \\EM\n\
     \\r\n\
-    \\ENQ\EOT\CAN\STX\NUL\ETX\DC2\EOT\168\SOH\FS\GS\n\
+    \\ENQ\EOT\RS\STX\NUL\ETX\DC2\EOT\214\SOH\FS\GS\n\
     \\f\n\
-    \\EOT\EOT\CAN\STX\SOH\DC2\EOT\169\SOH\EOT:\n\
+    \\EOT\EOT\RS\STX\SOH\DC2\EOT\215\SOH\EOT:\n\
     \\r\n\
-    \\ENQ\EOT\CAN\STX\SOH\EOT\DC2\EOT\169\SOH\EOT\f\n\
+    \\ENQ\EOT\RS\STX\SOH\EOT\DC2\EOT\215\SOH\EOT\f\n\
     \\r\n\
-    \\ENQ\EOT\CAN\STX\SOH\ACK\DC2\EOT\169\SOH\r+\n\
+    \\ENQ\EOT\RS\STX\SOH\ACK\DC2\EOT\215\SOH\r+\n\
     \\r\n\
-    \\ENQ\EOT\CAN\STX\SOH\SOH\DC2\EOT\169\SOH,5\n\
+    \\ENQ\EOT\RS\STX\SOH\SOH\DC2\EOT\215\SOH,5\n\
     \\r\n\
-    \\ENQ\EOT\CAN\STX\SOH\ETX\DC2\EOT\169\SOH89b\ACKproto3"
+    \\ENQ\EOT\RS\STX\SOH\ETX\DC2\EOT\215\SOH89b\ACKproto3"

@@ -39,17 +39,54 @@ deploymentName ::
    Data.ProtoLens.Field.HasField s "deploymentName" a) =>
   Lens.Family2.LensLike' f s a
 deploymentName = Data.ProtoLens.Field.field @"deploymentName"
+driverNames ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "driverNames" a) =>
+  Lens.Family2.LensLike' f s a
+driverNames = Data.ProtoLens.Field.field @"driverNames"
+maybe'totalDuration ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'totalDuration" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'totalDuration
+  = Data.ProtoLens.Field.field @"maybe'totalDuration"
 namespace ::
   forall f s a.
   (Prelude.Functor f,
    Data.ProtoLens.Field.HasField s "namespace" a) =>
   Lens.Family2.LensLike' f s a
 namespace = Data.ProtoLens.Field.field @"namespace"
+payloadCount ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "payloadCount" a) =>
+  Lens.Family2.LensLike' f s a
+payloadCount = Data.ProtoLens.Field.field @"payloadCount"
 runId ::
   forall f s a.
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "runId" a) =>
   Lens.Family2.LensLike' f s a
 runId = Data.ProtoLens.Field.field @"runId"
+totalDuration ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "totalDuration" a) =>
+  Lens.Family2.LensLike' f s a
+totalDuration = Data.ProtoLens.Field.field @"totalDuration"
+totalSizeBytes ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "totalSizeBytes" a) =>
+  Lens.Family2.LensLike' f s a
+totalSizeBytes = Data.ProtoLens.Field.field @"totalSizeBytes"
+vec'driverNames ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "vec'driverNames" a) =>
+  Lens.Family2.LensLike' f s a
+vec'driverNames = Data.ProtoLens.Field.field @"vec'driverNames"
 workflowId ::
   forall f s a.
   (Prelude.Functor f,

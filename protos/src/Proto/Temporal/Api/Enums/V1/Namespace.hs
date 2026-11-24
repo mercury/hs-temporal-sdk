@@ -5,10 +5,11 @@
 {-# OPTIONS_GHC -Wno-dodgy-exports#-}
 module Proto.Temporal.Api.Enums.V1.Namespace (
         ArchivalState(..), ArchivalState(),
-        ArchivalState'UnrecognizedValue, NamespaceState(..),
-        NamespaceState(), NamespaceState'UnrecognizedValue,
-        ReplicationState(..), ReplicationState(),
-        ReplicationState'UnrecognizedValue
+        ArchivalState'UnrecognizedValue, NamespaceRestoreState(..),
+        NamespaceRestoreState(), NamespaceRestoreState'UnrecognizedValue,
+        NamespaceState(..), NamespaceState(),
+        NamespaceState'UnrecognizedValue, ReplicationState(..),
+        ReplicationState(), ReplicationState'UnrecognizedValue
     ) where
 import qualified Data.ProtoLens.Runtime.Control.DeepSeq as Control.DeepSeq
 import qualified Data.ProtoLens.Runtime.Data.ProtoLens.Prism as Data.ProtoLens.Prism
@@ -108,6 +109,97 @@ instance Data.ProtoLens.FieldDefault ArchivalState where
   fieldDefault = ARCHIVAL_STATE_UNSPECIFIED
 instance Control.DeepSeq.NFData ArchivalState where
   rnf x__ = Prelude.seq x__ ()
+newtype NamespaceRestoreState'UnrecognizedValue
+  = NamespaceRestoreState'UnrecognizedValue Data.Int.Int32
+  deriving stock (Prelude.Eq, Prelude.Ord, Prelude.Show)
+data NamespaceRestoreState
+  = NAMESPACE_RESTORE_STATE_UNSPECIFIED |
+    NAMESPACE_RESTORE_STATE_RUNNING |
+    NAMESPACE_RESTORE_STATE_COMPLETED |
+    NAMESPACE_RESTORE_STATE_FAILED |
+    NamespaceRestoreState'Unrecognized !NamespaceRestoreState'UnrecognizedValue
+  deriving stock (Prelude.Show, Prelude.Eq, Prelude.Ord)
+instance Data.ProtoLens.MessageEnum NamespaceRestoreState where
+  maybeToEnum 0 = Prelude.Just NAMESPACE_RESTORE_STATE_UNSPECIFIED
+  maybeToEnum 1 = Prelude.Just NAMESPACE_RESTORE_STATE_RUNNING
+  maybeToEnum 2 = Prelude.Just NAMESPACE_RESTORE_STATE_COMPLETED
+  maybeToEnum 3 = Prelude.Just NAMESPACE_RESTORE_STATE_FAILED
+  maybeToEnum k
+    = Prelude.Just
+        (NamespaceRestoreState'Unrecognized
+           (NamespaceRestoreState'UnrecognizedValue (Prelude.fromIntegral k)))
+  showEnum NAMESPACE_RESTORE_STATE_UNSPECIFIED
+    = "NAMESPACE_RESTORE_STATE_UNSPECIFIED"
+  showEnum NAMESPACE_RESTORE_STATE_RUNNING
+    = "NAMESPACE_RESTORE_STATE_RUNNING"
+  showEnum NAMESPACE_RESTORE_STATE_COMPLETED
+    = "NAMESPACE_RESTORE_STATE_COMPLETED"
+  showEnum NAMESPACE_RESTORE_STATE_FAILED
+    = "NAMESPACE_RESTORE_STATE_FAILED"
+  showEnum
+    (NamespaceRestoreState'Unrecognized (NamespaceRestoreState'UnrecognizedValue k))
+    = Prelude.show k
+  readEnum k
+    | (Prelude.==) k "NAMESPACE_RESTORE_STATE_UNSPECIFIED"
+    = Prelude.Just NAMESPACE_RESTORE_STATE_UNSPECIFIED
+    | (Prelude.==) k "NAMESPACE_RESTORE_STATE_RUNNING"
+    = Prelude.Just NAMESPACE_RESTORE_STATE_RUNNING
+    | (Prelude.==) k "NAMESPACE_RESTORE_STATE_COMPLETED"
+    = Prelude.Just NAMESPACE_RESTORE_STATE_COMPLETED
+    | (Prelude.==) k "NAMESPACE_RESTORE_STATE_FAILED"
+    = Prelude.Just NAMESPACE_RESTORE_STATE_FAILED
+    | Prelude.otherwise
+    = (Prelude.>>=) (Text.Read.readMaybe k) Data.ProtoLens.maybeToEnum
+instance Prelude.Bounded NamespaceRestoreState where
+  minBound = NAMESPACE_RESTORE_STATE_UNSPECIFIED
+  maxBound = NAMESPACE_RESTORE_STATE_FAILED
+instance Prelude.Enum NamespaceRestoreState where
+  toEnum k__
+    = Prelude.maybe
+        (Prelude.error
+           ((Prelude.++)
+              "toEnum: unknown value for enum NamespaceRestoreState: "
+              (Prelude.show k__)))
+        Prelude.id (Data.ProtoLens.maybeToEnum k__)
+  fromEnum NAMESPACE_RESTORE_STATE_UNSPECIFIED = 0
+  fromEnum NAMESPACE_RESTORE_STATE_RUNNING = 1
+  fromEnum NAMESPACE_RESTORE_STATE_COMPLETED = 2
+  fromEnum NAMESPACE_RESTORE_STATE_FAILED = 3
+  fromEnum
+    (NamespaceRestoreState'Unrecognized (NamespaceRestoreState'UnrecognizedValue k))
+    = Prelude.fromIntegral k
+  succ NAMESPACE_RESTORE_STATE_FAILED
+    = Prelude.error
+        "NamespaceRestoreState.succ: bad argument NAMESPACE_RESTORE_STATE_FAILED. This value would be out of bounds."
+  succ NAMESPACE_RESTORE_STATE_UNSPECIFIED
+    = NAMESPACE_RESTORE_STATE_RUNNING
+  succ NAMESPACE_RESTORE_STATE_RUNNING
+    = NAMESPACE_RESTORE_STATE_COMPLETED
+  succ NAMESPACE_RESTORE_STATE_COMPLETED
+    = NAMESPACE_RESTORE_STATE_FAILED
+  succ (NamespaceRestoreState'Unrecognized _)
+    = Prelude.error
+        "NamespaceRestoreState.succ: bad argument: unrecognized value"
+  pred NAMESPACE_RESTORE_STATE_UNSPECIFIED
+    = Prelude.error
+        "NamespaceRestoreState.pred: bad argument NAMESPACE_RESTORE_STATE_UNSPECIFIED. This value would be out of bounds."
+  pred NAMESPACE_RESTORE_STATE_RUNNING
+    = NAMESPACE_RESTORE_STATE_UNSPECIFIED
+  pred NAMESPACE_RESTORE_STATE_COMPLETED
+    = NAMESPACE_RESTORE_STATE_RUNNING
+  pred NAMESPACE_RESTORE_STATE_FAILED
+    = NAMESPACE_RESTORE_STATE_COMPLETED
+  pred (NamespaceRestoreState'Unrecognized _)
+    = Prelude.error
+        "NamespaceRestoreState.pred: bad argument: unrecognized value"
+  enumFrom = Data.ProtoLens.Message.Enum.messageEnumFrom
+  enumFromTo = Data.ProtoLens.Message.Enum.messageEnumFromTo
+  enumFromThen = Data.ProtoLens.Message.Enum.messageEnumFromThen
+  enumFromThenTo = Data.ProtoLens.Message.Enum.messageEnumFromThenTo
+instance Data.ProtoLens.FieldDefault NamespaceRestoreState where
+  fieldDefault = NAMESPACE_RESTORE_STATE_UNSPECIFIED
+instance Control.DeepSeq.NFData NamespaceRestoreState where
+  rnf x__ = Prelude.seq x__ ()
 newtype NamespaceState'UnrecognizedValue
   = NamespaceState'UnrecognizedValue Data.Int.Int32
   deriving stock (Prelude.Eq, Prelude.Ord, Prelude.Show)
@@ -116,6 +208,7 @@ data NamespaceState
     NAMESPACE_STATE_REGISTERED |
     NAMESPACE_STATE_DEPRECATED |
     NAMESPACE_STATE_DELETED |
+    NAMESPACE_STATE_SOFT_DELETED |
     NamespaceState'Unrecognized !NamespaceState'UnrecognizedValue
   deriving stock (Prelude.Show, Prelude.Eq, Prelude.Ord)
 instance Data.ProtoLens.MessageEnum NamespaceState where
@@ -123,6 +216,7 @@ instance Data.ProtoLens.MessageEnum NamespaceState where
   maybeToEnum 1 = Prelude.Just NAMESPACE_STATE_REGISTERED
   maybeToEnum 2 = Prelude.Just NAMESPACE_STATE_DEPRECATED
   maybeToEnum 3 = Prelude.Just NAMESPACE_STATE_DELETED
+  maybeToEnum 4 = Prelude.Just NAMESPACE_STATE_SOFT_DELETED
   maybeToEnum k
     = Prelude.Just
         (NamespaceState'Unrecognized
@@ -132,6 +226,8 @@ instance Data.ProtoLens.MessageEnum NamespaceState where
   showEnum NAMESPACE_STATE_REGISTERED = "NAMESPACE_STATE_REGISTERED"
   showEnum NAMESPACE_STATE_DEPRECATED = "NAMESPACE_STATE_DEPRECATED"
   showEnum NAMESPACE_STATE_DELETED = "NAMESPACE_STATE_DELETED"
+  showEnum NAMESPACE_STATE_SOFT_DELETED
+    = "NAMESPACE_STATE_SOFT_DELETED"
   showEnum
     (NamespaceState'Unrecognized (NamespaceState'UnrecognizedValue k))
     = Prelude.show k
@@ -144,11 +240,13 @@ instance Data.ProtoLens.MessageEnum NamespaceState where
     = Prelude.Just NAMESPACE_STATE_DEPRECATED
     | (Prelude.==) k "NAMESPACE_STATE_DELETED"
     = Prelude.Just NAMESPACE_STATE_DELETED
+    | (Prelude.==) k "NAMESPACE_STATE_SOFT_DELETED"
+    = Prelude.Just NAMESPACE_STATE_SOFT_DELETED
     | Prelude.otherwise
     = (Prelude.>>=) (Text.Read.readMaybe k) Data.ProtoLens.maybeToEnum
 instance Prelude.Bounded NamespaceState where
   minBound = NAMESPACE_STATE_UNSPECIFIED
-  maxBound = NAMESPACE_STATE_DELETED
+  maxBound = NAMESPACE_STATE_SOFT_DELETED
 instance Prelude.Enum NamespaceState where
   toEnum k__
     = Prelude.maybe
@@ -161,15 +259,17 @@ instance Prelude.Enum NamespaceState where
   fromEnum NAMESPACE_STATE_REGISTERED = 1
   fromEnum NAMESPACE_STATE_DEPRECATED = 2
   fromEnum NAMESPACE_STATE_DELETED = 3
+  fromEnum NAMESPACE_STATE_SOFT_DELETED = 4
   fromEnum
     (NamespaceState'Unrecognized (NamespaceState'UnrecognizedValue k))
     = Prelude.fromIntegral k
-  succ NAMESPACE_STATE_DELETED
+  succ NAMESPACE_STATE_SOFT_DELETED
     = Prelude.error
-        "NamespaceState.succ: bad argument NAMESPACE_STATE_DELETED. This value would be out of bounds."
+        "NamespaceState.succ: bad argument NAMESPACE_STATE_SOFT_DELETED. This value would be out of bounds."
   succ NAMESPACE_STATE_UNSPECIFIED = NAMESPACE_STATE_REGISTERED
   succ NAMESPACE_STATE_REGISTERED = NAMESPACE_STATE_DEPRECATED
   succ NAMESPACE_STATE_DEPRECATED = NAMESPACE_STATE_DELETED
+  succ NAMESPACE_STATE_DELETED = NAMESPACE_STATE_SOFT_DELETED
   succ (NamespaceState'Unrecognized _)
     = Prelude.error
         "NamespaceState.succ: bad argument: unrecognized value"
@@ -179,6 +279,7 @@ instance Prelude.Enum NamespaceState where
   pred NAMESPACE_STATE_REGISTERED = NAMESPACE_STATE_UNSPECIFIED
   pred NAMESPACE_STATE_DEPRECATED = NAMESPACE_STATE_REGISTERED
   pred NAMESPACE_STATE_DELETED = NAMESPACE_STATE_DEPRECATED
+  pred NAMESPACE_STATE_SOFT_DELETED = NAMESPACE_STATE_DELETED
   pred (NamespaceState'Unrecognized _)
     = Prelude.error
         "NamespaceState.pred: bad argument: unrecognized value"

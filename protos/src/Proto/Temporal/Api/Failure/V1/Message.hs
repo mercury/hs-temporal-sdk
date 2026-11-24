@@ -723,9 +723,11 @@ instance Control.DeepSeq.NFData ApplicationFailureInfo where
 {- | Fields :
      
          * 'Proto.Temporal.Api.Failure.V1.Message_Fields.details' @:: Lens' CanceledFailureInfo Proto.Temporal.Api.Common.V1.Message.Payloads@
-         * 'Proto.Temporal.Api.Failure.V1.Message_Fields.maybe'details' @:: Lens' CanceledFailureInfo (Prelude.Maybe Proto.Temporal.Api.Common.V1.Message.Payloads)@ -}
+         * 'Proto.Temporal.Api.Failure.V1.Message_Fields.maybe'details' @:: Lens' CanceledFailureInfo (Prelude.Maybe Proto.Temporal.Api.Common.V1.Message.Payloads)@
+         * 'Proto.Temporal.Api.Failure.V1.Message_Fields.identity' @:: Lens' CanceledFailureInfo Data.Text.Text@ -}
 data CanceledFailureInfo
   = CanceledFailureInfo'_constructor {_CanceledFailureInfo'details :: !(Prelude.Maybe Proto.Temporal.Api.Common.V1.Message.Payloads),
+                                      _CanceledFailureInfo'identity :: !Data.Text.Text,
                                       _CanceledFailureInfo'_unknownFields :: !Data.ProtoLens.FieldSet}
   deriving stock (Prelude.Eq, Prelude.Ord)
 instance Prelude.Show CanceledFailureInfo where
@@ -748,13 +750,21 @@ instance Data.ProtoLens.Field.HasField CanceledFailureInfo "maybe'details" (Prel
            _CanceledFailureInfo'details
            (\ x__ y__ -> x__ {_CanceledFailureInfo'details = y__}))
         Prelude.id
+instance Data.ProtoLens.Field.HasField CanceledFailureInfo "identity" Data.Text.Text where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _CanceledFailureInfo'identity
+           (\ x__ y__ -> x__ {_CanceledFailureInfo'identity = y__}))
+        Prelude.id
 instance Data.ProtoLens.Message CanceledFailureInfo where
   messageName _
     = Data.Text.pack "temporal.api.failure.v1.CanceledFailureInfo"
   packedMessageDescriptor _
     = "\n\
       \\DC3CanceledFailureInfo\DC2:\n\
-      \\adetails\CAN\SOH \SOH(\v2 .temporal.api.common.v1.PayloadsR\adetails"
+      \\adetails\CAN\SOH \SOH(\v2 .temporal.api.common.v1.PayloadsR\adetails\DC2\SUB\n\
+      \\bidentity\CAN\STX \SOH(\tR\bidentity"
   packedFileDescriptor _ = packedFileDescriptor
   fieldsByTag
     = let
@@ -766,9 +776,19 @@ instance Data.ProtoLens.Message CanceledFailureInfo where
               (Data.ProtoLens.OptionalField
                  (Data.ProtoLens.Field.field @"maybe'details")) ::
               Data.ProtoLens.FieldDescriptor CanceledFailureInfo
+        identity__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "identity"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.StringField ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Text.Text)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"identity")) ::
+              Data.ProtoLens.FieldDescriptor CanceledFailureInfo
       in
         Data.Map.fromList
-          [(Data.ProtoLens.Tag 1, details__field_descriptor)]
+          [(Data.ProtoLens.Tag 1, details__field_descriptor),
+           (Data.ProtoLens.Tag 2, identity__field_descriptor)]
   unknownFields
     = Lens.Family2.Unchecked.lens
         _CanceledFailureInfo'_unknownFields
@@ -776,6 +796,7 @@ instance Data.ProtoLens.Message CanceledFailureInfo where
   defMessage
     = CanceledFailureInfo'_constructor
         {_CanceledFailureInfo'details = Prelude.Nothing,
+         _CanceledFailureInfo'identity = Data.ProtoLens.fieldDefault,
          _CanceledFailureInfo'_unknownFields = []}
   parseMessage
     = let
@@ -807,6 +828,14 @@ instance Data.ProtoLens.Message CanceledFailureInfo where
                                              (Prelude.fromIntegral len) Data.ProtoLens.parseMessage)
                                        "details"
                                 loop (Lens.Family2.set (Data.ProtoLens.Field.field @"details") y x)
+                        18
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.getText
+                                             (Prelude.fromIntegral len))
+                                       "identity"
+                                loop
+                                  (Lens.Family2.set (Data.ProtoLens.Field.field @"identity") y x)
                         wire
                           -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
                                         wire
@@ -833,14 +862,32 @@ instance Data.ProtoLens.Message CanceledFailureInfo where
                                      (Prelude.fromIntegral (Data.ByteString.length bs)))
                                   (Data.ProtoLens.Encoding.Bytes.putBytes bs))
                           Data.ProtoLens.encodeMessage _v))
-             (Data.ProtoLens.Encoding.Wire.buildFieldSet
-                (Lens.Family2.view Data.ProtoLens.unknownFields _x))
+             ((Data.Monoid.<>)
+                (let
+                   _v = Lens.Family2.view (Data.ProtoLens.Field.field @"identity") _x
+                 in
+                   if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                       Data.Monoid.mempty
+                   else
+                       (Data.Monoid.<>)
+                         (Data.ProtoLens.Encoding.Bytes.putVarInt 18)
+                         ((Prelude..)
+                            (\ bs
+                               -> (Data.Monoid.<>)
+                                    (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                       (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                    (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                            Data.Text.Encoding.encodeUtf8 _v))
+                (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                   (Lens.Family2.view Data.ProtoLens.unknownFields _x)))
 instance Control.DeepSeq.NFData CanceledFailureInfo where
   rnf
     = \ x__
         -> Control.DeepSeq.deepseq
              (_CanceledFailureInfo'_unknownFields x__)
-             (Control.DeepSeq.deepseq (_CanceledFailureInfo'details x__) ())
+             (Control.DeepSeq.deepseq
+                (_CanceledFailureInfo'details x__)
+                (Control.DeepSeq.deepseq (_CanceledFailureInfo'identity x__) ()))
 {- | Fields :
      
          * 'Proto.Temporal.Api.Failure.V1.Message_Fields.namespace' @:: Lens' ChildWorkflowExecutionFailureInfo Data.Text.Text@
@@ -3110,9 +3157,11 @@ instance Control.DeepSeq.NFData ServerFailureInfo where
              (_ServerFailureInfo'_unknownFields x__)
              (Control.DeepSeq.deepseq (_ServerFailureInfo'nonRetryable x__) ())
 {- | Fields :
-      -}
+     
+         * 'Proto.Temporal.Api.Failure.V1.Message_Fields.identity' @:: Lens' TerminatedFailureInfo Data.Text.Text@ -}
 data TerminatedFailureInfo
-  = TerminatedFailureInfo'_constructor {_TerminatedFailureInfo'_unknownFields :: !Data.ProtoLens.FieldSet}
+  = TerminatedFailureInfo'_constructor {_TerminatedFailureInfo'identity :: !Data.Text.Text,
+                                        _TerminatedFailureInfo'_unknownFields :: !Data.ProtoLens.FieldSet}
   deriving stock (Prelude.Eq, Prelude.Ord)
 instance Prelude.Show TerminatedFailureInfo where
   showsPrec _ __x __s
@@ -3120,21 +3169,43 @@ instance Prelude.Show TerminatedFailureInfo where
         '{'
         (Prelude.showString
            (Data.ProtoLens.showMessageShort __x) (Prelude.showChar '}' __s))
+instance Data.ProtoLens.Field.HasField TerminatedFailureInfo "identity" Data.Text.Text where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _TerminatedFailureInfo'identity
+           (\ x__ y__ -> x__ {_TerminatedFailureInfo'identity = y__}))
+        Prelude.id
 instance Data.ProtoLens.Message TerminatedFailureInfo where
   messageName _
     = Data.Text.pack "temporal.api.failure.v1.TerminatedFailureInfo"
   packedMessageDescriptor _
     = "\n\
-      \\NAKTerminatedFailureInfo"
+      \\NAKTerminatedFailureInfo\DC2\SUB\n\
+      \\bidentity\CAN\SOH \SOH(\tR\bidentity"
   packedFileDescriptor _ = packedFileDescriptor
-  fieldsByTag = let in Data.Map.fromList []
+  fieldsByTag
+    = let
+        identity__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "identity"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.StringField ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Text.Text)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"identity")) ::
+              Data.ProtoLens.FieldDescriptor TerminatedFailureInfo
+      in
+        Data.Map.fromList
+          [(Data.ProtoLens.Tag 1, identity__field_descriptor)]
   unknownFields
     = Lens.Family2.Unchecked.lens
         _TerminatedFailureInfo'_unknownFields
         (\ x__ y__ -> x__ {_TerminatedFailureInfo'_unknownFields = y__})
   defMessage
     = TerminatedFailureInfo'_constructor
-        {_TerminatedFailureInfo'_unknownFields = []}
+        {_TerminatedFailureInfo'identity = Data.ProtoLens.fieldDefault,
+         _TerminatedFailureInfo'_unknownFields = []}
   parseMessage
     = let
         loop ::
@@ -3158,6 +3229,14 @@ instance Data.ProtoLens.Message TerminatedFailureInfo where
                else
                    do tag <- Data.ProtoLens.Encoding.Bytes.getVarInt
                       case tag of
+                        10
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.getText
+                                             (Prelude.fromIntegral len))
+                                       "identity"
+                                loop
+                                  (Lens.Family2.set (Data.ProtoLens.Field.field @"identity") y x)
                         wire
                           -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
                                         wire
@@ -3169,13 +3248,30 @@ instance Data.ProtoLens.Message TerminatedFailureInfo where
           (do loop Data.ProtoLens.defMessage) "TerminatedFailureInfo"
   buildMessage
     = \ _x
-        -> Data.ProtoLens.Encoding.Wire.buildFieldSet
-             (Lens.Family2.view Data.ProtoLens.unknownFields _x)
+        -> (Data.Monoid.<>)
+             (let
+                _v = Lens.Family2.view (Data.ProtoLens.Field.field @"identity") _x
+              in
+                if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                    Data.Monoid.mempty
+                else
+                    (Data.Monoid.<>)
+                      (Data.ProtoLens.Encoding.Bytes.putVarInt 10)
+                      ((Prelude..)
+                         (\ bs
+                            -> (Data.Monoid.<>)
+                                 (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                    (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                 (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                         Data.Text.Encoding.encodeUtf8 _v))
+             (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                (Lens.Family2.view Data.ProtoLens.unknownFields _x))
 instance Control.DeepSeq.NFData TerminatedFailureInfo where
   rnf
     = \ x__
         -> Control.DeepSeq.deepseq
-             (_TerminatedFailureInfo'_unknownFields x__) ()
+             (_TerminatedFailureInfo'_unknownFields x__)
+             (Control.DeepSeq.deepseq (_TerminatedFailureInfo'identity x__) ())
 {- | Fields :
      
          * 'Proto.Temporal.Api.Failure.V1.Message_Fields.timeoutType' @:: Lens' TimeoutFailureInfo Proto.Temporal.Api.Enums.V1.Workflow.TimeoutType@
@@ -3361,10 +3457,12 @@ packedFileDescriptor
     \\bcategory\CAN\ENQ \SOH(\SO2/.temporal.api.enums.v1.ApplicationErrorCategoryR\bcategory\"\179\SOH\n\
     \\DC2TimeoutFailureInfo\DC2E\n\
     \\ftimeout_type\CAN\SOH \SOH(\SO2\".temporal.api.enums.v1.TimeoutTypeR\vtimeoutType\DC2V\n\
-    \\SYNlast_heartbeat_details\CAN\STX \SOH(\v2 .temporal.api.common.v1.PayloadsR\DC4lastHeartbeatDetails\"Q\n\
+    \\SYNlast_heartbeat_details\CAN\STX \SOH(\v2 .temporal.api.common.v1.PayloadsR\DC4lastHeartbeatDetails\"m\n\
     \\DC3CanceledFailureInfo\DC2:\n\
-    \\adetails\CAN\SOH \SOH(\v2 .temporal.api.common.v1.PayloadsR\adetails\"\ETB\n\
-    \\NAKTerminatedFailureInfo\"8\n\
+    \\adetails\CAN\SOH \SOH(\v2 .temporal.api.common.v1.PayloadsR\adetails\DC2\SUB\n\
+    \\bidentity\CAN\STX \SOH(\tR\bidentity\"3\n\
+    \\NAKTerminatedFailureInfo\DC2\SUB\n\
+    \\bidentity\CAN\SOH \SOH(\tR\bidentity\"8\n\
     \\DC1ServerFailureInfo\DC2#\n\
     \\rnon_retryable\CAN\SOH \SOH(\bR\fnonRetryable\"r\n\
     \\CANResetWorkflowFailureInfo\DC2V\n\
@@ -3417,8 +3515,8 @@ packedFileDescriptor
     \\SUBnexus_handler_failure_info\CAN\SO \SOH(\v20.temporal.api.failure.v1.NexusHandlerFailureInfoH\NULR\ETBnexusHandlerFailureInfoB\SO\n\
     \\ffailure_info\" \n\
     \\RSMultiOperationExecutionAbortedB\142\SOH\n\
-    \\SUBio.temporal.api.failure.v1B\fMessageProtoP\SOHZ%go.temporal.io/api/failure/v1;failure\170\STX\EMTemporalio.Api.Failure.V1\234\STX\FSTemporalio::Api::Failure::V1J\199&\n\
-    \\a\DC2\ENQ\NUL\NUL\130\SOH)\n\
+    \\SUBio.temporal.api.failure.v1B\fMessageProtoP\SOHZ%go.temporal.io/api/failure/v1;failure\170\STX\EMTemporalio.Api.Failure.V1\234\STX\FSTemporalio::Api::Failure::V1J\190)\n\
+    \\a\DC2\ENQ\NUL\NUL\135\SOH)\n\
     \\b\n\
     \\SOH\f\DC2\ETX\NUL\NUL\DC2\n\
     \\b\n\
@@ -3533,7 +3631,7 @@ packedFileDescriptor
     \\ENQ\EOT\SOH\STX\SOH\ETX\DC2\ETX =>\n\
     \\n\
     \\n\
-    \\STX\EOT\STX\DC2\EOT#\NUL%\SOH\n\
+    \\STX\EOT\STX\DC2\EOT#\NUL'\SOH\n\
     \\n\
     \\n\
     \\ETX\EOT\STX\SOH\DC2\ETX#\b\ESC\n\
@@ -3545,304 +3643,324 @@ packedFileDescriptor
     \\ENQ\EOT\STX\STX\NUL\SOH\DC2\ETX$$+\n\
     \\f\n\
     \\ENQ\EOT\STX\STX\NUL\ETX\DC2\ETX$./\n\
+    \T\n\
+    \\EOT\EOT\STX\STX\SOH\DC2\ETX&\EOT\CAN\SUBG The identity of the worker or client that requested the cancellation.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\STX\STX\SOH\ENQ\DC2\ETX&\EOT\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\STX\STX\SOH\SOH\DC2\ETX&\v\DC3\n\
+    \\f\n\
+    \\ENQ\EOT\STX\STX\SOH\ETX\DC2\ETX&\SYN\ETB\n\
     \\n\
     \\n\
-    \\STX\EOT\ETX\DC2\EOT'\NUL(\SOH\n\
+    \\STX\EOT\ETX\DC2\EOT)\NUL,\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\ETX\SOH\DC2\ETX'\b\GS\n\
+    \\ETX\EOT\ETX\SOH\DC2\ETX)\b\GS\n\
+    \S\n\
+    \\EOT\EOT\ETX\STX\NUL\DC2\ETX+\EOT\CAN\SUBF The identity of the worker or client that requested the termination.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\ETX\STX\NUL\ENQ\DC2\ETX+\EOT\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\ETX\STX\NUL\SOH\DC2\ETX+\v\DC3\n\
+    \\f\n\
+    \\ENQ\EOT\ETX\STX\NUL\ETX\DC2\ETX+\SYN\ETB\n\
     \\n\
     \\n\
-    \\STX\EOT\EOT\DC2\EOT*\NUL,\SOH\n\
+    \\STX\EOT\EOT\DC2\EOT.\NUL0\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\EOT\SOH\DC2\ETX*\b\EM\n\
+    \\ETX\EOT\EOT\SOH\DC2\ETX.\b\EM\n\
     \\v\n\
-    \\EOT\EOT\EOT\STX\NUL\DC2\ETX+\EOT\ESC\n\
+    \\EOT\EOT\EOT\STX\NUL\DC2\ETX/\EOT\ESC\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\NUL\ENQ\DC2\ETX+\EOT\b\n\
+    \\ENQ\EOT\EOT\STX\NUL\ENQ\DC2\ETX/\EOT\b\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\NUL\SOH\DC2\ETX+\t\SYN\n\
+    \\ENQ\EOT\EOT\STX\NUL\SOH\DC2\ETX/\t\SYN\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\NUL\ETX\DC2\ETX+\EM\SUB\n\
+    \\ENQ\EOT\EOT\STX\NUL\ETX\DC2\ETX/\EM\SUB\n\
     \\n\
     \\n\
-    \\STX\EOT\ENQ\DC2\EOT.\NUL0\SOH\n\
+    \\STX\EOT\ENQ\DC2\EOT2\NUL4\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\ENQ\SOH\DC2\ETX.\b \n\
+    \\ETX\EOT\ENQ\SOH\DC2\ETX2\b \n\
     \\v\n\
-    \\EOT\EOT\ENQ\STX\NUL\DC2\ETX/\EOT?\n\
+    \\EOT\EOT\ENQ\STX\NUL\DC2\ETX3\EOT?\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\NUL\ACK\DC2\ETX/\EOT#\n\
+    \\ENQ\EOT\ENQ\STX\NUL\ACK\DC2\ETX3\EOT#\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\NUL\SOH\DC2\ETX/$:\n\
+    \\ENQ\EOT\ENQ\STX\NUL\SOH\DC2\ETX3$:\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\NUL\ETX\DC2\ETX/=>\n\
+    \\ENQ\EOT\ENQ\STX\NUL\ETX\DC2\ETX3=>\n\
     \\n\
     \\n\
-    \\STX\EOT\ACK\DC2\EOT2\NUL9\SOH\n\
+    \\STX\EOT\ACK\DC2\EOT6\NUL=\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\ACK\SOH\DC2\ETX2\b\ESC\n\
+    \\ETX\EOT\ACK\SOH\DC2\ETX6\b\ESC\n\
     \\v\n\
-    \\EOT\EOT\ACK\STX\NUL\DC2\ETX3\EOT!\n\
+    \\EOT\EOT\ACK\STX\NUL\DC2\ETX7\EOT!\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\NUL\ENQ\DC2\ETX3\EOT\t\n\
+    \\ENQ\EOT\ACK\STX\NUL\ENQ\DC2\ETX7\EOT\t\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\NUL\SOH\DC2\ETX3\n\
+    \\ENQ\EOT\ACK\STX\NUL\SOH\DC2\ETX7\n\
     \\FS\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\NUL\ETX\DC2\ETX3\US \n\
+    \\ENQ\EOT\ACK\STX\NUL\ETX\DC2\ETX7\US \n\
     \\v\n\
-    \\EOT\EOT\ACK\STX\SOH\DC2\ETX4\EOT\US\n\
+    \\EOT\EOT\ACK\STX\SOH\DC2\ETX8\EOT\US\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\SOH\ENQ\DC2\ETX4\EOT\t\n\
+    \\ENQ\EOT\ACK\STX\SOH\ENQ\DC2\ETX8\EOT\t\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\SOH\SOH\DC2\ETX4\n\
+    \\ENQ\EOT\ACK\STX\SOH\SOH\DC2\ETX8\n\
     \\SUB\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\SOH\ETX\DC2\ETX4\GS\RS\n\
+    \\ENQ\EOT\ACK\STX\SOH\ETX\DC2\ETX8\GS\RS\n\
     \\v\n\
-    \\EOT\EOT\ACK\STX\STX\DC2\ETX5\EOT\CAN\n\
+    \\EOT\EOT\ACK\STX\STX\DC2\ETX9\EOT\CAN\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\STX\ENQ\DC2\ETX5\EOT\n\
+    \\ENQ\EOT\ACK\STX\STX\ENQ\DC2\ETX9\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\STX\SOH\DC2\ETX5\v\DC3\n\
+    \\ENQ\EOT\ACK\STX\STX\SOH\DC2\ETX9\v\DC3\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\STX\ETX\DC2\ETX5\SYN\ETB\n\
+    \\ENQ\EOT\ACK\STX\STX\ETX\DC2\ETX9\SYN\ETB\n\
     \\v\n\
-    \\EOT\EOT\ACK\STX\ETX\DC2\ETX6\EOT:\n\
+    \\EOT\EOT\ACK\STX\ETX\DC2\ETX:\EOT:\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\ETX\ACK\DC2\ETX6\EOT'\n\
+    \\ENQ\EOT\ACK\STX\ETX\ACK\DC2\ETX:\EOT'\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\ETX\SOH\DC2\ETX6(5\n\
+    \\ENQ\EOT\ACK\STX\ETX\SOH\DC2\ETX:(5\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\ETX\ETX\DC2\ETX689\n\
+    \\ENQ\EOT\ACK\STX\ETX\ETX\DC2\ETX:89\n\
     \\v\n\
-    \\EOT\EOT\ACK\STX\EOT\DC2\ETX7\EOT\ESC\n\
+    \\EOT\EOT\ACK\STX\EOT\DC2\ETX;\EOT\ESC\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\EOT\ENQ\DC2\ETX7\EOT\n\
+    \\ENQ\EOT\ACK\STX\EOT\ENQ\DC2\ETX;\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\EOT\SOH\DC2\ETX7\v\SYN\n\
+    \\ENQ\EOT\ACK\STX\EOT\SOH\DC2\ETX;\v\SYN\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\EOT\ETX\DC2\ETX7\EM\SUB\n\
+    \\ENQ\EOT\ACK\STX\EOT\ETX\DC2\ETX;\EM\SUB\n\
     \\v\n\
-    \\EOT\EOT\ACK\STX\ENQ\DC2\ETX8\EOT5\n\
+    \\EOT\EOT\ACK\STX\ENQ\DC2\ETX<\EOT5\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\ENQ\ACK\DC2\ETX8\EOT$\n\
+    \\ENQ\EOT\ACK\STX\ENQ\ACK\DC2\ETX<\EOT$\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\ENQ\SOH\DC2\ETX8%0\n\
+    \\ENQ\EOT\ACK\STX\ENQ\SOH\DC2\ETX<%0\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\ENQ\ETX\DC2\ETX834\n\
+    \\ENQ\EOT\ACK\STX\ENQ\ETX\DC2\ETX<34\n\
     \\n\
     \\n\
-    \\STX\EOT\a\DC2\EOT;\NULB\SOH\n\
+    \\STX\EOT\a\DC2\EOT?\NULF\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\a\SOH\DC2\ETX;\b)\n\
+    \\ETX\EOT\a\SOH\DC2\ETX?\b)\n\
     \\v\n\
-    \\EOT\EOT\a\STX\NUL\DC2\ETX<\EOT\EM\n\
+    \\EOT\EOT\a\STX\NUL\DC2\ETX@\EOT\EM\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\NUL\ENQ\DC2\ETX<\EOT\n\
+    \\ENQ\EOT\a\STX\NUL\ENQ\DC2\ETX@\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\NUL\SOH\DC2\ETX<\v\DC4\n\
+    \\ENQ\EOT\a\STX\NUL\SOH\DC2\ETX@\v\DC4\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\NUL\ETX\DC2\ETX<\ETB\CAN\n\
+    \\ENQ\EOT\a\STX\NUL\ETX\DC2\ETX@\ETB\CAN\n\
     \\v\n\
-    \\EOT\EOT\a\STX\SOH\DC2\ETX=\EOTD\n\
+    \\EOT\EOT\a\STX\SOH\DC2\ETXA\EOTD\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\SOH\ACK\DC2\ETX=\EOT,\n\
+    \\ENQ\EOT\a\STX\SOH\ACK\DC2\ETXA\EOT,\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\SOH\SOH\DC2\ETX=-?\n\
+    \\ENQ\EOT\a\STX\SOH\SOH\DC2\ETXA-?\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\SOH\ETX\DC2\ETX=BC\n\
+    \\ENQ\EOT\a\STX\SOH\ETX\DC2\ETXABC\n\
     \\v\n\
-    \\EOT\EOT\a\STX\STX\DC2\ETX>\EOT:\n\
+    \\EOT\EOT\a\STX\STX\DC2\ETXB\EOT:\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\STX\ACK\DC2\ETX>\EOT'\n\
+    \\ENQ\EOT\a\STX\STX\ACK\DC2\ETXB\EOT'\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\STX\SOH\DC2\ETX>(5\n\
+    \\ENQ\EOT\a\STX\STX\SOH\DC2\ETXB(5\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\STX\ETX\DC2\ETX>89\n\
+    \\ENQ\EOT\a\STX\STX\ETX\DC2\ETXB89\n\
     \\v\n\
-    \\EOT\EOT\a\STX\ETX\DC2\ETX?\EOT!\n\
+    \\EOT\EOT\a\STX\ETX\DC2\ETXC\EOT!\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\ETX\ENQ\DC2\ETX?\EOT\t\n\
+    \\ENQ\EOT\a\STX\ETX\ENQ\DC2\ETXC\EOT\t\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\ETX\SOH\DC2\ETX?\n\
+    \\ENQ\EOT\a\STX\ETX\SOH\DC2\ETXC\n\
     \\FS\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\ETX\ETX\DC2\ETX?\US \n\
+    \\ENQ\EOT\a\STX\ETX\ETX\DC2\ETXC\US \n\
     \\v\n\
-    \\EOT\EOT\a\STX\EOT\DC2\ETX@\EOT\US\n\
+    \\EOT\EOT\a\STX\EOT\DC2\ETXD\EOT\US\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\EOT\ENQ\DC2\ETX@\EOT\t\n\
+    \\ENQ\EOT\a\STX\EOT\ENQ\DC2\ETXD\EOT\t\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\EOT\SOH\DC2\ETX@\n\
+    \\ENQ\EOT\a\STX\EOT\SOH\DC2\ETXD\n\
     \\SUB\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\EOT\ETX\DC2\ETX@\GS\RS\n\
+    \\ENQ\EOT\a\STX\EOT\ETX\DC2\ETXD\GS\RS\n\
     \\v\n\
-    \\EOT\EOT\a\STX\ENQ\DC2\ETXA\EOT5\n\
+    \\EOT\EOT\a\STX\ENQ\DC2\ETXE\EOT5\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\ENQ\ACK\DC2\ETXA\EOT$\n\
+    \\ENQ\EOT\a\STX\ENQ\ACK\DC2\ETXE\EOT$\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\ENQ\SOH\DC2\ETXA%0\n\
+    \\ENQ\EOT\a\STX\ENQ\SOH\DC2\ETXE%0\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\ENQ\ETX\DC2\ETXA34\n\
+    \\ENQ\EOT\a\STX\ENQ\ETX\DC2\ETXE34\n\
+    \q\n\
+    \\STX\EOT\b\DC2\EOTI\NULX\SOH\SUBe Representation of the Temporal SDK NexusOperationError object that is returned to workflow callers.\n\
     \\n\
     \\n\
-    \\STX\EOT\b\DC2\EOTD\NULS\SOH\n\
     \\n\
-    \\n\
-    \\ETX\EOT\b\SOH\DC2\ETXD\b!\n\
+    \\ETX\EOT\b\SOH\DC2\ETXI\b!\n\
     \4\n\
-    \\EOT\EOT\b\STX\NUL\DC2\ETXF\EOT!\SUB' The NexusOperationScheduled event ID.\n\
+    \\EOT\EOT\b\STX\NUL\DC2\ETXK\EOT!\SUB' The NexusOperationScheduled event ID.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\NUL\ENQ\DC2\ETXF\EOT\t\n\
+    \\ENQ\EOT\b\STX\NUL\ENQ\DC2\ETXK\EOT\t\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\NUL\SOH\DC2\ETXF\n\
+    \\ENQ\EOT\b\STX\NUL\SOH\DC2\ETXK\n\
     \\FS\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\NUL\ETX\DC2\ETXF\US \n\
+    \\ENQ\EOT\b\STX\NUL\ETX\DC2\ETXK\US \n\
     \\GS\n\
-    \\EOT\EOT\b\STX\SOH\DC2\ETXH\EOT\CAN\SUB\DLE Endpoint name.\n\
+    \\EOT\EOT\b\STX\SOH\DC2\ETXM\EOT\CAN\SUB\DLE Endpoint name.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\SOH\ENQ\DC2\ETXH\EOT\n\
+    \\ENQ\EOT\b\STX\SOH\ENQ\DC2\ETXM\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\SOH\SOH\DC2\ETXH\v\DC3\n\
+    \\ENQ\EOT\b\STX\SOH\SOH\DC2\ETXM\v\DC3\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\SOH\ETX\DC2\ETXH\SYN\ETB\n\
+    \\ENQ\EOT\b\STX\SOH\ETX\DC2\ETXM\SYN\ETB\n\
     \\FS\n\
-    \\EOT\EOT\b\STX\STX\DC2\ETXJ\EOT\ETB\SUB\SI Service name.\n\
+    \\EOT\EOT\b\STX\STX\DC2\ETXO\EOT\ETB\SUB\SI Service name.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\STX\ENQ\DC2\ETXJ\EOT\n\
+    \\ENQ\EOT\b\STX\STX\ENQ\DC2\ETXO\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\STX\SOH\DC2\ETXJ\v\DC2\n\
+    \\ENQ\EOT\b\STX\STX\SOH\DC2\ETXO\v\DC2\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\STX\ETX\DC2\ETXJ\NAK\SYN\n\
+    \\ENQ\EOT\b\STX\STX\ETX\DC2\ETXO\NAK\SYN\n\
     \\RS\n\
-    \\EOT\EOT\b\STX\ETX\DC2\ETXL\EOT\EM\SUB\DC1 Operation name.\n\
+    \\EOT\EOT\b\STX\ETX\DC2\ETXQ\EOT\EM\SUB\DC1 Operation name.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\ETX\ENQ\DC2\ETXL\EOT\n\
+    \\ENQ\EOT\b\STX\ETX\ENQ\DC2\ETXQ\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\ETX\SOH\DC2\ETXL\v\DC4\n\
+    \\ENQ\EOT\b\STX\ETX\SOH\DC2\ETXQ\v\DC4\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\ETX\ETX\DC2\ETXL\ETB\CAN\n\
+    \\ENQ\EOT\b\STX\ETX\ETX\DC2\ETXQ\ETB\CAN\n\
     \~\n\
-    \\EOT\EOT\b\STX\EOT\DC2\ETXP\EOT0\SUBq Operation ID - may be empty if the operation completed synchronously.\n\
+    \\EOT\EOT\b\STX\EOT\DC2\ETXU\EOT0\SUBq Operation ID - may be empty if the operation completed synchronously.\n\
     \\n\
     \ Deprecated. Renamed to operation_token.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\EOT\ENQ\DC2\ETXP\EOT\n\
+    \\ENQ\EOT\b\STX\EOT\ENQ\DC2\ETXU\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\EOT\SOH\DC2\ETXP\v\ETB\n\
+    \\ENQ\EOT\b\STX\EOT\SOH\DC2\ETXU\v\ETB\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\EOT\ETX\DC2\ETXP\SUB\ESC\n\
+    \\ENQ\EOT\b\STX\EOT\ETX\DC2\ETXU\SUB\ESC\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\EOT\b\DC2\ETXP\FS/\n\
+    \\ENQ\EOT\b\STX\EOT\b\DC2\ETXU\FS/\n\
     \\r\n\
-    \\ACK\EOT\b\STX\EOT\b\ETX\DC2\ETXP\GS.\n\
+    \\ACK\EOT\b\STX\EOT\b\ETX\DC2\ETXU\GS.\n\
     \W\n\
-    \\EOT\EOT\b\STX\ENQ\DC2\ETXR\EOT\US\SUBJ Operation token - may be empty if the operation completed synchronously.\n\
+    \\EOT\EOT\b\STX\ENQ\DC2\ETXW\EOT\US\SUBJ Operation token - may be empty if the operation completed synchronously.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\ENQ\ENQ\DC2\ETXR\EOT\n\
+    \\ENQ\EOT\b\STX\ENQ\ENQ\DC2\ETXW\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\ENQ\SOH\DC2\ETXR\v\SUB\n\
+    \\ENQ\EOT\b\STX\ENQ\SOH\DC2\ETXW\v\SUB\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\ENQ\ETX\DC2\ETXR\GS\RS\n\
+    \\ENQ\EOT\b\STX\ENQ\ETX\DC2\ETXW\GS\RS\n\
     \\n\
     \\n\
-    \\STX\EOT\t\DC2\EOTU\NUL[\SOH\n\
+    \\STX\EOT\t\DC2\EOTZ\NUL`\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\t\SOH\DC2\ETXU\b\US\n\
+    \\ETX\EOT\t\SOH\DC2\ETXZ\b\US\n\
     \\138\SOH\n\
-    \\EOT\EOT\t\STX\NUL\DC2\ETXX\EOT\DC4\SUB} The Nexus error type as defined in the spec:\n\
+    \\EOT\EOT\t\STX\NUL\DC2\ETX]\EOT\DC4\SUB} The Nexus error type as defined in the spec:\n\
     \ https://github.com/nexus-rpc/api/blob/main/SPEC.md#predefined-handler-errors.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\t\STX\NUL\ENQ\DC2\ETXX\EOT\n\
+    \\ENQ\EOT\t\STX\NUL\ENQ\DC2\ETX]\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\t\STX\NUL\SOH\DC2\ETXX\v\SI\n\
+    \\ENQ\EOT\t\STX\NUL\SOH\DC2\ETX]\v\SI\n\
     \\f\n\
-    \\ENQ\EOT\t\STX\NUL\ETX\DC2\ETXX\DC2\DC3\n\
+    \\ENQ\EOT\t\STX\NUL\ETX\DC2\ETX]\DC2\DC3\n\
     \g\n\
-    \\EOT\EOT\t\STX\SOH\DC2\ETXZ\EOTL\SUBZ Retry behavior, defaults to the retry behavior of the error type as defined in the spec.\n\
+    \\EOT\EOT\t\STX\SOH\DC2\ETX_\EOTL\SUBZ Retry behavior, defaults to the retry behavior of the error type as defined in the spec.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\t\STX\SOH\ACK\DC2\ETXZ\EOT8\n\
+    \\ENQ\EOT\t\STX\SOH\ACK\DC2\ETX_\EOT8\n\
     \\f\n\
-    \\ENQ\EOT\t\STX\SOH\SOH\DC2\ETXZ9G\n\
+    \\ENQ\EOT\t\STX\SOH\SOH\DC2\ETX_9G\n\
     \\f\n\
-    \\ENQ\EOT\t\STX\SOH\ETX\DC2\ETXZJK\n\
+    \\ENQ\EOT\t\STX\SOH\ETX\DC2\ETX_JK\n\
     \\v\n\
     \\STX\EOT\n\
-    \\DC2\ENQ]\NUL\128\SOH\SOH\n\
+    \\DC2\ENQb\NUL\133\SOH\SOH\n\
     \\n\
     \\n\
     \\ETX\EOT\n\
-    \\SOH\DC2\ETX]\b\SI\n\
+    \\SOH\DC2\ETXb\b\SI\n\
     \\v\n\
     \\EOT\EOT\n\
-    \\STX\NUL\DC2\ETX^\EOT\ETB\n\
+    \\STX\NUL\DC2\ETXc\EOT\ETB\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\NUL\ENQ\DC2\ETX^\EOT\n\
+    \\STX\NUL\ENQ\DC2\ETXc\EOT\n\
     \\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\NUL\SOH\DC2\ETX^\v\DC2\n\
+    \\STX\NUL\SOH\DC2\ETXc\v\DC2\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\NUL\ETX\DC2\ETX^\NAK\SYN\n\
+    \\STX\NUL\ETX\DC2\ETXc\NAK\SYN\n\
     \\165\SOH\n\
     \\EOT\EOT\n\
-    \\STX\SOH\DC2\ETXa\EOT\SYN\SUB\151\SOH The source this Failure originated in, e.g. TypeScriptSDK / JavaSDK\n\
+    \\STX\SOH\DC2\ETXf\EOT\SYN\SUB\151\SOH The source this Failure originated in, e.g. TypeScriptSDK / JavaSDK\n\
     \ In some SDKs this is used to rehydrate the stack trace into an exception object.\n\
     \\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\SOH\ENQ\DC2\ETXa\EOT\n\
+    \\STX\SOH\ENQ\DC2\ETXf\EOT\n\
     \\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\SOH\SOH\DC2\ETXa\v\DC1\n\
+    \\STX\SOH\SOH\DC2\ETXf\v\DC1\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\SOH\ETX\DC2\ETXa\DC4\NAK\n\
+    \\STX\SOH\ETX\DC2\ETXf\DC4\NAK\n\
     \\v\n\
     \\EOT\EOT\n\
-    \\STX\STX\DC2\ETXb\EOT\ESC\n\
+    \\STX\STX\DC2\ETXg\EOT\ESC\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\STX\ENQ\DC2\ETXb\EOT\n\
+    \\STX\STX\ENQ\DC2\ETXg\EOT\n\
     \\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\STX\SOH\DC2\ETXb\v\SYN\n\
+    \\STX\STX\SOH\DC2\ETXg\v\SYN\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\STX\ETX\DC2\ETXb\EM\SUB\n\
+    \\STX\STX\ETX\DC2\ETXg\EM\SUB\n\
     \\251\a\n\
     \\EOT\EOT\n\
-    \\STX\ETX\DC2\ETXr\EOT;\SUB\237\a Alternative way to supply `message` and `stack_trace` and possibly other attributes, used for encryption of\n\
+    \\STX\ETX\DC2\ETXw\EOT;\SUB\237\a Alternative way to supply `message` and `stack_trace` and possibly other attributes, used for encryption of\n\
     \ errors originating in user code which might contain sensitive information.\n\
     \ The `encoded_attributes` Payload could represent any serializable object, e.g. JSON object or a `Failure` proto\n\
     \ message.\n\
@@ -3860,158 +3978,158 @@ packedFileDescriptor
     \\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\ETX\ACK\DC2\ETXr\EOT\"\n\
+    \\STX\ETX\ACK\DC2\ETXw\EOT\"\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\ETX\SOH\DC2\ETXr#5\n\
+    \\STX\ETX\SOH\DC2\ETXw#5\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\ETX\ETX\DC2\ETXr8:\n\
+    \\STX\ETX\ETX\DC2\ETXw8:\n\
     \\v\n\
     \\EOT\EOT\n\
-    \\STX\EOT\DC2\ETXs\EOT\SYN\n\
+    \\STX\EOT\DC2\ETXx\EOT\SYN\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\EOT\ACK\DC2\ETXs\EOT\v\n\
+    \\STX\EOT\ACK\DC2\ETXx\EOT\v\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\EOT\SOH\DC2\ETXs\f\DC1\n\
+    \\STX\EOT\SOH\DC2\ETXx\f\DC1\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\EOT\ETX\DC2\ETXs\DC4\NAK\n\
-    \\f\n\
+    \\STX\EOT\ETX\DC2\ETXx\DC4\NAK\n\
+    \\r\n\
     \\EOT\EOT\n\
-    \\b\NUL\DC2\EOTt\EOT\DEL\ENQ\n\
+    \\b\NUL\DC2\ENQy\EOT\132\SOH\ENQ\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\b\NUL\SOH\DC2\ETXt\n\
+    \\b\NUL\SOH\DC2\ETXy\n\
     \\SYN\n\
     \\v\n\
     \\EOT\EOT\n\
-    \\STX\ENQ\DC2\ETXu\b<\n\
+    \\STX\ENQ\DC2\ETXz\b<\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\ENQ\ACK\DC2\ETXu\b\RS\n\
+    \\STX\ENQ\ACK\DC2\ETXz\b\RS\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\ENQ\SOH\DC2\ETXu\US7\n\
+    \\STX\ENQ\SOH\DC2\ETXz\US7\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\ENQ\ETX\DC2\ETXu:;\n\
+    \\STX\ENQ\ETX\DC2\ETXz:;\n\
     \\v\n\
     \\EOT\EOT\n\
-    \\STX\ACK\DC2\ETXv\b4\n\
+    \\STX\ACK\DC2\ETX{\b4\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\ACK\ACK\DC2\ETXv\b\SUB\n\
+    \\STX\ACK\ACK\DC2\ETX{\b\SUB\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\ACK\SOH\DC2\ETXv\ESC/\n\
+    \\STX\ACK\SOH\DC2\ETX{\ESC/\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\ACK\ETX\DC2\ETXv23\n\
+    \\STX\ACK\ETX\DC2\ETX{23\n\
     \\v\n\
     \\EOT\EOT\n\
-    \\STX\a\DC2\ETXw\b6\n\
+    \\STX\a\DC2\ETX|\b6\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\a\ACK\DC2\ETXw\b\ESC\n\
+    \\STX\a\ACK\DC2\ETX|\b\ESC\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\a\SOH\DC2\ETXw\FS1\n\
+    \\STX\a\SOH\DC2\ETX|\FS1\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\a\ETX\DC2\ETXw45\n\
+    \\STX\a\ETX\DC2\ETX|45\n\
     \\v\n\
     \\EOT\EOT\n\
-    \\STX\b\DC2\ETXx\b:\n\
+    \\STX\b\DC2\ETX}\b:\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\b\ACK\DC2\ETXx\b\GS\n\
+    \\STX\b\ACK\DC2\ETX}\b\GS\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\b\SOH\DC2\ETXx\RS5\n\
+    \\STX\b\SOH\DC2\ETX}\RS5\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\b\ETX\DC2\ETXx89\n\
+    \\STX\b\ETX\DC2\ETX}89\n\
     \\v\n\
     \\EOT\EOT\n\
-    \\STX\t\DC2\ETXy\b2\n\
+    \\STX\t\DC2\ETX~\b2\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\t\ACK\DC2\ETXy\b\EM\n\
+    \\STX\t\ACK\DC2\ETX~\b\EM\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\t\SOH\DC2\ETXy\SUB-\n\
+    \\STX\t\SOH\DC2\ETX~\SUB-\n\
     \\f\n\
     \\ENQ\EOT\n\
-    \\STX\t\ETX\DC2\ETXy01\n\
+    \\STX\t\ETX\DC2\ETX~01\n\
     \\v\n\
     \\EOT\EOT\n\
     \\STX\n\
-    \\DC2\ETXz\bB\n\
+    \\DC2\ETX\DEL\bB\n\
     \\f\n\
     \\ENQ\EOT\n\
     \\STX\n\
-    \\ACK\DC2\ETXz\b \n\
+    \\ACK\DC2\ETX\DEL\b \n\
     \\f\n\
     \\ENQ\EOT\n\
     \\STX\n\
-    \\SOH\DC2\ETXz!<\n\
+    \\SOH\DC2\ETX\DEL!<\n\
     \\f\n\
     \\ENQ\EOT\n\
     \\STX\n\
-    \\ETX\DC2\ETXz?A\n\
-    \\v\n\
+    \\ETX\DC2\ETX\DEL?A\n\
+    \\f\n\
     \\EOT\EOT\n\
-    \\STX\v\DC2\ETX{\b7\n\
-    \\f\n\
+    \\STX\v\DC2\EOT\128\SOH\b7\n\
+    \\r\n\
     \\ENQ\EOT\n\
-    \\STX\v\ACK\DC2\ETX{\b\ESC\n\
-    \\f\n\
+    \\STX\v\ACK\DC2\EOT\128\SOH\b\ESC\n\
+    \\r\n\
     \\ENQ\EOT\n\
-    \\STX\v\SOH\DC2\ETX{\FS1\n\
-    \\f\n\
+    \\STX\v\SOH\DC2\EOT\128\SOH\FS1\n\
+    \\r\n\
     \\ENQ\EOT\n\
-    \\STX\v\ETX\DC2\ETX{46\n\
-    \\v\n\
+    \\STX\v\ETX\DC2\EOT\128\SOH46\n\
+    \\f\n\
     \\EOT\EOT\n\
-    \\STX\f\DC2\ETX|\bU\n\
-    \\f\n\
+    \\STX\f\DC2\EOT\129\SOH\bU\n\
+    \\r\n\
     \\ENQ\EOT\n\
-    \\STX\f\ACK\DC2\ETX|\b)\n\
-    \\f\n\
+    \\STX\f\ACK\DC2\EOT\129\SOH\b)\n\
+    \\r\n\
     \\ENQ\EOT\n\
-    \\STX\f\SOH\DC2\ETX|*O\n\
-    \\f\n\
+    \\STX\f\SOH\DC2\EOT\129\SOH*O\n\
+    \\r\n\
     \\ENQ\EOT\n\
-    \\STX\f\ETX\DC2\ETX|RT\n\
-    \\v\n\
+    \\STX\f\ETX\DC2\EOT\129\SOHRT\n\
+    \\f\n\
     \\EOT\EOT\n\
-    \\STX\r\DC2\ETX}\bN\n\
-    \\f\n\
+    \\STX\r\DC2\EOT\130\SOH\bN\n\
+    \\r\n\
     \\ENQ\EOT\n\
-    \\STX\r\ACK\DC2\ETX}\b!\n\
-    \\f\n\
+    \\STX\r\ACK\DC2\EOT\130\SOH\b!\n\
+    \\r\n\
     \\ENQ\EOT\n\
-    \\STX\r\SOH\DC2\ETX}\"H\n\
-    \\f\n\
+    \\STX\r\SOH\DC2\EOT\130\SOH\"H\n\
+    \\r\n\
     \\ENQ\EOT\n\
-    \\STX\r\ETX\DC2\ETX}KM\n\
-    \\v\n\
+    \\STX\r\ETX\DC2\EOT\130\SOHKM\n\
+    \\f\n\
     \\EOT\EOT\n\
-    \\STX\SO\DC2\ETX~\b@\n\
-    \\f\n\
+    \\STX\SO\DC2\EOT\131\SOH\b@\n\
+    \\r\n\
     \\ENQ\EOT\n\
-    \\STX\SO\ACK\DC2\ETX~\b\US\n\
-    \\f\n\
+    \\STX\SO\ACK\DC2\EOT\131\SOH\b\US\n\
+    \\r\n\
     \\ENQ\EOT\n\
-    \\STX\SO\SOH\DC2\ETX~ :\n\
-    \\f\n\
+    \\STX\SO\SOH\DC2\EOT\131\SOH :\n\
+    \\r\n\
     \\ENQ\EOT\n\
-    \\STX\SO\ETX\DC2\ETX~=?\n\
+    \\STX\SO\ETX\DC2\EOT\131\SOH=?\n\
     \\n\
     \\n\
-    \\STX\EOT\v\DC2\EOT\130\SOH\NUL)\n\
+    \\STX\EOT\v\DC2\EOT\135\SOH\NUL)\n\
     \\v\n\
-    \\ETX\EOT\v\SOH\DC2\EOT\130\SOH\b&b\ACKproto3"
+    \\ETX\EOT\v\SOH\DC2\EOT\135\SOH\b&b\ACKproto3"

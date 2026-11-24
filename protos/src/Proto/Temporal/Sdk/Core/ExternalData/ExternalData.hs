@@ -44,7 +44,9 @@ import qualified Proto.Google.Protobuf.Timestamp
          * 'Proto.Temporal.Sdk.Core.ExternalData.ExternalData_Fields.backoff' @:: Lens' LocalActivityMarkerData Proto.Google.Protobuf.Duration.Duration@
          * 'Proto.Temporal.Sdk.Core.ExternalData.ExternalData_Fields.maybe'backoff' @:: Lens' LocalActivityMarkerData (Prelude.Maybe Proto.Google.Protobuf.Duration.Duration)@
          * 'Proto.Temporal.Sdk.Core.ExternalData.ExternalData_Fields.originalScheduleTime' @:: Lens' LocalActivityMarkerData Proto.Google.Protobuf.Timestamp.Timestamp@
-         * 'Proto.Temporal.Sdk.Core.ExternalData.ExternalData_Fields.maybe'originalScheduleTime' @:: Lens' LocalActivityMarkerData (Prelude.Maybe Proto.Google.Protobuf.Timestamp.Timestamp)@ -}
+         * 'Proto.Temporal.Sdk.Core.ExternalData.ExternalData_Fields.maybe'originalScheduleTime' @:: Lens' LocalActivityMarkerData (Prelude.Maybe Proto.Google.Protobuf.Timestamp.Timestamp)@
+         * 'Proto.Temporal.Sdk.Core.ExternalData.ExternalData_Fields.activationIndex' @:: Lens' LocalActivityMarkerData Data.Word.Word64@
+         * 'Proto.Temporal.Sdk.Core.ExternalData.ExternalData_Fields.maybe'activationIndex' @:: Lens' LocalActivityMarkerData (Prelude.Maybe Data.Word.Word64)@ -}
 data LocalActivityMarkerData
   = LocalActivityMarkerData'_constructor {_LocalActivityMarkerData'seq :: !Data.Word.Word32,
                                           _LocalActivityMarkerData'attempt :: !Data.Word.Word32,
@@ -53,6 +55,7 @@ data LocalActivityMarkerData
                                           _LocalActivityMarkerData'completeTime :: !(Prelude.Maybe Proto.Google.Protobuf.Timestamp.Timestamp),
                                           _LocalActivityMarkerData'backoff :: !(Prelude.Maybe Proto.Google.Protobuf.Duration.Duration),
                                           _LocalActivityMarkerData'originalScheduleTime :: !(Prelude.Maybe Proto.Google.Protobuf.Timestamp.Timestamp),
+                                          _LocalActivityMarkerData'activationIndex :: !(Prelude.Maybe Data.Word.Word64),
                                           _LocalActivityMarkerData'_unknownFields :: !Data.ProtoLens.FieldSet}
   deriving stock (Prelude.Eq, Prelude.Ord)
 instance Prelude.Show LocalActivityMarkerData where
@@ -133,6 +136,22 @@ instance Data.ProtoLens.Field.HasField LocalActivityMarkerData "maybe'originalSc
            (\ x__ y__
               -> x__ {_LocalActivityMarkerData'originalScheduleTime = y__}))
         Prelude.id
+instance Data.ProtoLens.Field.HasField LocalActivityMarkerData "activationIndex" Data.Word.Word64 where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _LocalActivityMarkerData'activationIndex
+           (\ x__ y__
+              -> x__ {_LocalActivityMarkerData'activationIndex = y__}))
+        (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
+instance Data.ProtoLens.Field.HasField LocalActivityMarkerData "maybe'activationIndex" (Prelude.Maybe Data.Word.Word64) where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _LocalActivityMarkerData'activationIndex
+           (\ x__ y__
+              -> x__ {_LocalActivityMarkerData'activationIndex = y__}))
+        Prelude.id
 instance Data.ProtoLens.Message LocalActivityMarkerData where
   messageName _
     = Data.Text.pack "coresdk.external_data.LocalActivityMarkerData"
@@ -146,7 +165,9 @@ instance Data.ProtoLens.Message LocalActivityMarkerData where
       \\ractivity_type\CAN\EOT \SOH(\tR\factivityType\DC2?\n\
       \\rcomplete_time\CAN\ENQ \SOH(\v2\SUB.google.protobuf.TimestampR\fcompleteTime\DC23\n\
       \\abackoff\CAN\ACK \SOH(\v2\EM.google.protobuf.DurationR\abackoff\DC2P\n\
-      \\SYNoriginal_schedule_time\CAN\a \SOH(\v2\SUB.google.protobuf.TimestampR\DC4originalScheduleTime"
+      \\SYNoriginal_schedule_time\CAN\a \SOH(\v2\SUB.google.protobuf.TimestampR\DC4originalScheduleTime\DC2.\n\
+      \\DLEactivation_index\CAN\b \SOH(\EOTH\NULR\SIactivationIndex\136\SOH\SOHB\DC3\n\
+      \\DC1_activation_index"
   packedFileDescriptor _ = packedFileDescriptor
   fieldsByTag
     = let
@@ -208,6 +229,14 @@ instance Data.ProtoLens.Message LocalActivityMarkerData where
               (Data.ProtoLens.OptionalField
                  (Data.ProtoLens.Field.field @"maybe'originalScheduleTime")) ::
               Data.ProtoLens.FieldDescriptor LocalActivityMarkerData
+        activationIndex__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "activation_index"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.UInt64Field ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Word.Word64)
+              (Data.ProtoLens.OptionalField
+                 (Data.ProtoLens.Field.field @"maybe'activationIndex")) ::
+              Data.ProtoLens.FieldDescriptor LocalActivityMarkerData
       in
         Data.Map.fromList
           [(Data.ProtoLens.Tag 1, seq__field_descriptor),
@@ -216,7 +245,8 @@ instance Data.ProtoLens.Message LocalActivityMarkerData where
            (Data.ProtoLens.Tag 4, activityType__field_descriptor),
            (Data.ProtoLens.Tag 5, completeTime__field_descriptor),
            (Data.ProtoLens.Tag 6, backoff__field_descriptor),
-           (Data.ProtoLens.Tag 7, originalScheduleTime__field_descriptor)]
+           (Data.ProtoLens.Tag 7, originalScheduleTime__field_descriptor),
+           (Data.ProtoLens.Tag 8, activationIndex__field_descriptor)]
   unknownFields
     = Lens.Family2.Unchecked.lens
         _LocalActivityMarkerData'_unknownFields
@@ -230,6 +260,7 @@ instance Data.ProtoLens.Message LocalActivityMarkerData where
          _LocalActivityMarkerData'completeTime = Prelude.Nothing,
          _LocalActivityMarkerData'backoff = Prelude.Nothing,
          _LocalActivityMarkerData'originalScheduleTime = Prelude.Nothing,
+         _LocalActivityMarkerData'activationIndex = Prelude.Nothing,
          _LocalActivityMarkerData'_unknownFields = []}
   parseMessage
     = let
@@ -309,6 +340,12 @@ instance Data.ProtoLens.Message LocalActivityMarkerData where
                                 loop
                                   (Lens.Family2.set
                                      (Data.ProtoLens.Field.field @"originalScheduleTime") y x)
+                        64
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       Data.ProtoLens.Encoding.Bytes.getVarInt "activation_index"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field @"activationIndex") y x)
                         wire
                           -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
                                         wire
@@ -424,8 +461,18 @@ instance Data.ProtoLens.Message LocalActivityMarkerData where
                                                           (Data.ByteString.length bs)))
                                                     (Data.ProtoLens.Encoding.Bytes.putBytes bs))
                                             Data.ProtoLens.encodeMessage _v))
-                               (Data.ProtoLens.Encoding.Wire.buildFieldSet
-                                  (Lens.Family2.view Data.ProtoLens.unknownFields _x))))))))
+                               ((Data.Monoid.<>)
+                                  (case
+                                       Lens.Family2.view
+                                         (Data.ProtoLens.Field.field @"maybe'activationIndex") _x
+                                   of
+                                     Prelude.Nothing -> Data.Monoid.mempty
+                                     (Prelude.Just _v)
+                                       -> (Data.Monoid.<>)
+                                            (Data.ProtoLens.Encoding.Bytes.putVarInt 64)
+                                            (Data.ProtoLens.Encoding.Bytes.putVarInt _v))
+                                  (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                                     (Lens.Family2.view Data.ProtoLens.unknownFields _x)))))))))
 instance Control.DeepSeq.NFData LocalActivityMarkerData where
   rnf
     = \ x__
@@ -444,7 +491,9 @@ instance Control.DeepSeq.NFData LocalActivityMarkerData where
                             (Control.DeepSeq.deepseq
                                (_LocalActivityMarkerData'backoff x__)
                                (Control.DeepSeq.deepseq
-                                  (_LocalActivityMarkerData'originalScheduleTime x__) ())))))))
+                                  (_LocalActivityMarkerData'originalScheduleTime x__)
+                                  (Control.DeepSeq.deepseq
+                                     (_LocalActivityMarkerData'activationIndex x__) ()))))))))
 {- | Fields :
      
          * 'Proto.Temporal.Sdk.Core.ExternalData.ExternalData_Fields.id' @:: Lens' PatchedMarkerData Data.Text.Text@
@@ -606,7 +655,7 @@ instance Control.DeepSeq.NFData PatchedMarkerData where
 packedFileDescriptor :: Data.ByteString.ByteString
 packedFileDescriptor
   = "\n\
-    \3temporal/sdk/core/external_data/external_data.proto\DC2\NAKcoresdk.external_data\SUB\RSgoogle/protobuf/duration.proto\SUB\USgoogle/protobuf/timestamp.proto\"\211\STX\n\
+    \3temporal/sdk/core/external_data/external_data.proto\DC2\NAKcoresdk.external_data\SUB\RSgoogle/protobuf/duration.proto\SUB\USgoogle/protobuf/timestamp.proto\"\152\ETX\n\
     \\ETBLocalActivityMarkerData\DC2\DLE\n\
     \\ETXseq\CAN\SOH \SOH(\rR\ETXseq\DC2\CAN\n\
     \\aattempt\CAN\STX \SOH(\rR\aattempt\DC2\US\n\
@@ -615,13 +664,15 @@ packedFileDescriptor
     \\ractivity_type\CAN\EOT \SOH(\tR\factivityType\DC2?\n\
     \\rcomplete_time\CAN\ENQ \SOH(\v2\SUB.google.protobuf.TimestampR\fcompleteTime\DC23\n\
     \\abackoff\CAN\ACK \SOH(\v2\EM.google.protobuf.DurationR\abackoff\DC2P\n\
-    \\SYNoriginal_schedule_time\CAN\a \SOH(\v2\SUB.google.protobuf.TimestampR\DC4originalScheduleTime\"C\n\
+    \\SYNoriginal_schedule_time\CAN\a \SOH(\v2\SUB.google.protobuf.TimestampR\DC4originalScheduleTime\DC2.\n\
+    \\DLEactivation_index\CAN\b \SOH(\EOTH\NULR\SIactivationIndex\136\SOH\SOHB\DC3\n\
+    \\DC1_activation_index\"C\n\
     \\DC1PatchedMarkerData\DC2\SO\n\
     \\STXid\CAN\SOH \SOH(\tR\STXid\DC2\RS\n\
     \\n\
     \deprecated\CAN\STX \SOH(\bR\n\
-    \deprecatedB2\234\STX/Temporalio::Internal::Bridge::Api::ExternalDataJ\231\r\n\
-    \\ACK\DC2\EOT\NUL\NUL%\SOH\n\
+    \deprecatedB2\234\STX/Temporalio::Internal::Bridge::Api::ExternalDataJ\196\DLE\n\
+    \\ACK\DC2\EOT\NUL\NUL)\SOH\n\
     \\b\n\
     \\SOH\f\DC2\ETX\NUL\NUL\DC2\n\
     \\b\n\
@@ -635,7 +686,7 @@ packedFileDescriptor
     \\t\n\
     \\STX\ETX\SOH\DC2\ETX\ACK\NUL)\n\
     \\166\STX\n\
-    \\STX\EOT\NUL\DC2\EOT\f\NUL\RS\SOH2\153\STX This file defines data that Core might write externally. The first motivating case being\n\
+    \\STX\EOT\NUL\DC2\EOT\f\NUL\"\SOH2\153\STX This file defines data that Core might write externally. The first motivating case being\n\
     \ storing data in markers in event history. Defining such data as protos provides an easy way\n\
     \ for consumers which would like to just depend on the proto package to make sense of marker data.\n\
     \\n\
@@ -708,27 +759,41 @@ packedFileDescriptor
     \\ENQ\EOT\NUL\STX\ACK\SOH\DC2\ETX\GS\FS2\n\
     \\f\n\
     \\ENQ\EOT\NUL\STX\ACK\ETX\DC2\ETX\GS56\n\
+    \\162\STX\n\
+    \\EOT\EOT\NUL\STX\a\DC2\ETX!\STX'\SUB\148\STX Position, within the workflow task, of the activation this resolution was delivered in.\n\
+    \ Replay must deliver resolutions in the same activations because workflow code can branch on\n\
+    \ which handles are ready. Absent in markers written by Core versions that predate this field.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\NUL\STX\a\EOT\DC2\ETX!\STX\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\NUL\STX\a\ENQ\DC2\ETX!\v\DC1\n\
+    \\f\n\
+    \\ENQ\EOT\NUL\STX\a\SOH\DC2\ETX!\DC2\"\n\
+    \\f\n\
+    \\ENQ\EOT\NUL\STX\a\ETX\DC2\ETX!%&\n\
     \\n\
     \\n\
-    \\STX\EOT\SOH\DC2\EOT \NUL%\SOH\n\
+    \\STX\EOT\SOH\DC2\EOT$\NUL)\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\SOH\SOH\DC2\ETX \b\EM\n\
+    \\ETX\EOT\SOH\SOH\DC2\ETX$\b\EM\n\
     \\ESC\n\
-    \\EOT\EOT\SOH\STX\NUL\DC2\ETX\"\STX\DLE\SUB\SO The patch id\n\
+    \\EOT\EOT\SOH\STX\NUL\DC2\ETX&\STX\DLE\SUB\SO The patch id\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\NUL\ENQ\DC2\ETX\"\STX\b\n\
+    \\ENQ\EOT\SOH\STX\NUL\ENQ\DC2\ETX&\STX\b\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\NUL\SOH\DC2\ETX\"\t\v\n\
+    \\ENQ\EOT\SOH\STX\NUL\SOH\DC2\ETX&\t\v\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\NUL\ETX\DC2\ETX\"\SO\SI\n\
+    \\ENQ\EOT\SOH\STX\NUL\ETX\DC2\ETX&\SO\SI\n\
     \=\n\
-    \\EOT\EOT\SOH\STX\SOH\DC2\ETX$\STX\SYN\SUB0 Whether or not the patch is marked deprecated.\n\
+    \\EOT\EOT\SOH\STX\SOH\DC2\ETX(\STX\SYN\SUB0 Whether or not the patch is marked deprecated.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\SOH\ENQ\DC2\ETX$\STX\ACK\n\
+    \\ENQ\EOT\SOH\STX\SOH\ENQ\DC2\ETX(\STX\ACK\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\SOH\SOH\DC2\ETX$\a\DC1\n\
+    \\ENQ\EOT\SOH\STX\SOH\SOH\DC2\ETX(\a\DC1\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\SOH\ETX\DC2\ETX$\DC4\NAKb\ACKproto3"
+    \\ENQ\EOT\SOH\STX\SOH\ETX\DC2\ETX(\DC4\NAKb\ACKproto3"

@@ -28,4 +28,6 @@ import qualified Data.ProtoLens.Runtime.Data.Vector.Generic as Data.Vector.Gener
 import qualified Data.ProtoLens.Runtime.Data.Vector.Unboxed as Data.Vector.Unboxed
 import qualified Data.ProtoLens.Runtime.Text.Read as Text.Read
 import qualified Proto.Google.Api.Annotations
+import qualified Proto.Nexusannotations.V1.Options
+import qualified Proto.Temporal.Api.Protometa.V1.Annotations
 import qualified Proto.Temporal.Api.Workflowservice.V1.RequestResponse

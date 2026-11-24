@@ -5,7 +5,8 @@
 {-# OPTIONS_GHC -Wno-dodgy-exports#-}
 module Proto.Temporal.Sdk.Core.CoreInterface (
         ActivityHeartbeat(), ActivitySlotInfo(), ActivityTaskCompletion(),
-        LocalActivitySlotInfo(), NexusSlotInfo(), WorkflowSlotInfo()
+        LocalActivitySlotInfo(), NamespaceInfo(), NamespaceInfo'Limits(),
+        NexusSlotInfo(), WorkflowSlotInfo()
     ) where
 import qualified Data.ProtoLens.Runtime.Control.DeepSeq as Control.DeepSeq
 import qualified Data.ProtoLens.Runtime.Data.ProtoLens.Prism as Data.ProtoLens.Prism
@@ -628,6 +629,288 @@ instance Control.DeepSeq.NFData LocalActivitySlotInfo where
                 (_LocalActivitySlotInfo'activityType x__) ())
 {- | Fields :
      
+         * 'Proto.Temporal.Sdk.Core.CoreInterface_Fields.limits' @:: Lens' NamespaceInfo NamespaceInfo'Limits@
+         * 'Proto.Temporal.Sdk.Core.CoreInterface_Fields.maybe'limits' @:: Lens' NamespaceInfo (Prelude.Maybe NamespaceInfo'Limits)@ -}
+data NamespaceInfo
+  = NamespaceInfo'_constructor {_NamespaceInfo'limits :: !(Prelude.Maybe NamespaceInfo'Limits),
+                                _NamespaceInfo'_unknownFields :: !Data.ProtoLens.FieldSet}
+  deriving stock (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show NamespaceInfo where
+  showsPrec _ __x __s
+    = Prelude.showChar
+        '{'
+        (Prelude.showString
+           (Data.ProtoLens.showMessageShort __x) (Prelude.showChar '}' __s))
+instance Data.ProtoLens.Field.HasField NamespaceInfo "limits" NamespaceInfo'Limits where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _NamespaceInfo'limits
+           (\ x__ y__ -> x__ {_NamespaceInfo'limits = y__}))
+        (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
+instance Data.ProtoLens.Field.HasField NamespaceInfo "maybe'limits" (Prelude.Maybe NamespaceInfo'Limits) where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _NamespaceInfo'limits
+           (\ x__ y__ -> x__ {_NamespaceInfo'limits = y__}))
+        Prelude.id
+instance Data.ProtoLens.Message NamespaceInfo where
+  messageName _ = Data.Text.pack "coresdk.NamespaceInfo"
+  packedMessageDescriptor _
+    = "\n\
+      \\rNamespaceInfo\DC25\n\
+      \\ACKlimits\CAN\SOH \SOH(\v2\GS.coresdk.NamespaceInfo.LimitsR\ACKlimits\SUBn\n\
+      \\ACKLimits\DC21\n\
+      \\NAKblob_size_limit_error\CAN\SOH \SOH(\ETXR\DC2blobSizeLimitError\DC21\n\
+      \\NAKmemo_size_limit_error\CAN\STX \SOH(\ETXR\DC2memoSizeLimitError"
+  packedFileDescriptor _ = packedFileDescriptor
+  fieldsByTag
+    = let
+        limits__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "limits"
+              (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                 Data.ProtoLens.FieldTypeDescriptor NamespaceInfo'Limits)
+              (Data.ProtoLens.OptionalField
+                 (Data.ProtoLens.Field.field @"maybe'limits")) ::
+              Data.ProtoLens.FieldDescriptor NamespaceInfo
+      in
+        Data.Map.fromList
+          [(Data.ProtoLens.Tag 1, limits__field_descriptor)]
+  unknownFields
+    = Lens.Family2.Unchecked.lens
+        _NamespaceInfo'_unknownFields
+        (\ x__ y__ -> x__ {_NamespaceInfo'_unknownFields = y__})
+  defMessage
+    = NamespaceInfo'_constructor
+        {_NamespaceInfo'limits = Prelude.Nothing,
+         _NamespaceInfo'_unknownFields = []}
+  parseMessage
+    = let
+        loop ::
+          NamespaceInfo -> Data.ProtoLens.Encoding.Bytes.Parser NamespaceInfo
+        loop x
+          = do end <- Data.ProtoLens.Encoding.Bytes.atEnd
+               if end then
+                   do (let missing = []
+                       in
+                         if Prelude.null missing then
+                             Prelude.return ()
+                         else
+                             Prelude.fail
+                               ((Prelude.++)
+                                  "Missing required fields: "
+                                  (Prelude.show (missing :: [Prelude.String]))))
+                      Prelude.return
+                        (Lens.Family2.over
+                           Data.ProtoLens.unknownFields (\ !t -> Prelude.reverse t) x)
+               else
+                   do tag <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                      case tag of
+                        10
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.isolate
+                                             (Prelude.fromIntegral len) Data.ProtoLens.parseMessage)
+                                       "limits"
+                                loop (Lens.Family2.set (Data.ProtoLens.Field.field @"limits") y x)
+                        wire
+                          -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
+                                        wire
+                                loop
+                                  (Lens.Family2.over
+                                     Data.ProtoLens.unknownFields (\ !t -> (:) y t) x)
+      in
+        (Data.ProtoLens.Encoding.Bytes.<?>)
+          (do loop Data.ProtoLens.defMessage) "NamespaceInfo"
+  buildMessage
+    = \ _x
+        -> (Data.Monoid.<>)
+             (case
+                  Lens.Family2.view (Data.ProtoLens.Field.field @"maybe'limits") _x
+              of
+                Prelude.Nothing -> Data.Monoid.mempty
+                (Prelude.Just _v)
+                  -> (Data.Monoid.<>)
+                       (Data.ProtoLens.Encoding.Bytes.putVarInt 10)
+                       ((Prelude..)
+                          (\ bs
+                             -> (Data.Monoid.<>)
+                                  (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                     (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                  (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                          Data.ProtoLens.encodeMessage _v))
+             (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                (Lens.Family2.view Data.ProtoLens.unknownFields _x))
+instance Control.DeepSeq.NFData NamespaceInfo where
+  rnf
+    = \ x__
+        -> Control.DeepSeq.deepseq
+             (_NamespaceInfo'_unknownFields x__)
+             (Control.DeepSeq.deepseq (_NamespaceInfo'limits x__) ())
+{- | Fields :
+     
+         * 'Proto.Temporal.Sdk.Core.CoreInterface_Fields.blobSizeLimitError' @:: Lens' NamespaceInfo'Limits Data.Int.Int64@
+         * 'Proto.Temporal.Sdk.Core.CoreInterface_Fields.memoSizeLimitError' @:: Lens' NamespaceInfo'Limits Data.Int.Int64@ -}
+data NamespaceInfo'Limits
+  = NamespaceInfo'Limits'_constructor {_NamespaceInfo'Limits'blobSizeLimitError :: !Data.Int.Int64,
+                                       _NamespaceInfo'Limits'memoSizeLimitError :: !Data.Int.Int64,
+                                       _NamespaceInfo'Limits'_unknownFields :: !Data.ProtoLens.FieldSet}
+  deriving stock (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show NamespaceInfo'Limits where
+  showsPrec _ __x __s
+    = Prelude.showChar
+        '{'
+        (Prelude.showString
+           (Data.ProtoLens.showMessageShort __x) (Prelude.showChar '}' __s))
+instance Data.ProtoLens.Field.HasField NamespaceInfo'Limits "blobSizeLimitError" Data.Int.Int64 where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _NamespaceInfo'Limits'blobSizeLimitError
+           (\ x__ y__
+              -> x__ {_NamespaceInfo'Limits'blobSizeLimitError = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField NamespaceInfo'Limits "memoSizeLimitError" Data.Int.Int64 where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _NamespaceInfo'Limits'memoSizeLimitError
+           (\ x__ y__
+              -> x__ {_NamespaceInfo'Limits'memoSizeLimitError = y__}))
+        Prelude.id
+instance Data.ProtoLens.Message NamespaceInfo'Limits where
+  messageName _ = Data.Text.pack "coresdk.NamespaceInfo.Limits"
+  packedMessageDescriptor _
+    = "\n\
+      \\ACKLimits\DC21\n\
+      \\NAKblob_size_limit_error\CAN\SOH \SOH(\ETXR\DC2blobSizeLimitError\DC21\n\
+      \\NAKmemo_size_limit_error\CAN\STX \SOH(\ETXR\DC2memoSizeLimitError"
+  packedFileDescriptor _ = packedFileDescriptor
+  fieldsByTag
+    = let
+        blobSizeLimitError__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "blob_size_limit_error"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.Int64Field ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Int.Int64)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"blobSizeLimitError")) ::
+              Data.ProtoLens.FieldDescriptor NamespaceInfo'Limits
+        memoSizeLimitError__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "memo_size_limit_error"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.Int64Field ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Int.Int64)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"memoSizeLimitError")) ::
+              Data.ProtoLens.FieldDescriptor NamespaceInfo'Limits
+      in
+        Data.Map.fromList
+          [(Data.ProtoLens.Tag 1, blobSizeLimitError__field_descriptor),
+           (Data.ProtoLens.Tag 2, memoSizeLimitError__field_descriptor)]
+  unknownFields
+    = Lens.Family2.Unchecked.lens
+        _NamespaceInfo'Limits'_unknownFields
+        (\ x__ y__ -> x__ {_NamespaceInfo'Limits'_unknownFields = y__})
+  defMessage
+    = NamespaceInfo'Limits'_constructor
+        {_NamespaceInfo'Limits'blobSizeLimitError = Data.ProtoLens.fieldDefault,
+         _NamespaceInfo'Limits'memoSizeLimitError = Data.ProtoLens.fieldDefault,
+         _NamespaceInfo'Limits'_unknownFields = []}
+  parseMessage
+    = let
+        loop ::
+          NamespaceInfo'Limits
+          -> Data.ProtoLens.Encoding.Bytes.Parser NamespaceInfo'Limits
+        loop x
+          = do end <- Data.ProtoLens.Encoding.Bytes.atEnd
+               if end then
+                   do (let missing = []
+                       in
+                         if Prelude.null missing then
+                             Prelude.return ()
+                         else
+                             Prelude.fail
+                               ((Prelude.++)
+                                  "Missing required fields: "
+                                  (Prelude.show (missing :: [Prelude.String]))))
+                      Prelude.return
+                        (Lens.Family2.over
+                           Data.ProtoLens.unknownFields (\ !t -> Prelude.reverse t) x)
+               else
+                   do tag <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                      case tag of
+                        8 -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (Prelude.fmap
+                                          Prelude.fromIntegral
+                                          Data.ProtoLens.Encoding.Bytes.getVarInt)
+                                       "blob_size_limit_error"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field @"blobSizeLimitError") y x)
+                        16
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (Prelude.fmap
+                                          Prelude.fromIntegral
+                                          Data.ProtoLens.Encoding.Bytes.getVarInt)
+                                       "memo_size_limit_error"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field @"memoSizeLimitError") y x)
+                        wire
+                          -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
+                                        wire
+                                loop
+                                  (Lens.Family2.over
+                                     Data.ProtoLens.unknownFields (\ !t -> (:) y t) x)
+      in
+        (Data.ProtoLens.Encoding.Bytes.<?>)
+          (do loop Data.ProtoLens.defMessage) "Limits"
+  buildMessage
+    = \ _x
+        -> (Data.Monoid.<>)
+             (let
+                _v
+                  = Lens.Family2.view
+                      (Data.ProtoLens.Field.field @"blobSizeLimitError") _x
+              in
+                if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                    Data.Monoid.mempty
+                else
+                    (Data.Monoid.<>)
+                      (Data.ProtoLens.Encoding.Bytes.putVarInt 8)
+                      ((Prelude..)
+                         Data.ProtoLens.Encoding.Bytes.putVarInt Prelude.fromIntegral _v))
+             ((Data.Monoid.<>)
+                (let
+                   _v
+                     = Lens.Family2.view
+                         (Data.ProtoLens.Field.field @"memoSizeLimitError") _x
+                 in
+                   if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                       Data.Monoid.mempty
+                   else
+                       (Data.Monoid.<>)
+                         (Data.ProtoLens.Encoding.Bytes.putVarInt 16)
+                         ((Prelude..)
+                            Data.ProtoLens.Encoding.Bytes.putVarInt Prelude.fromIntegral _v))
+                (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                   (Lens.Family2.view Data.ProtoLens.unknownFields _x)))
+instance Control.DeepSeq.NFData NamespaceInfo'Limits where
+  rnf
+    = \ x__
+        -> Control.DeepSeq.deepseq
+             (_NamespaceInfo'Limits'_unknownFields x__)
+             (Control.DeepSeq.deepseq
+                (_NamespaceInfo'Limits'blobSizeLimitError x__)
+                (Control.DeepSeq.deepseq
+                   (_NamespaceInfo'Limits'memoSizeLimitError x__) ()))
+{- | Fields :
+     
          * 'Proto.Temporal.Sdk.Core.CoreInterface_Fields.service' @:: Lens' NexusSlotInfo Data.Text.Text@
          * 'Proto.Temporal.Sdk.Core.CoreInterface_Fields.operation' @:: Lens' NexusSlotInfo Data.Text.Text@ -}
 data NexusSlotInfo
@@ -965,9 +1248,13 @@ packedFileDescriptor
     \\ractivity_type\CAN\SOH \SOH(\tR\factivityType\"G\n\
     \\rNexusSlotInfo\DC2\CAN\n\
     \\aservice\CAN\SOH \SOH(\tR\aservice\DC2\FS\n\
-    \\toperation\CAN\STX \SOH(\tR\toperationB3\234\STX0Temporalio::Internal::Bridge::Api::CoreInterfaceJ\233\n\
-    \\n\
-    \\ACK\DC2\EOT\NUL\NUL4\SOH\n\
+    \\toperation\CAN\STX \SOH(\tR\toperation\"\182\SOH\n\
+    \\rNamespaceInfo\DC25\n\
+    \\ACKlimits\CAN\SOH \SOH(\v2\GS.coresdk.NamespaceInfo.LimitsR\ACKlimits\SUBn\n\
+    \\ACKLimits\DC21\n\
+    \\NAKblob_size_limit_error\CAN\SOH \SOH(\ETXR\DC2blobSizeLimitError\DC21\n\
+    \\NAKmemo_size_limit_error\CAN\STX \SOH(\ETXR\DC2memoSizeLimitErrorB3\234\STX0Temporalio::Internal::Bridge::Api::CoreInterfaceJ\165\SI\n\
+    \\ACK\DC2\EOT\NUL\NULC\SOH\n\
     \\b\n\
     \\SOH\f\DC2\ETX\NUL\NUL\DC2\n\
     \\b\n\
@@ -1127,4 +1414,44 @@ packedFileDescriptor
     \\f\n\
     \\ENQ\EOT\ENQ\STX\SOH\SOH\DC2\ETX3\v\DC4\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\SOH\ETX\DC2\ETX3\ETB\CANb\ACKproto3"
+    \\ENQ\EOT\ENQ\STX\SOH\ETX\DC2\ETX3\ETB\CAN\n\
+    \$\n\
+    \\STX\EOT\ACK\DC2\EOT7\NULC\SOH\SUB\CAN Info about a namespace\n\
+    \\n\
+    \\n\
+    \\n\
+    \\ETX\EOT\ACK\SOH\DC2\ETX7\b\NAK\n\
+    \*\n\
+    \\EOT\EOT\ACK\STX\NUL\DC2\ETX9\EOT\SYN\SUB\GS Namespace configured limits\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\ACK\STX\NUL\ACK\DC2\ETX9\EOT\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\ACK\STX\NUL\SOH\DC2\ETX9\v\DC1\n\
+    \\f\n\
+    \\ENQ\EOT\ACK\STX\NUL\ETX\DC2\ETX9\DC4\NAK\n\
+    \\f\n\
+    \\EOT\EOT\ACK\ETX\NUL\DC2\EOT;\EOTB\ENQ\n\
+    \\f\n\
+    \\ENQ\EOT\ACK\ETX\NUL\SOH\DC2\ETX;\f\DC2\n\
+    \\234\SOH\n\
+    \\ACK\EOT\ACK\ETX\NUL\STX\NUL\DC2\ETX?\b(\SUB\218\SOH Maximum size in bytes for payload fields in workflow history events\n\
+    \ (e.g., workflow/activity inputs and results, failure details, signal payloads).\n\
+    \ When exceeded, the server will reject the operation with an error.\n\
+    \\n\
+    \\SO\n\
+    \\a\EOT\ACK\ETX\NUL\STX\NUL\ENQ\DC2\ETX?\b\r\n\
+    \\SO\n\
+    \\a\EOT\ACK\ETX\NUL\STX\NUL\SOH\DC2\ETX?\SO#\n\
+    \\SO\n\
+    \\a\EOT\ACK\ETX\NUL\STX\NUL\ETX\DC2\ETX?&'\n\
+    \I\n\
+    \\ACK\EOT\ACK\ETX\NUL\STX\SOH\DC2\ETXA\b(\SUB: Maximum total memo size in bytes per workflow execution.\n\
+    \\n\
+    \\SO\n\
+    \\a\EOT\ACK\ETX\NUL\STX\SOH\ENQ\DC2\ETXA\b\r\n\
+    \\SO\n\
+    \\a\EOT\ACK\ETX\NUL\STX\SOH\SOH\DC2\ETXA\SO#\n\
+    \\SO\n\
+    \\a\EOT\ACK\ETX\NUL\STX\SOH\ETX\DC2\ETXA&'b\ACKproto3"

@@ -945,7 +945,12 @@ convertExitVariantToCommand variant = do
                   & Command.taskQueue .~ maybe "" rawTaskQueue continueAsNewOptions.taskQueue
                   & Command.vec'arguments .~ fmap convertToProtoPayload args
                   & Command.maybe'retryPolicy .~ (retryPolicyToProto <$> continueAsNewOptions.retryPolicy)
-                  & Command.searchAttributes .~ searchAttrs
+                  -- Core previously omitted empty search attributes on continue-as-new.
+                  & Command.maybe'searchAttributes
+                    .~ ( if searchAttrs == mempty
+                           then Nothing
+                           else Just (defMessage & Message.indexedFields .~ searchAttrs)
+                       )
                   & Command.headers .~ fmap convertToProtoPayload continueAsNewOptions.headers
                   & Command.memo .~ fmap convertToProtoPayload memo
                   & Command.maybe'workflowTaskTimeout .~ (durationToProto <$> continueAsNewOptions.taskTimeout)

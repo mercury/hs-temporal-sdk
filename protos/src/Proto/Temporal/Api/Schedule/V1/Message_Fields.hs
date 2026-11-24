@@ -299,6 +299,20 @@ maybe'state ::
    Data.ProtoLens.Field.HasField s "maybe'state" a) =>
   Lens.Family2.LensLike' f s a
 maybe'state = Data.ProtoLens.Field.field @"maybe'state"
+maybe'timeSkippingConfig ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'timeSkippingConfig" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'timeSkippingConfig
+  = Data.ProtoLens.Field.field @"maybe'timeSkippingConfig"
+maybe'timeSkippingInfo ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'timeSkippingInfo" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'timeSkippingInfo
+  = Data.ProtoLens.Field.field @"maybe'timeSkippingInfo"
 maybe'triggerImmediately ::
   forall f s a.
   (Prelude.Functor f,
@@ -473,6 +487,12 @@ state ::
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "state" a) =>
   Lens.Family2.LensLike' f s a
 state = Data.ProtoLens.Field.field @"state"
+stateSizeBytes ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "stateSizeBytes" a) =>
+  Lens.Family2.LensLike' f s a
+stateSizeBytes = Data.ProtoLens.Field.field @"stateSizeBytes"
 step ::
   forall f s a.
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "step" a) =>
@@ -485,6 +505,19 @@ structuredCalendar ::
   Lens.Family2.LensLike' f s a
 structuredCalendar
   = Data.ProtoLens.Field.field @"structuredCalendar"
+timeSkippingConfig ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "timeSkippingConfig" a) =>
+  Lens.Family2.LensLike' f s a
+timeSkippingConfig
+  = Data.ProtoLens.Field.field @"timeSkippingConfig"
+timeSkippingInfo ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "timeSkippingInfo" a) =>
+  Lens.Family2.LensLike' f s a
+timeSkippingInfo = Data.ProtoLens.Field.field @"timeSkippingInfo"
 timezoneData ::
   forall f s a.
   (Prelude.Functor f,
