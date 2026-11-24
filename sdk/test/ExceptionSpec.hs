@@ -1,15 +1,20 @@
 module ExceptionSpec where
 
+import Control.Exception (ErrorCall (..), toException)
 import Data.ProtoLens
 import Data.ProtoLens.Field (field)
+import qualified Data.Text as Text
 import Lens.Family2
 import Proto.Temporal.Api.Failure.V1.Message ()
 import qualified Temporal.Core.Client as Core
 import Temporal.Exception (
+  ApplicationFailure (..),
   RPCStatusCode (..),
   RpcError (..),
   RpcErrorDetails (..),
   coreRpcErrorToRpcError,
+  mkApplicationFailure,
+  standardApplicationFailureHandlers,
  )
 import Test.Hspec
 
@@ -38,3 +43,13 @@ spec = do
                         & field @"runId"
                         .~ "0195f782-4076-7e1f-8d9f-6567e745033e"
                    ]
+
+  describe "ApplicationFailure conversion" do
+    -- Since base 4.21, the location of the deprecated ErrorCallWithLocation
+    -- pattern is an error thunk. The failure must not keep it, or encoding the
+    -- failure throws instead of reporting it.
+    specify "an ErrorCall becomes a failure whose fields can all be evaluated" $ do
+      let failure = mkApplicationFailure (toException (ErrorCall "boom")) standardApplicationFailureHandlers
+      failure.type' `shouldBe` "ErrorCallWithLocation"
+      failure.message `shouldBe` "boom"
+      Text.length failure.stack `shouldSatisfy` (>= 0)
