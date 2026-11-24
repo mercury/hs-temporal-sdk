@@ -36,6 +36,7 @@ import qualified Data.ProtoLens.Runtime.Text.Read as Text.Read
 import qualified Proto.Temporal.Api.Common.V1.Message
 import qualified Proto.Temporal.Api.Enums.V1.Update
 import qualified Proto.Temporal.Api.Failure.V1.Message
+import qualified Proto.Temporal.Api.Nexus.V1.Message
 {- | Fields :
      
          * 'Proto.Temporal.Api.Update.V1.Message_Fields.acceptedRequestMessageId' @:: Lens' Acceptance Data.Text.Text@
@@ -1115,10 +1116,21 @@ instance Control.DeepSeq.NFData Rejection where
          * 'Proto.Temporal.Api.Update.V1.Message_Fields.meta' @:: Lens' Request Meta@
          * 'Proto.Temporal.Api.Update.V1.Message_Fields.maybe'meta' @:: Lens' Request (Prelude.Maybe Meta)@
          * 'Proto.Temporal.Api.Update.V1.Message_Fields.input' @:: Lens' Request Input@
-         * 'Proto.Temporal.Api.Update.V1.Message_Fields.maybe'input' @:: Lens' Request (Prelude.Maybe Input)@ -}
+         * 'Proto.Temporal.Api.Update.V1.Message_Fields.maybe'input' @:: Lens' Request (Prelude.Maybe Input)@
+         * 'Proto.Temporal.Api.Update.V1.Message_Fields.requestId' @:: Lens' Request Data.Text.Text@
+         * 'Proto.Temporal.Api.Update.V1.Message_Fields.completionCallbacks' @:: Lens' Request [Proto.Temporal.Api.Common.V1.Message.Callback]@
+         * 'Proto.Temporal.Api.Update.V1.Message_Fields.vec'completionCallbacks' @:: Lens' Request (Data.Vector.Vector Proto.Temporal.Api.Common.V1.Message.Callback)@
+         * 'Proto.Temporal.Api.Update.V1.Message_Fields.links' @:: Lens' Request [Proto.Temporal.Api.Common.V1.Message.Link]@
+         * 'Proto.Temporal.Api.Update.V1.Message_Fields.vec'links' @:: Lens' Request (Data.Vector.Vector Proto.Temporal.Api.Common.V1.Message.Link)@
+         * 'Proto.Temporal.Api.Update.V1.Message_Fields.propagatedNexusSerializationContext' @:: Lens' Request Proto.Temporal.Api.Nexus.V1.Message.PropagatedSerializationContext@
+         * 'Proto.Temporal.Api.Update.V1.Message_Fields.maybe'propagatedNexusSerializationContext' @:: Lens' Request (Prelude.Maybe Proto.Temporal.Api.Nexus.V1.Message.PropagatedSerializationContext)@ -}
 data Request
   = Request'_constructor {_Request'meta :: !(Prelude.Maybe Meta),
                           _Request'input :: !(Prelude.Maybe Input),
+                          _Request'requestId :: !Data.Text.Text,
+                          _Request'completionCallbacks :: !(Data.Vector.Vector Proto.Temporal.Api.Common.V1.Message.Callback),
+                          _Request'links :: !(Data.Vector.Vector Proto.Temporal.Api.Common.V1.Message.Link),
+                          _Request'propagatedNexusSerializationContext :: !(Prelude.Maybe Proto.Temporal.Api.Nexus.V1.Message.PropagatedSerializationContext),
                           _Request'_unknownFields :: !Data.ProtoLens.FieldSet}
   deriving stock (Prelude.Eq, Prelude.Ord)
 instance Prelude.Show Request where
@@ -1151,13 +1163,70 @@ instance Data.ProtoLens.Field.HasField Request "maybe'input" (Prelude.Maybe Inpu
         (Lens.Family2.Unchecked.lens
            _Request'input (\ x__ y__ -> x__ {_Request'input = y__}))
         Prelude.id
+instance Data.ProtoLens.Field.HasField Request "requestId" Data.Text.Text where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _Request'requestId (\ x__ y__ -> x__ {_Request'requestId = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField Request "completionCallbacks" [Proto.Temporal.Api.Common.V1.Message.Callback] where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _Request'completionCallbacks
+           (\ x__ y__ -> x__ {_Request'completionCallbacks = y__}))
+        (Lens.Family2.Unchecked.lens
+           Data.Vector.Generic.toList
+           (\ _ y__ -> Data.Vector.Generic.fromList y__))
+instance Data.ProtoLens.Field.HasField Request "vec'completionCallbacks" (Data.Vector.Vector Proto.Temporal.Api.Common.V1.Message.Callback) where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _Request'completionCallbacks
+           (\ x__ y__ -> x__ {_Request'completionCallbacks = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField Request "links" [Proto.Temporal.Api.Common.V1.Message.Link] where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _Request'links (\ x__ y__ -> x__ {_Request'links = y__}))
+        (Lens.Family2.Unchecked.lens
+           Data.Vector.Generic.toList
+           (\ _ y__ -> Data.Vector.Generic.fromList y__))
+instance Data.ProtoLens.Field.HasField Request "vec'links" (Data.Vector.Vector Proto.Temporal.Api.Common.V1.Message.Link) where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _Request'links (\ x__ y__ -> x__ {_Request'links = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField Request "propagatedNexusSerializationContext" Proto.Temporal.Api.Nexus.V1.Message.PropagatedSerializationContext where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _Request'propagatedNexusSerializationContext
+           (\ x__ y__
+              -> x__ {_Request'propagatedNexusSerializationContext = y__}))
+        (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
+instance Data.ProtoLens.Field.HasField Request "maybe'propagatedNexusSerializationContext" (Prelude.Maybe Proto.Temporal.Api.Nexus.V1.Message.PropagatedSerializationContext) where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _Request'propagatedNexusSerializationContext
+           (\ x__ y__
+              -> x__ {_Request'propagatedNexusSerializationContext = y__}))
+        Prelude.id
 instance Data.ProtoLens.Message Request where
   messageName _ = Data.Text.pack "temporal.api.update.v1.Request"
   packedMessageDescriptor _
     = "\n\
       \\aRequest\DC20\n\
       \\EOTmeta\CAN\SOH \SOH(\v2\FS.temporal.api.update.v1.MetaR\EOTmeta\DC23\n\
-      \\ENQinput\CAN\STX \SOH(\v2\GS.temporal.api.update.v1.InputR\ENQinput"
+      \\ENQinput\CAN\STX \SOH(\v2\GS.temporal.api.update.v1.InputR\ENQinput\DC2\GS\n\
+      \\n\
+      \request_id\CAN\ETX \SOH(\tR\trequestId\DC2S\n\
+      \\DC4completion_callbacks\CAN\EOT \ETX(\v2 .temporal.api.common.v1.CallbackR\DC3completionCallbacks\DC22\n\
+      \\ENQlinks\CAN\ENQ \ETX(\v2\FS.temporal.api.common.v1.LinkR\ENQlinks\DC2\138\SOH\n\
+      \&propagated_nexus_serialization_context\CAN\ACK \SOH(\v25.temporal.api.nexus.v1.PropagatedSerializationContextR#propagatedNexusSerializationContext"
   packedFileDescriptor _ = packedFileDescriptor
   fieldsByTag
     = let
@@ -1177,10 +1246,50 @@ instance Data.ProtoLens.Message Request where
               (Data.ProtoLens.OptionalField
                  (Data.ProtoLens.Field.field @"maybe'input")) ::
               Data.ProtoLens.FieldDescriptor Request
+        requestId__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "request_id"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.StringField ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Text.Text)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"requestId")) ::
+              Data.ProtoLens.FieldDescriptor Request
+        completionCallbacks__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "completion_callbacks"
+              (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                 Data.ProtoLens.FieldTypeDescriptor Proto.Temporal.Api.Common.V1.Message.Callback)
+              (Data.ProtoLens.RepeatedField
+                 Data.ProtoLens.Unpacked
+                 (Data.ProtoLens.Field.field @"completionCallbacks")) ::
+              Data.ProtoLens.FieldDescriptor Request
+        links__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "links"
+              (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                 Data.ProtoLens.FieldTypeDescriptor Proto.Temporal.Api.Common.V1.Message.Link)
+              (Data.ProtoLens.RepeatedField
+                 Data.ProtoLens.Unpacked (Data.ProtoLens.Field.field @"links")) ::
+              Data.ProtoLens.FieldDescriptor Request
+        propagatedNexusSerializationContext__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "propagated_nexus_serialization_context"
+              (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                 Data.ProtoLens.FieldTypeDescriptor Proto.Temporal.Api.Nexus.V1.Message.PropagatedSerializationContext)
+              (Data.ProtoLens.OptionalField
+                 (Data.ProtoLens.Field.field
+                    @"maybe'propagatedNexusSerializationContext")) ::
+              Data.ProtoLens.FieldDescriptor Request
       in
         Data.Map.fromList
           [(Data.ProtoLens.Tag 1, meta__field_descriptor),
-           (Data.ProtoLens.Tag 2, input__field_descriptor)]
+           (Data.ProtoLens.Tag 2, input__field_descriptor),
+           (Data.ProtoLens.Tag 3, requestId__field_descriptor),
+           (Data.ProtoLens.Tag 4, completionCallbacks__field_descriptor),
+           (Data.ProtoLens.Tag 5, links__field_descriptor),
+           (Data.ProtoLens.Tag 6, 
+            propagatedNexusSerializationContext__field_descriptor)]
   unknownFields
     = Lens.Family2.Unchecked.lens
         _Request'_unknownFields
@@ -1188,14 +1297,27 @@ instance Data.ProtoLens.Message Request where
   defMessage
     = Request'_constructor
         {_Request'meta = Prelude.Nothing, _Request'input = Prelude.Nothing,
+         _Request'requestId = Data.ProtoLens.fieldDefault,
+         _Request'completionCallbacks = Data.Vector.Generic.empty,
+         _Request'links = Data.Vector.Generic.empty,
+         _Request'propagatedNexusSerializationContext = Prelude.Nothing,
          _Request'_unknownFields = []}
   parseMessage
     = let
-        loop :: Request -> Data.ProtoLens.Encoding.Bytes.Parser Request
-        loop x
+        loop ::
+          Request
+          -> Data.ProtoLens.Encoding.Growing.Growing Data.Vector.Vector Data.ProtoLens.Encoding.Growing.RealWorld Proto.Temporal.Api.Common.V1.Message.Callback
+             -> Data.ProtoLens.Encoding.Growing.Growing Data.Vector.Vector Data.ProtoLens.Encoding.Growing.RealWorld Proto.Temporal.Api.Common.V1.Message.Link
+                -> Data.ProtoLens.Encoding.Bytes.Parser Request
+        loop x mutable'completionCallbacks mutable'links
           = do end <- Data.ProtoLens.Encoding.Bytes.atEnd
                if end then
-                   do (let missing = []
+                   do frozen'completionCallbacks <- Data.ProtoLens.Encoding.Parser.Unsafe.unsafeLiftIO
+                                                      (Data.ProtoLens.Encoding.Growing.unsafeFreeze
+                                                         mutable'completionCallbacks)
+                      frozen'links <- Data.ProtoLens.Encoding.Parser.Unsafe.unsafeLiftIO
+                                        (Data.ProtoLens.Encoding.Growing.unsafeFreeze mutable'links)
+                      (let missing = []
                        in
                          if Prelude.null missing then
                              Prelude.return ()
@@ -1206,7 +1328,12 @@ instance Data.ProtoLens.Message Request where
                                   (Prelude.show (missing :: [Prelude.String]))))
                       Prelude.return
                         (Lens.Family2.over
-                           Data.ProtoLens.unknownFields (\ !t -> Prelude.reverse t) x)
+                           Data.ProtoLens.unknownFields (\ !t -> Prelude.reverse t)
+                           (Lens.Family2.set
+                              (Data.ProtoLens.Field.field @"vec'completionCallbacks")
+                              frozen'completionCallbacks
+                              (Lens.Family2.set
+                                 (Data.ProtoLens.Field.field @"vec'links") frozen'links x)))
                else
                    do tag <- Data.ProtoLens.Encoding.Bytes.getVarInt
                       case tag of
@@ -1216,23 +1343,77 @@ instance Data.ProtoLens.Message Request where
                                            Data.ProtoLens.Encoding.Bytes.isolate
                                              (Prelude.fromIntegral len) Data.ProtoLens.parseMessage)
                                        "meta"
-                                loop (Lens.Family2.set (Data.ProtoLens.Field.field @"meta") y x)
+                                loop
+                                  (Lens.Family2.set (Data.ProtoLens.Field.field @"meta") y x)
+                                  mutable'completionCallbacks mutable'links
                         18
                           -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
                                        (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
                                            Data.ProtoLens.Encoding.Bytes.isolate
                                              (Prelude.fromIntegral len) Data.ProtoLens.parseMessage)
                                        "input"
-                                loop (Lens.Family2.set (Data.ProtoLens.Field.field @"input") y x)
+                                loop
+                                  (Lens.Family2.set (Data.ProtoLens.Field.field @"input") y x)
+                                  mutable'completionCallbacks mutable'links
+                        26
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.getText
+                                             (Prelude.fromIntegral len))
+                                       "request_id"
+                                loop
+                                  (Lens.Family2.set (Data.ProtoLens.Field.field @"requestId") y x)
+                                  mutable'completionCallbacks mutable'links
+                        34
+                          -> do !y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                        (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                            Data.ProtoLens.Encoding.Bytes.isolate
+                                              (Prelude.fromIntegral len)
+                                              Data.ProtoLens.parseMessage)
+                                        "completion_callbacks"
+                                v <- Data.ProtoLens.Encoding.Parser.Unsafe.unsafeLiftIO
+                                       (Data.ProtoLens.Encoding.Growing.append
+                                          mutable'completionCallbacks y)
+                                loop x v mutable'links
+                        42
+                          -> do !y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                        (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                            Data.ProtoLens.Encoding.Bytes.isolate
+                                              (Prelude.fromIntegral len)
+                                              Data.ProtoLens.parseMessage)
+                                        "links"
+                                v <- Data.ProtoLens.Encoding.Parser.Unsafe.unsafeLiftIO
+                                       (Data.ProtoLens.Encoding.Growing.append mutable'links y)
+                                loop x mutable'completionCallbacks v
+                        50
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.isolate
+                                             (Prelude.fromIntegral len) Data.ProtoLens.parseMessage)
+                                       "propagated_nexus_serialization_context"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field
+                                        @"propagatedNexusSerializationContext")
+                                     y x)
+                                  mutable'completionCallbacks mutable'links
                         wire
                           -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
                                         wire
                                 loop
                                   (Lens.Family2.over
                                      Data.ProtoLens.unknownFields (\ !t -> (:) y t) x)
+                                  mutable'completionCallbacks mutable'links
       in
         (Data.ProtoLens.Encoding.Bytes.<?>)
-          (do loop Data.ProtoLens.defMessage) "Request"
+          (do mutable'completionCallbacks <- Data.ProtoLens.Encoding.Parser.Unsafe.unsafeLiftIO
+                                               Data.ProtoLens.Encoding.Growing.new
+              mutable'links <- Data.ProtoLens.Encoding.Parser.Unsafe.unsafeLiftIO
+                                 Data.ProtoLens.Encoding.Growing.new
+              loop
+                Data.ProtoLens.defMessage mutable'completionCallbacks
+                mutable'links)
+          "Request"
   buildMessage
     = \ _x
         -> (Data.Monoid.<>)
@@ -1265,8 +1446,71 @@ instance Data.ProtoLens.Message Request where
                                         (Prelude.fromIntegral (Data.ByteString.length bs)))
                                      (Data.ProtoLens.Encoding.Bytes.putBytes bs))
                              Data.ProtoLens.encodeMessage _v))
-                (Data.ProtoLens.Encoding.Wire.buildFieldSet
-                   (Lens.Family2.view Data.ProtoLens.unknownFields _x)))
+                ((Data.Monoid.<>)
+                   (let
+                      _v = Lens.Family2.view (Data.ProtoLens.Field.field @"requestId") _x
+                    in
+                      if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                          Data.Monoid.mempty
+                      else
+                          (Data.Monoid.<>)
+                            (Data.ProtoLens.Encoding.Bytes.putVarInt 26)
+                            ((Prelude..)
+                               (\ bs
+                                  -> (Data.Monoid.<>)
+                                       (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                          (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                       (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                               Data.Text.Encoding.encodeUtf8 _v))
+                   ((Data.Monoid.<>)
+                      (Data.ProtoLens.Encoding.Bytes.foldMapBuilder
+                         (\ _v
+                            -> (Data.Monoid.<>)
+                                 (Data.ProtoLens.Encoding.Bytes.putVarInt 34)
+                                 ((Prelude..)
+                                    (\ bs
+                                       -> (Data.Monoid.<>)
+                                            (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                               (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                            (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                                    Data.ProtoLens.encodeMessage _v))
+                         (Lens.Family2.view
+                            (Data.ProtoLens.Field.field @"vec'completionCallbacks") _x))
+                      ((Data.Monoid.<>)
+                         (Data.ProtoLens.Encoding.Bytes.foldMapBuilder
+                            (\ _v
+                               -> (Data.Monoid.<>)
+                                    (Data.ProtoLens.Encoding.Bytes.putVarInt 42)
+                                    ((Prelude..)
+                                       (\ bs
+                                          -> (Data.Monoid.<>)
+                                               (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                                  (Prelude.fromIntegral
+                                                     (Data.ByteString.length bs)))
+                                               (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                                       Data.ProtoLens.encodeMessage _v))
+                            (Lens.Family2.view (Data.ProtoLens.Field.field @"vec'links") _x))
+                         ((Data.Monoid.<>)
+                            (case
+                                 Lens.Family2.view
+                                   (Data.ProtoLens.Field.field
+                                      @"maybe'propagatedNexusSerializationContext")
+                                   _x
+                             of
+                               Prelude.Nothing -> Data.Monoid.mempty
+                               (Prelude.Just _v)
+                                 -> (Data.Monoid.<>)
+                                      (Data.ProtoLens.Encoding.Bytes.putVarInt 50)
+                                      ((Prelude..)
+                                         (\ bs
+                                            -> (Data.Monoid.<>)
+                                                 (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                                    (Prelude.fromIntegral
+                                                       (Data.ByteString.length bs)))
+                                                 (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                                         Data.ProtoLens.encodeMessage _v))
+                            (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                               (Lens.Family2.view Data.ProtoLens.unknownFields _x)))))))
 instance Control.DeepSeq.NFData Request where
   rnf
     = \ x__
@@ -1274,7 +1518,16 @@ instance Control.DeepSeq.NFData Request where
              (_Request'_unknownFields x__)
              (Control.DeepSeq.deepseq
                 (_Request'meta x__)
-                (Control.DeepSeq.deepseq (_Request'input x__) ()))
+                (Control.DeepSeq.deepseq
+                   (_Request'input x__)
+                   (Control.DeepSeq.deepseq
+                      (_Request'requestId x__)
+                      (Control.DeepSeq.deepseq
+                         (_Request'completionCallbacks x__)
+                         (Control.DeepSeq.deepseq
+                            (_Request'links x__)
+                            (Control.DeepSeq.deepseq
+                               (_Request'propagatedNexusSerializationContext x__) ()))))))
 {- | Fields :
      
          * 'Proto.Temporal.Api.Update.V1.Message_Fields.meta' @:: Lens' Response Meta@
@@ -1726,7 +1979,7 @@ instance Control.DeepSeq.NFData WaitPolicy where
 packedFileDescriptor :: Data.ByteString.ByteString
 packedFileDescriptor
   = "\n\
-    \$temporal/api/update/v1/message.proto\DC2\SYNtemporal.api.update.v1\SUB$temporal/api/common/v1/message.proto\SUB\"temporal/api/enums/v1/update.proto\SUB%temporal/api/failure/v1/message.proto\"s\n\
+    \$temporal/api/update/v1/message.proto\DC2\SYNtemporal.api.update.v1\SUB$temporal/api/common/v1/message.proto\SUB\"temporal/api/enums/v1/update.proto\SUB%temporal/api/failure/v1/message.proto\SUB#temporal/api/nexus/v1/message.proto\"s\n\
     \\n\
     \WaitPolicy\DC2e\n\
     \\SIlifecycle_stage\CAN\SOH \SOH(\SO2<.temporal.api.enums.v1.UpdateWorkflowExecutionLifecycleStageR\SOlifecycleStage\"\130\SOH\n\
@@ -1743,10 +1996,15 @@ packedFileDescriptor
     \\ENQInput\DC26\n\
     \\ACKheader\CAN\SOH \SOH(\v2\RS.temporal.api.common.v1.HeaderR\ACKheader\DC2\DC2\n\
     \\EOTname\CAN\STX \SOH(\tR\EOTname\DC24\n\
-    \\EOTargs\CAN\ETX \SOH(\v2 .temporal.api.common.v1.PayloadsR\EOTargs\"p\n\
+    \\EOTargs\CAN\ETX \SOH(\v2 .temporal.api.common.v1.PayloadsR\EOTargs\"\165\ETX\n\
     \\aRequest\DC20\n\
     \\EOTmeta\CAN\SOH \SOH(\v2\FS.temporal.api.update.v1.MetaR\EOTmeta\DC23\n\
-    \\ENQinput\CAN\STX \SOH(\v2\GS.temporal.api.update.v1.InputR\ENQinput\"\162\STX\n\
+    \\ENQinput\CAN\STX \SOH(\v2\GS.temporal.api.update.v1.InputR\ENQinput\DC2\GS\n\
+    \\n\
+    \request_id\CAN\ETX \SOH(\tR\trequestId\DC2S\n\
+    \\DC4completion_callbacks\CAN\EOT \ETX(\v2 .temporal.api.common.v1.CallbackR\DC3completionCallbacks\DC22\n\
+    \\ENQlinks\CAN\ENQ \ETX(\v2\FS.temporal.api.common.v1.LinkR\ENQlinks\DC2\138\SOH\n\
+    \&propagated_nexus_serialization_context\CAN\ACK \SOH(\v25.temporal.api.nexus.v1.PropagatedSerializationContextR#propagatedNexusSerializationContext\"\162\STX\n\
     \\tRejection\DC2=\n\
     \\ESCrejected_request_message_id\CAN\SOH \SOH(\tR\CANrejectedRequestMessageId\DC2N\n\
     \$rejected_request_sequencing_event_id\CAN\STX \SOH(\ETXR rejectedRequestSequencingEventId\DC2J\n\
@@ -1760,8 +2018,8 @@ packedFileDescriptor
     \\bResponse\DC20\n\
     \\EOTmeta\CAN\SOH \SOH(\v2\FS.temporal.api.update.v1.MetaR\EOTmeta\DC29\n\
     \\aoutcome\CAN\STX \SOH(\v2\US.temporal.api.update.v1.OutcomeR\aoutcomeB\137\SOH\n\
-    \\EMio.temporal.api.update.v1B\fMessageProtoP\SOHZ#go.temporal.io/api/update/v1;update\170\STX\CANTemporalio.Api.Update.V1\234\STX\ESCTemporalio::Api::Update::V1J\206\SYN\n\
-    \\ACK\DC2\EOT\NUL\NULW\SOH\n\
+    \\EMio.temporal.api.update.v1B\fMessageProtoP\SOHZ#go.temporal.io/api/update/v1;update\170\STX\CANTemporalio.Api.Update.V1\234\STX\ESCTemporalio::Api::Update::V1J\198\SUB\n\
+    \\ACK\DC2\EOT\NUL\NUL`\SOH\n\
     \\b\n\
     \\SOH\f\DC2\ETX\NUL\NUL\DC2\n\
     \\b\n\
@@ -1797,252 +2055,295 @@ packedFileDescriptor
     \\STX\ETX\SOH\DC2\ETX\f\NUL,\n\
     \\t\n\
     \\STX\ETX\STX\DC2\ETX\r\NUL/\n\
+    \\t\n\
+    \\STX\ETX\ETX\DC2\ETX\SO\NUL-\n\
     \C\n\
-    \\STX\EOT\NUL\DC2\EOT\DLE\NUL\ETB\SOH\SUB7 Specifies client's intent to wait for Update results.\n\
+    \\STX\EOT\NUL\DC2\EOT\DC1\NUL\CAN\SOH\SUB7 Specifies client's intent to wait for Update results.\n\
     \\n\
     \\n\
     \\n\
-    \\ETX\EOT\NUL\SOH\DC2\ETX\DLE\b\DC2\n\
+    \\ETX\EOT\NUL\SOH\DC2\ETX\DC1\b\DC2\n\
     \\211\STX\n\
-    \\EOT\EOT\NUL\STX\NUL\DC2\ETX\SYN\EOTT\SUB\197\STX Indicates the Update lifecycle stage that the Update must reach before\n\
+    \\EOT\EOT\NUL\STX\NUL\DC2\ETX\ETB\EOTT\SUB\197\STX Indicates the Update lifecycle stage that the Update must reach before\n\
     \ API call is returned.\n\
     \ NOTE: This field works together with API call timeout which is limited by\n\
     \ server timeout (maximum wait time). If server timeout is expired before\n\
     \ user specified timeout, API call returns even if specified stage is not reached.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\NUL\ACK\DC2\ETX\SYN\EOT?\n\
+    \\ENQ\EOT\NUL\STX\NUL\ACK\DC2\ETX\ETB\EOT?\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\NUL\SOH\DC2\ETX\SYN@O\n\
+    \\ENQ\EOT\NUL\STX\NUL\SOH\DC2\ETX\ETB@O\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\NUL\ETX\DC2\ETX\SYNRS\n\
+    \\ENQ\EOT\NUL\STX\NUL\ETX\DC2\ETX\ETBRS\n\
     \[\n\
-    \\STX\EOT\SOH\DC2\EOT\SUB\NUL\GS\SOH\SUBO The data needed by a client to refer to a previously invoked Workflow Update.\n\
+    \\STX\EOT\SOH\DC2\EOT\ESC\NUL\RS\SOH\SUBO The data needed by a client to refer to a previously invoked Workflow Update.\n\
     \\n\
     \\n\
     \\n\
-    \\ETX\EOT\SOH\SOH\DC2\ETX\SUB\b\DC1\n\
+    \\ETX\EOT\SOH\SOH\DC2\ETX\ESC\b\DC1\n\
     \\v\n\
-    \\EOT\EOT\SOH\STX\NUL\DC2\ETX\ESC\EOTD\n\
+    \\EOT\EOT\SOH\STX\NUL\DC2\ETX\FS\EOTD\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\NUL\ACK\DC2\ETX\ESC\EOT,\n\
+    \\ENQ\EOT\SOH\STX\NUL\ACK\DC2\ETX\FS\EOT,\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\NUL\SOH\DC2\ETX\ESC-?\n\
+    \\ENQ\EOT\SOH\STX\NUL\SOH\DC2\ETX\FS-?\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\NUL\ETX\DC2\ETX\ESCBC\n\
+    \\ENQ\EOT\SOH\STX\NUL\ETX\DC2\ETX\FSBC\n\
     \\v\n\
-    \\EOT\EOT\SOH\STX\SOH\DC2\ETX\FS\EOT\EM\n\
+    \\EOT\EOT\SOH\STX\SOH\DC2\ETX\GS\EOT\EM\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\SOH\ENQ\DC2\ETX\FS\EOT\n\
+    \\ENQ\EOT\SOH\STX\SOH\ENQ\DC2\ETX\GS\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\SOH\SOH\DC2\ETX\FS\v\DC4\n\
+    \\ENQ\EOT\SOH\STX\SOH\SOH\DC2\ETX\GS\v\DC4\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\SOH\ETX\DC2\ETX\FS\ETB\CAN\n\
+    \\ENQ\EOT\SOH\STX\SOH\ETX\DC2\ETX\GS\ETB\CAN\n\
     \C\n\
-    \\STX\EOT\STX\DC2\EOT \NUL%\SOH\SUB7 The outcome of a Workflow Update: success or failure.\n\
+    \\STX\EOT\STX\DC2\EOT!\NUL&\SOH\SUB7 The outcome of a Workflow Update: success or failure.\n\
     \\n\
     \\n\
     \\n\
-    \\ETX\EOT\STX\SOH\DC2\ETX \b\SI\n\
+    \\ETX\EOT\STX\SOH\DC2\ETX!\b\SI\n\
     \\f\n\
-    \\EOT\EOT\STX\b\NUL\DC2\EOT!\EOT$\ENQ\n\
+    \\EOT\EOT\STX\b\NUL\DC2\EOT\"\EOT%\ENQ\n\
     \\f\n\
-    \\ENQ\EOT\STX\b\NUL\SOH\DC2\ETX!\n\
+    \\ENQ\EOT\STX\b\NUL\SOH\DC2\ETX\"\n\
     \\SI\n\
     \\v\n\
-    \\EOT\EOT\STX\STX\NUL\DC2\ETX\"\b4\n\
+    \\EOT\EOT\STX\STX\NUL\DC2\ETX#\b4\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\NUL\ACK\DC2\ETX\"\b'\n\
+    \\ENQ\EOT\STX\STX\NUL\ACK\DC2\ETX#\b'\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\NUL\SOH\DC2\ETX\"(/\n\
+    \\ENQ\EOT\STX\STX\NUL\SOH\DC2\ETX#(/\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\NUL\ETX\DC2\ETX\"23\n\
+    \\ENQ\EOT\STX\STX\NUL\ETX\DC2\ETX#23\n\
     \\v\n\
-    \\EOT\EOT\STX\STX\SOH\DC2\ETX#\b4\n\
+    \\EOT\EOT\STX\STX\SOH\DC2\ETX$\b4\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\SOH\ACK\DC2\ETX#\b'\n\
+    \\ENQ\EOT\STX\STX\SOH\ACK\DC2\ETX$\b'\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\SOH\SOH\DC2\ETX#(/\n\
+    \\ENQ\EOT\STX\STX\SOH\SOH\DC2\ETX$(/\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\SOH\ETX\DC2\ETX#23\n\
+    \\ENQ\EOT\STX\STX\SOH\ETX\DC2\ETX$23\n\
     \/\n\
-    \\STX\EOT\ETX\DC2\EOT(\NUL.\SOH\SUB# Metadata about a Workflow Update.\n\
+    \\STX\EOT\ETX\DC2\EOT)\NUL/\SOH\SUB# Metadata about a Workflow Update.\n\
     \\n\
     \\n\
     \\n\
-    \\ETX\EOT\ETX\SOH\DC2\ETX(\b\f\n\
+    \\ETX\EOT\ETX\SOH\DC2\ETX)\b\f\n\
     \E\n\
-    \\EOT\EOT\ETX\STX\NUL\DC2\ETX*\EOT\EM\SUB8 An ID with workflow-scoped uniqueness for this Update.\n\
+    \\EOT\EOT\ETX\STX\NUL\DC2\ETX+\EOT\EM\SUB8 An ID with workflow-scoped uniqueness for this Update.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\ETX\STX\NUL\ENQ\DC2\ETX*\EOT\n\
+    \\ENQ\EOT\ETX\STX\NUL\ENQ\DC2\ETX+\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\ETX\STX\NUL\SOH\DC2\ETX*\v\DC4\n\
+    \\ENQ\EOT\ETX\STX\NUL\SOH\DC2\ETX+\v\DC4\n\
     \\f\n\
-    \\ENQ\EOT\ETX\STX\NUL\ETX\DC2\ETX*\ETB\CAN\n\
+    \\ENQ\EOT\ETX\STX\NUL\ETX\DC2\ETX+\ETB\CAN\n\
     \I\n\
-    \\EOT\EOT\ETX\STX\SOH\DC2\ETX-\EOT\CAN\SUB< A string identifying the agent that requested this Update.\n\
+    \\EOT\EOT\ETX\STX\SOH\DC2\ETX.\EOT\CAN\SUB< A string identifying the agent that requested this Update.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\ETX\STX\SOH\ENQ\DC2\ETX-\EOT\n\
+    \\ENQ\EOT\ETX\STX\SOH\ENQ\DC2\ETX.\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\ETX\STX\SOH\SOH\DC2\ETX-\v\DC3\n\
+    \\ENQ\EOT\ETX\STX\SOH\SOH\DC2\ETX.\v\DC3\n\
     \\f\n\
-    \\ENQ\EOT\ETX\STX\SOH\ETX\DC2\ETX-\SYN\ETB\n\
+    \\ENQ\EOT\ETX\STX\SOH\ETX\DC2\ETX.\SYN\ETB\n\
     \\n\
     \\n\
-    \\STX\EOT\EOT\DC2\EOT0\NUL:\SOH\n\
+    \\STX\EOT\EOT\DC2\EOT1\NUL;\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\EOT\SOH\DC2\ETX0\b\r\n\
+    \\ETX\EOT\EOT\SOH\DC2\ETX1\b\r\n\
     \\137\SOH\n\
-    \\EOT\EOT\EOT\STX\NUL\DC2\ETX3\EOT-\SUB| Headers that are passed with the Update from the requesting entity.\n\
+    \\EOT\EOT\EOT\STX\NUL\DC2\ETX4\EOT-\SUB| Headers that are passed with the Update from the requesting entity.\n\
     \ These can include things like auth or tracing tokens.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\NUL\ACK\DC2\ETX3\EOT!\n\
+    \\ENQ\EOT\EOT\STX\NUL\ACK\DC2\ETX4\EOT!\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\NUL\SOH\DC2\ETX3\"(\n\
+    \\ENQ\EOT\EOT\STX\NUL\SOH\DC2\ETX4\"(\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\NUL\ETX\DC2\ETX3+,\n\
+    \\ENQ\EOT\EOT\STX\NUL\ETX\DC2\ETX4+,\n\
     \O\n\
-    \\EOT\EOT\EOT\STX\SOH\DC2\ETX6\EOT\DC4\SUBB The name of the Update handler to invoke on the target Workflow.\n\
+    \\EOT\EOT\EOT\STX\SOH\DC2\ETX7\EOT\DC4\SUBB The name of the Update handler to invoke on the target Workflow.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\SOH\ENQ\DC2\ETX6\EOT\n\
+    \\ENQ\EOT\EOT\STX\SOH\ENQ\DC2\ETX7\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\SOH\SOH\DC2\ETX6\v\SI\n\
+    \\ENQ\EOT\EOT\STX\SOH\SOH\DC2\ETX7\v\SI\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\SOH\ETX\DC2\ETX6\DC2\DC3\n\
+    \\ENQ\EOT\EOT\STX\SOH\ETX\DC2\ETX7\DC2\DC3\n\
     \A\n\
-    \\EOT\EOT\EOT\STX\STX\DC2\ETX9\EOT-\SUB4 The arguments to pass to the named Update handler.\n\
+    \\EOT\EOT\EOT\STX\STX\DC2\ETX:\EOT-\SUB4 The arguments to pass to the named Update handler.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\STX\ACK\DC2\ETX9\EOT#\n\
+    \\ENQ\EOT\EOT\STX\STX\ACK\DC2\ETX:\EOT#\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\STX\SOH\DC2\ETX9$(\n\
+    \\ENQ\EOT\EOT\STX\STX\SOH\DC2\ETX:$(\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\STX\ETX\DC2\ETX9+,\n\
+    \\ENQ\EOT\EOT\STX\STX\ETX\DC2\ETX:+,\n\
     \A\n\
-    \\STX\EOT\ENQ\DC2\EOT=\NUL@\SOH\SUB5 The client request that triggers a Workflow Update.\n\
+    \\STX\EOT\ENQ\DC2\EOT>\NULI\SOH\SUB5 The client request that triggers a Workflow Update.\n\
     \\n\
     \\n\
     \\n\
-    \\ETX\EOT\ENQ\SOH\DC2\ETX=\b\SI\n\
+    \\ETX\EOT\ENQ\SOH\DC2\ETX>\b\SI\n\
     \\v\n\
-    \\EOT\EOT\ENQ\STX\NUL\DC2\ETX>\EOT\DC2\n\
+    \\EOT\EOT\ENQ\STX\NUL\DC2\ETX?\EOT\DC2\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\NUL\ACK\DC2\ETX>\EOT\b\n\
+    \\ENQ\EOT\ENQ\STX\NUL\ACK\DC2\ETX?\EOT\b\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\NUL\SOH\DC2\ETX>\t\r\n\
+    \\ENQ\EOT\ENQ\STX\NUL\SOH\DC2\ETX?\t\r\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\NUL\ETX\DC2\ETX>\DLE\DC1\n\
+    \\ENQ\EOT\ENQ\STX\NUL\ETX\DC2\ETX?\DLE\DC1\n\
     \\v\n\
-    \\EOT\EOT\ENQ\STX\SOH\DC2\ETX?\EOT\DC4\n\
+    \\EOT\EOT\ENQ\STX\SOH\DC2\ETX@\EOT\DC4\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\SOH\ACK\DC2\ETX?\EOT\t\n\
+    \\ENQ\EOT\ENQ\STX\SOH\ACK\DC2\ETX@\EOT\t\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\SOH\SOH\DC2\ETX?\n\
+    \\ENQ\EOT\ENQ\STX\SOH\SOH\DC2\ETX@\n\
     \\SI\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\SOH\ETX\DC2\ETX?\DC2\DC3\n\
+    \\ENQ\EOT\ENQ\STX\SOH\ETX\DC2\ETX@\DC2\DC3\n\
+    \-\n\
+    \\EOT\EOT\ENQ\STX\STX\DC2\ETXB\EOT\SUB\SUB  The request ID of the request.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\ENQ\STX\STX\ENQ\DC2\ETXB\EOT\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\ENQ\STX\STX\SOH\DC2\ETXB\v\NAK\n\
+    \\f\n\
+    \\ENQ\EOT\ENQ\STX\STX\ETX\DC2\ETXB\CAN\EM\n\
+    \^\n\
+    \\EOT\EOT\ENQ\STX\ETX\DC2\ETXD\EOTF\SUBQ Callbacks to be called by the server when this update reaches a terminal state.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\ENQ\STX\ETX\EOT\DC2\ETXD\EOT\f\n\
+    \\f\n\
+    \\ENQ\EOT\ENQ\STX\ETX\ACK\DC2\ETXD\r,\n\
+    \\f\n\
+    \\ENQ\EOT\ENQ\STX\ETX\SOH\DC2\ETXD-A\n\
+    \\f\n\
+    \\ENQ\EOT\ENQ\STX\ETX\ETX\DC2\ETXDDE\n\
+    \7\n\
+    \\EOT\EOT\ENQ\STX\EOT\DC2\ETXF\EOT3\SUB* Links to be associated with this update.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\ENQ\STX\EOT\EOT\DC2\ETXF\EOT\f\n\
+    \\f\n\
+    \\ENQ\EOT\ENQ\STX\EOT\ACK\DC2\ETXF\r(\n\
+    \\f\n\
+    \\ENQ\EOT\ENQ\STX\EOT\SOH\DC2\ETXF).\n\
+    \\f\n\
+    \\ENQ\EOT\ENQ\STX\EOT\ETX\DC2\ETXF12\n\
+    \_\n\
+    \\EOT\EOT\ENQ\STX\ENQ\DC2\ETXH\EOTd\SUBR Serialization context propagated from the Nexus caller that started this update.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\ENQ\STX\ENQ\ACK\DC2\ETXH\EOT8\n\
+    \\f\n\
+    \\ENQ\EOT\ENQ\STX\ENQ\SOH\DC2\ETXH9_\n\
+    \\f\n\
+    \\ENQ\EOT\ENQ\STX\ENQ\ETX\DC2\ETXHbc\n\
     \]\n\
-    \\STX\EOT\ACK\DC2\EOTC\NULH\SOH\SUBQ An Update protocol message indicating that a Workflow Update has been rejected.\n\
+    \\STX\EOT\ACK\DC2\EOTL\NULQ\SOH\SUBQ An Update protocol message indicating that a Workflow Update has been rejected.\n\
     \\n\
     \\n\
     \\n\
-    \\ETX\EOT\ACK\SOH\DC2\ETXC\b\DC1\n\
+    \\ETX\EOT\ACK\SOH\DC2\ETXL\b\DC1\n\
     \\v\n\
-    \\EOT\EOT\ACK\STX\NUL\DC2\ETXD\EOT+\n\
+    \\EOT\EOT\ACK\STX\NUL\DC2\ETXM\EOT+\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\NUL\ENQ\DC2\ETXD\EOT\n\
+    \\ENQ\EOT\ACK\STX\NUL\ENQ\DC2\ETXM\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\NUL\SOH\DC2\ETXD\v&\n\
+    \\ENQ\EOT\ACK\STX\NUL\SOH\DC2\ETXM\v&\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\NUL\ETX\DC2\ETXD)*\n\
+    \\ENQ\EOT\ACK\STX\NUL\ETX\DC2\ETXM)*\n\
     \\v\n\
-    \\EOT\EOT\ACK\STX\SOH\DC2\ETXE\EOT3\n\
+    \\EOT\EOT\ACK\STX\SOH\DC2\ETXN\EOT3\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\SOH\ENQ\DC2\ETXE\EOT\t\n\
+    \\ENQ\EOT\ACK\STX\SOH\ENQ\DC2\ETXN\EOT\t\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\SOH\SOH\DC2\ETXE\n\
+    \\ENQ\EOT\ACK\STX\SOH\SOH\DC2\ETXN\n\
     \.\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\SOH\ETX\DC2\ETXE12\n\
+    \\ENQ\EOT\ACK\STX\SOH\ETX\DC2\ETXN12\n\
     \\v\n\
-    \\EOT\EOT\ACK\STX\STX\DC2\ETXF\EOT!\n\
+    \\EOT\EOT\ACK\STX\STX\DC2\ETXO\EOT!\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\STX\ACK\DC2\ETXF\EOT\v\n\
+    \\ENQ\EOT\ACK\STX\STX\ACK\DC2\ETXO\EOT\v\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\STX\SOH\DC2\ETXF\f\FS\n\
+    \\ENQ\EOT\ACK\STX\STX\SOH\DC2\ETXO\f\FS\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\STX\ETX\DC2\ETXF\US \n\
+    \\ENQ\EOT\ACK\STX\STX\ETX\DC2\ETXO\US \n\
     \\v\n\
-    \\EOT\EOT\ACK\STX\ETX\DC2\ETXG\EOT0\n\
+    \\EOT\EOT\ACK\STX\ETX\DC2\ETXP\EOT0\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\ETX\ACK\DC2\ETXG\EOT#\n\
+    \\ENQ\EOT\ACK\STX\ETX\ACK\DC2\ETXP\EOT#\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\ETX\SOH\DC2\ETXG$+\n\
+    \\ENQ\EOT\ACK\STX\ETX\SOH\DC2\ETXP$+\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\ETX\ETX\DC2\ETXG./\n\
+    \\ENQ\EOT\ACK\STX\ETX\ETX\DC2\ETXP./\n\
     \\142\SOH\n\
-    \\STX\EOT\a\DC2\EOTL\NULP\SOH\SUB\129\SOH An Update protocol message indicating that a Workflow Update has\n\
+    \\STX\EOT\a\DC2\EOTU\NULY\SOH\SUB\129\SOH An Update protocol message indicating that a Workflow Update has\n\
     \ been accepted (i.e. passed the worker-side validation phase).\n\
     \\n\
     \\n\
     \\n\
-    \\ETX\EOT\a\SOH\DC2\ETXL\b\DC2\n\
+    \\ETX\EOT\a\SOH\DC2\ETXU\b\DC2\n\
     \\v\n\
-    \\EOT\EOT\a\STX\NUL\DC2\ETXM\EOT+\n\
+    \\EOT\EOT\a\STX\NUL\DC2\ETXV\EOT+\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\NUL\ENQ\DC2\ETXM\EOT\n\
+    \\ENQ\EOT\a\STX\NUL\ENQ\DC2\ETXV\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\NUL\SOH\DC2\ETXM\v&\n\
+    \\ENQ\EOT\a\STX\NUL\SOH\DC2\ETXV\v&\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\NUL\ETX\DC2\ETXM)*\n\
+    \\ENQ\EOT\a\STX\NUL\ETX\DC2\ETXV)*\n\
     \\v\n\
-    \\EOT\EOT\a\STX\SOH\DC2\ETXN\EOT3\n\
+    \\EOT\EOT\a\STX\SOH\DC2\ETXW\EOT3\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\SOH\ENQ\DC2\ETXN\EOT\t\n\
+    \\ENQ\EOT\a\STX\SOH\ENQ\DC2\ETXW\EOT\t\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\SOH\SOH\DC2\ETXN\n\
+    \\ENQ\EOT\a\STX\SOH\SOH\DC2\ETXW\n\
     \.\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\SOH\ETX\DC2\ETXN12\n\
+    \\ENQ\EOT\a\STX\SOH\ETX\DC2\ETXW12\n\
     \\v\n\
-    \\EOT\EOT\a\STX\STX\DC2\ETXO\EOT!\n\
+    \\EOT\EOT\a\STX\STX\DC2\ETXX\EOT!\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\STX\ACK\DC2\ETXO\EOT\v\n\
+    \\ENQ\EOT\a\STX\STX\ACK\DC2\ETXX\EOT\v\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\STX\SOH\DC2\ETXO\f\FS\n\
+    \\ENQ\EOT\a\STX\STX\SOH\DC2\ETXX\f\FS\n\
     \\f\n\
-    \\ENQ\EOT\a\STX\STX\ETX\DC2\ETXO\US \n\
+    \\ENQ\EOT\a\STX\STX\ETX\DC2\ETXX\US \n\
     \u\n\
-    \\STX\EOT\b\DC2\EOTT\NULW\SOH\SUBi An Update protocol message indicating that a Workflow Update has\n\
+    \\STX\EOT\b\DC2\EOT]\NUL`\SOH\SUBi An Update protocol message indicating that a Workflow Update has\n\
     \ completed with the contained outcome.\n\
     \\n\
     \\n\
     \\n\
-    \\ETX\EOT\b\SOH\DC2\ETXT\b\DLE\n\
+    \\ETX\EOT\b\SOH\DC2\ETX]\b\DLE\n\
     \\v\n\
-    \\EOT\EOT\b\STX\NUL\DC2\ETXU\EOT\DC2\n\
+    \\EOT\EOT\b\STX\NUL\DC2\ETX^\EOT\DC2\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\NUL\ACK\DC2\ETXU\EOT\b\n\
+    \\ENQ\EOT\b\STX\NUL\ACK\DC2\ETX^\EOT\b\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\NUL\SOH\DC2\ETXU\t\r\n\
+    \\ENQ\EOT\b\STX\NUL\SOH\DC2\ETX^\t\r\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\NUL\ETX\DC2\ETXU\DLE\DC1\n\
+    \\ENQ\EOT\b\STX\NUL\ETX\DC2\ETX^\DLE\DC1\n\
     \\v\n\
-    \\EOT\EOT\b\STX\SOH\DC2\ETXV\EOT\CAN\n\
+    \\EOT\EOT\b\STX\SOH\DC2\ETX_\EOT\CAN\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\SOH\ACK\DC2\ETXV\EOT\v\n\
+    \\ENQ\EOT\b\STX\SOH\ACK\DC2\ETX_\EOT\v\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\SOH\SOH\DC2\ETXV\f\DC3\n\
+    \\ENQ\EOT\b\STX\SOH\SOH\DC2\ETX_\f\DC3\n\
     \\f\n\
-    \\ENQ\EOT\b\STX\SOH\ETX\DC2\ETXV\SYN\ETBb\ACKproto3"
+    \\ENQ\EOT\b\STX\SOH\ETX\DC2\ETX_\SYN\ETBb\ACKproto3"

@@ -27,6 +27,7 @@ import qualified Data.ProtoLens.Runtime.Data.Vector as Data.Vector
 import qualified Data.ProtoLens.Runtime.Data.Vector.Generic as Data.Vector.Generic
 import qualified Data.ProtoLens.Runtime.Data.Vector.Unboxed as Data.Vector.Unboxed
 import qualified Data.ProtoLens.Runtime.Text.Read as Text.Read
+import qualified Proto.Google.Protobuf.Duration
 import qualified Proto.Google.Protobuf.Timestamp
 import qualified Proto.Temporal.Api.Enums.V1.Namespace
 activeClusterName ::
@@ -66,6 +67,20 @@ maybe'failoverTime ::
   Lens.Family2.LensLike' f s a
 maybe'failoverTime
   = Data.ProtoLens.Field.field @"maybe'failoverTime"
+maybe'replicationRampDuration ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'replicationRampDuration" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'replicationRampDuration
+  = Data.ProtoLens.Field.field @"maybe'replicationRampDuration"
+replicationRampDuration ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "replicationRampDuration" a) =>
+  Lens.Family2.LensLike' f s a
+replicationRampDuration
+  = Data.ProtoLens.Field.field @"replicationRampDuration"
 state ::
   forall f s a.
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "state" a) =>

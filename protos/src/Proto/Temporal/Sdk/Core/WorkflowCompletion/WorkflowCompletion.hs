@@ -486,6 +486,10 @@ instance Control.DeepSeq.NFData Success where
 {- | Fields :
      
          * 'Proto.Temporal.Sdk.Core.WorkflowCompletion.WorkflowCompletion_Fields.runId' @:: Lens' WorkflowActivationCompletion Data.Text.Text@
+         * 'Proto.Temporal.Sdk.Core.WorkflowCompletion.WorkflowCompletion_Fields.payloadDownloadMetrics' @:: Lens' WorkflowActivationCompletion Proto.Temporal.Sdk.Core.Common.Common.ExternalStorageMetrics@
+         * 'Proto.Temporal.Sdk.Core.WorkflowCompletion.WorkflowCompletion_Fields.maybe'payloadDownloadMetrics' @:: Lens' WorkflowActivationCompletion (Prelude.Maybe Proto.Temporal.Sdk.Core.Common.Common.ExternalStorageMetrics)@
+         * 'Proto.Temporal.Sdk.Core.WorkflowCompletion.WorkflowCompletion_Fields.payloadUploadMetrics' @:: Lens' WorkflowActivationCompletion Proto.Temporal.Sdk.Core.Common.Common.ExternalStorageMetrics@
+         * 'Proto.Temporal.Sdk.Core.WorkflowCompletion.WorkflowCompletion_Fields.maybe'payloadUploadMetrics' @:: Lens' WorkflowActivationCompletion (Prelude.Maybe Proto.Temporal.Sdk.Core.Common.Common.ExternalStorageMetrics)@
          * 'Proto.Temporal.Sdk.Core.WorkflowCompletion.WorkflowCompletion_Fields.maybe'status' @:: Lens' WorkflowActivationCompletion (Prelude.Maybe WorkflowActivationCompletion'Status)@
          * 'Proto.Temporal.Sdk.Core.WorkflowCompletion.WorkflowCompletion_Fields.maybe'successful' @:: Lens' WorkflowActivationCompletion (Prelude.Maybe Success)@
          * 'Proto.Temporal.Sdk.Core.WorkflowCompletion.WorkflowCompletion_Fields.successful' @:: Lens' WorkflowActivationCompletion Success@
@@ -493,6 +497,8 @@ instance Control.DeepSeq.NFData Success where
          * 'Proto.Temporal.Sdk.Core.WorkflowCompletion.WorkflowCompletion_Fields.failed' @:: Lens' WorkflowActivationCompletion Failure@ -}
 data WorkflowActivationCompletion
   = WorkflowActivationCompletion'_constructor {_WorkflowActivationCompletion'runId :: !Data.Text.Text,
+                                               _WorkflowActivationCompletion'payloadDownloadMetrics :: !(Prelude.Maybe Proto.Temporal.Sdk.Core.Common.Common.ExternalStorageMetrics),
+                                               _WorkflowActivationCompletion'payloadUploadMetrics :: !(Prelude.Maybe Proto.Temporal.Sdk.Core.Common.Common.ExternalStorageMetrics),
                                                _WorkflowActivationCompletion'status :: !(Prelude.Maybe WorkflowActivationCompletion'Status),
                                                _WorkflowActivationCompletion'_unknownFields :: !Data.ProtoLens.FieldSet}
   deriving stock (Prelude.Eq, Prelude.Ord)
@@ -512,6 +518,40 @@ instance Data.ProtoLens.Field.HasField WorkflowActivationCompletion "runId" Data
         (Lens.Family2.Unchecked.lens
            _WorkflowActivationCompletion'runId
            (\ x__ y__ -> x__ {_WorkflowActivationCompletion'runId = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField WorkflowActivationCompletion "payloadDownloadMetrics" Proto.Temporal.Sdk.Core.Common.Common.ExternalStorageMetrics where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _WorkflowActivationCompletion'payloadDownloadMetrics
+           (\ x__ y__
+              -> x__
+                   {_WorkflowActivationCompletion'payloadDownloadMetrics = y__}))
+        (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
+instance Data.ProtoLens.Field.HasField WorkflowActivationCompletion "maybe'payloadDownloadMetrics" (Prelude.Maybe Proto.Temporal.Sdk.Core.Common.Common.ExternalStorageMetrics) where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _WorkflowActivationCompletion'payloadDownloadMetrics
+           (\ x__ y__
+              -> x__
+                   {_WorkflowActivationCompletion'payloadDownloadMetrics = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField WorkflowActivationCompletion "payloadUploadMetrics" Proto.Temporal.Sdk.Core.Common.Common.ExternalStorageMetrics where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _WorkflowActivationCompletion'payloadUploadMetrics
+           (\ x__ y__
+              -> x__ {_WorkflowActivationCompletion'payloadUploadMetrics = y__}))
+        (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
+instance Data.ProtoLens.Field.HasField WorkflowActivationCompletion "maybe'payloadUploadMetrics" (Prelude.Maybe Proto.Temporal.Sdk.Core.Common.Common.ExternalStorageMetrics) where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _WorkflowActivationCompletion'payloadUploadMetrics
+           (\ x__ y__
+              -> x__ {_WorkflowActivationCompletion'payloadUploadMetrics = y__}))
         Prelude.id
 instance Data.ProtoLens.Field.HasField WorkflowActivationCompletion "maybe'status" (Prelude.Maybe WorkflowActivationCompletion'Status) where
   fieldOf _
@@ -589,7 +629,9 @@ instance Data.ProtoLens.Message WorkflowActivationCompletion where
       \\n\
       \successful\CAN\STX \SOH(\v2$.coresdk.workflow_completion.SuccessH\NULR\n\
       \successful\DC2>\n\
-      \\ACKfailed\CAN\ETX \SOH(\v2$.coresdk.workflow_completion.FailureH\NULR\ACKfailedB\b\n\
+      \\ACKfailed\CAN\ETX \SOH(\v2$.coresdk.workflow_completion.FailureH\NULR\ACKfailed\DC2`\n\
+      \\CANpayload_download_metrics\CAN\EOT \SOH(\v2&.coresdk.common.ExternalStorageMetricsR\SYNpayloadDownloadMetrics\DC2\\\n\
+      \\SYNpayload_upload_metrics\CAN\ENQ \SOH(\v2&.coresdk.common.ExternalStorageMetricsR\DC4payloadUploadMetricsB\b\n\
       \\ACKstatus"
   packedFileDescriptor _ = packedFileDescriptor
   fieldsByTag
@@ -601,6 +643,22 @@ instance Data.ProtoLens.Message WorkflowActivationCompletion where
                  Data.ProtoLens.FieldTypeDescriptor Data.Text.Text)
               (Data.ProtoLens.PlainField
                  Data.ProtoLens.Optional (Data.ProtoLens.Field.field @"runId")) ::
+              Data.ProtoLens.FieldDescriptor WorkflowActivationCompletion
+        payloadDownloadMetrics__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "payload_download_metrics"
+              (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                 Data.ProtoLens.FieldTypeDescriptor Proto.Temporal.Sdk.Core.Common.Common.ExternalStorageMetrics)
+              (Data.ProtoLens.OptionalField
+                 (Data.ProtoLens.Field.field @"maybe'payloadDownloadMetrics")) ::
+              Data.ProtoLens.FieldDescriptor WorkflowActivationCompletion
+        payloadUploadMetrics__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "payload_upload_metrics"
+              (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                 Data.ProtoLens.FieldTypeDescriptor Proto.Temporal.Sdk.Core.Common.Common.ExternalStorageMetrics)
+              (Data.ProtoLens.OptionalField
+                 (Data.ProtoLens.Field.field @"maybe'payloadUploadMetrics")) ::
               Data.ProtoLens.FieldDescriptor WorkflowActivationCompletion
         successful__field_descriptor
           = Data.ProtoLens.FieldDescriptor
@@ -621,6 +679,8 @@ instance Data.ProtoLens.Message WorkflowActivationCompletion where
       in
         Data.Map.fromList
           [(Data.ProtoLens.Tag 1, runId__field_descriptor),
+           (Data.ProtoLens.Tag 4, payloadDownloadMetrics__field_descriptor),
+           (Data.ProtoLens.Tag 5, payloadUploadMetrics__field_descriptor),
            (Data.ProtoLens.Tag 2, successful__field_descriptor),
            (Data.ProtoLens.Tag 3, failed__field_descriptor)]
   unknownFields
@@ -631,6 +691,8 @@ instance Data.ProtoLens.Message WorkflowActivationCompletion where
   defMessage
     = WorkflowActivationCompletion'_constructor
         {_WorkflowActivationCompletion'runId = Data.ProtoLens.fieldDefault,
+         _WorkflowActivationCompletion'payloadDownloadMetrics = Prelude.Nothing,
+         _WorkflowActivationCompletion'payloadUploadMetrics = Prelude.Nothing,
          _WorkflowActivationCompletion'status = Prelude.Nothing,
          _WorkflowActivationCompletion'_unknownFields = []}
   parseMessage
@@ -663,6 +725,24 @@ instance Data.ProtoLens.Message WorkflowActivationCompletion where
                                              (Prelude.fromIntegral len))
                                        "run_id"
                                 loop (Lens.Family2.set (Data.ProtoLens.Field.field @"runId") y x)
+                        34
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.isolate
+                                             (Prelude.fromIntegral len) Data.ProtoLens.parseMessage)
+                                       "payload_download_metrics"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field @"payloadDownloadMetrics") y x)
+                        42
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.isolate
+                                             (Prelude.fromIntegral len) Data.ProtoLens.parseMessage)
+                                       "payload_upload_metrics"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field @"payloadUploadMetrics") y x)
                         18
                           -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
                                        (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
@@ -707,31 +787,63 @@ instance Data.ProtoLens.Message WorkflowActivationCompletion where
                          Data.Text.Encoding.encodeUtf8 _v))
              ((Data.Monoid.<>)
                 (case
-                     Lens.Family2.view (Data.ProtoLens.Field.field @"maybe'status") _x
+                     Lens.Family2.view
+                       (Data.ProtoLens.Field.field @"maybe'payloadDownloadMetrics") _x
                  of
                    Prelude.Nothing -> Data.Monoid.mempty
-                   (Prelude.Just (WorkflowActivationCompletion'Successful v))
+                   (Prelude.Just _v)
                      -> (Data.Monoid.<>)
-                          (Data.ProtoLens.Encoding.Bytes.putVarInt 18)
+                          (Data.ProtoLens.Encoding.Bytes.putVarInt 34)
                           ((Prelude..)
                              (\ bs
                                 -> (Data.Monoid.<>)
                                      (Data.ProtoLens.Encoding.Bytes.putVarInt
                                         (Prelude.fromIntegral (Data.ByteString.length bs)))
                                      (Data.ProtoLens.Encoding.Bytes.putBytes bs))
-                             Data.ProtoLens.encodeMessage v)
-                   (Prelude.Just (WorkflowActivationCompletion'Failed v))
-                     -> (Data.Monoid.<>)
-                          (Data.ProtoLens.Encoding.Bytes.putVarInt 26)
-                          ((Prelude..)
-                             (\ bs
-                                -> (Data.Monoid.<>)
-                                     (Data.ProtoLens.Encoding.Bytes.putVarInt
-                                        (Prelude.fromIntegral (Data.ByteString.length bs)))
-                                     (Data.ProtoLens.Encoding.Bytes.putBytes bs))
-                             Data.ProtoLens.encodeMessage v))
-                (Data.ProtoLens.Encoding.Wire.buildFieldSet
-                   (Lens.Family2.view Data.ProtoLens.unknownFields _x)))
+                             Data.ProtoLens.encodeMessage _v))
+                ((Data.Monoid.<>)
+                   (case
+                        Lens.Family2.view
+                          (Data.ProtoLens.Field.field @"maybe'payloadUploadMetrics") _x
+                    of
+                      Prelude.Nothing -> Data.Monoid.mempty
+                      (Prelude.Just _v)
+                        -> (Data.Monoid.<>)
+                             (Data.ProtoLens.Encoding.Bytes.putVarInt 42)
+                             ((Prelude..)
+                                (\ bs
+                                   -> (Data.Monoid.<>)
+                                        (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                           (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                        (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                                Data.ProtoLens.encodeMessage _v))
+                   ((Data.Monoid.<>)
+                      (case
+                           Lens.Family2.view (Data.ProtoLens.Field.field @"maybe'status") _x
+                       of
+                         Prelude.Nothing -> Data.Monoid.mempty
+                         (Prelude.Just (WorkflowActivationCompletion'Successful v))
+                           -> (Data.Monoid.<>)
+                                (Data.ProtoLens.Encoding.Bytes.putVarInt 18)
+                                ((Prelude..)
+                                   (\ bs
+                                      -> (Data.Monoid.<>)
+                                           (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                              (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                           (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                                   Data.ProtoLens.encodeMessage v)
+                         (Prelude.Just (WorkflowActivationCompletion'Failed v))
+                           -> (Data.Monoid.<>)
+                                (Data.ProtoLens.Encoding.Bytes.putVarInt 26)
+                                ((Prelude..)
+                                   (\ bs
+                                      -> (Data.Monoid.<>)
+                                           (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                              (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                           (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                                   Data.ProtoLens.encodeMessage v))
+                      (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                         (Lens.Family2.view Data.ProtoLens.unknownFields _x)))))
 instance Control.DeepSeq.NFData WorkflowActivationCompletion where
   rnf
     = \ x__
@@ -740,7 +852,11 @@ instance Control.DeepSeq.NFData WorkflowActivationCompletion where
              (Control.DeepSeq.deepseq
                 (_WorkflowActivationCompletion'runId x__)
                 (Control.DeepSeq.deepseq
-                   (_WorkflowActivationCompletion'status x__) ()))
+                   (_WorkflowActivationCompletion'payloadDownloadMetrics x__)
+                   (Control.DeepSeq.deepseq
+                      (_WorkflowActivationCompletion'payloadUploadMetrics x__)
+                      (Control.DeepSeq.deepseq
+                         (_WorkflowActivationCompletion'status x__) ()))))
 instance Control.DeepSeq.NFData WorkflowActivationCompletion'Status where
   rnf (WorkflowActivationCompletion'Successful x__)
     = Control.DeepSeq.rnf x__
@@ -768,13 +884,15 @@ _WorkflowActivationCompletion'Failed
 packedFileDescriptor :: Data.ByteString.ByteString
 packedFileDescriptor
   = "\n\
-    \?temporal/sdk/core/workflow_completion/workflow_completion.proto\DC2\ESCcoresdk.workflow_completion\SUB%temporal/api/failure/v1/message.proto\SUB(temporal/api/enums/v1/failed_cause.proto\SUB$temporal/api/enums/v1/workflow.proto\SUB%temporal/sdk/core/common/common.proto\SUB;temporal/sdk/core/workflow_commands/workflow_commands.proto\"\199\SOH\n\
+    \?temporal/sdk/core/workflow_completion/workflow_completion.proto\DC2\ESCcoresdk.workflow_completion\SUB%temporal/api/failure/v1/message.proto\SUB(temporal/api/enums/v1/failed_cause.proto\SUB$temporal/api/enums/v1/workflow.proto\SUB%temporal/sdk/core/common/common.proto\SUB;temporal/sdk/core/workflow_commands/workflow_commands.proto\"\135\ETX\n\
     \\FSWorkflowActivationCompletion\DC2\NAK\n\
     \\ACKrun_id\CAN\SOH \SOH(\tR\ENQrunId\DC2F\n\
     \\n\
     \successful\CAN\STX \SOH(\v2$.coresdk.workflow_completion.SuccessH\NULR\n\
     \successful\DC2>\n\
-    \\ACKfailed\CAN\ETX \SOH(\v2$.coresdk.workflow_completion.FailureH\NULR\ACKfailedB\b\n\
+    \\ACKfailed\CAN\ETX \SOH(\v2$.coresdk.workflow_completion.FailureH\NULR\ACKfailed\DC2`\n\
+    \\CANpayload_download_metrics\CAN\EOT \SOH(\v2&.coresdk.common.ExternalStorageMetricsR\SYNpayloadDownloadMetrics\DC2\\\n\
+    \\SYNpayload_upload_metrics\CAN\ENQ \SOH(\v2&.coresdk.common.ExternalStorageMetricsR\DC4payloadUploadMetricsB\b\n\
     \\ACKstatus\"\221\SOH\n\
     \\aSuccess\DC2F\n\
     \\bcommands\CAN\SOH \ETX(\v2*.coresdk.workflow_commands.WorkflowCommandR\bcommands\DC2.\n\
@@ -783,8 +901,8 @@ packedFileDescriptor
     \\aFailure\DC2:\n\
     \\afailure\CAN\SOH \SOH(\v2 .temporal.api.failure.v1.FailureR\afailure\DC2O\n\
     \\vforce_cause\CAN\STX \SOH(\SO2..temporal.api.enums.v1.WorkflowTaskFailedCauseR\n\
-    \forceCauseB8\234\STX5Temporalio::Internal::Bridge::Api::WorkflowCompletionJ\163\t\n\
-    \\ACK\DC2\EOT\NUL\NUL$\SOH\n\
+    \forceCauseB8\234\STX5Temporalio::Internal::Bridge::Api::WorkflowCompletionJ\202\f\n\
+    \\ACK\DC2\EOT\NUL\NUL*\SOH\n\
     \\b\n\
     \\SOH\f\DC2\ETX\NUL\NUL\DC2\n\
     \\b\n\
@@ -804,7 +922,7 @@ packedFileDescriptor
     \\t\n\
     \\STX\ETX\EOT\DC2\ETX\t\NULE\n\
     \P\n\
-    \\STX\EOT\NUL\DC2\EOT\f\NUL\DC3\SOH\SUBD Result of a single workflow activation, reported from lang to core\n\
+    \\STX\EOT\NUL\DC2\EOT\f\NUL\EM\SOH\SUBD Result of a single workflow activation, reported from lang to core\n\
     \\n\
     \\n\
     \\n\
@@ -840,63 +958,83 @@ packedFileDescriptor
     \\ENQ\EOT\NUL\STX\STX\SOH\DC2\ETX\DC1\DLE\SYN\n\
     \\f\n\
     \\ENQ\EOT\NUL\STX\STX\ETX\DC2\ETX\DC1\EM\SUB\n\
+    \\171\SOH\n\
+    \\EOT\EOT\NUL\STX\ETX\DC2\ETX\NAK\EOT?\SUB\157\SOH Metrics for external payload storage downloads (retrievals) performed while processing\n\
+    \ this activation. Only set when external storage retrieved payloads.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\NUL\STX\ETX\ACK\DC2\ETX\NAK\EOT!\n\
+    \\f\n\
+    \\ENQ\EOT\NUL\STX\ETX\SOH\DC2\ETX\NAK\":\n\
+    \\f\n\
+    \\ENQ\EOT\NUL\STX\ETX\ETX\DC2\ETX\NAK=>\n\
+    \\162\SOH\n\
+    \\EOT\EOT\NUL\STX\EOT\DC2\ETX\CAN\EOT=\SUB\148\SOH Metrics for external payload storage uploads (stores) performed while processing this\n\
+    \ activation. Only set when external storage stored payloads.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\NUL\STX\EOT\ACK\DC2\ETX\CAN\EOT!\n\
+    \\f\n\
+    \\ENQ\EOT\NUL\STX\EOT\SOH\DC2\ETX\CAN\"8\n\
+    \\f\n\
+    \\ENQ\EOT\NUL\STX\EOT\ETX\DC2\ETX\CAN;<\n\
     \h\n\
-    \\STX\EOT\SOH\DC2\EOT\SYN\NUL\GS\SOH\SUB\\ Successful workflow activation with a list of commands generated by the workflow execution\n\
+    \\STX\EOT\SOH\DC2\EOT\FS\NUL#\SOH\SUB\\ Successful workflow activation with a list of commands generated by the workflow execution\n\
     \\n\
     \\n\
     \\n\
-    \\ETX\EOT\SOH\SOH\DC2\ETX\SYN\b\SI\n\
+    \\ETX\EOT\SOH\SOH\DC2\ETX\FS\b\SI\n\
     \E\n\
-    \\EOT\EOT\SOH\STX\NUL\DC2\ETX\CAN\EOT<\SUB8 A list of commands to send back to the temporal server\n\
+    \\EOT\EOT\SOH\STX\NUL\DC2\ETX\RS\EOT<\SUB8 A list of commands to send back to the temporal server\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\NUL\EOT\DC2\ETX\CAN\EOT\f\n\
+    \\ENQ\EOT\SOH\STX\NUL\EOT\DC2\ETX\RS\EOT\f\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\NUL\ACK\DC2\ETX\CAN\r.\n\
+    \\ENQ\EOT\SOH\STX\NUL\ACK\DC2\ETX\RS\r.\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\NUL\SOH\DC2\ETX\CAN/7\n\
+    \\ENQ\EOT\SOH\STX\NUL\SOH\DC2\ETX\RS/7\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\NUL\ETX\DC2\ETX\CAN:;\n\
+    \\ENQ\EOT\SOH\STX\NUL\ETX\DC2\ETX\RS:;\n\
     \^\n\
-    \\EOT\EOT\SOH\STX\SOH\DC2\ETX\SUB\EOT,\SUBQ Any internal flags which the lang SDK used in the processing of this activation\n\
+    \\EOT\EOT\SOH\STX\SOH\DC2\ETX \EOT,\SUBQ Any internal flags which the lang SDK used in the processing of this activation\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\SOH\EOT\DC2\ETX\SUB\EOT\f\n\
+    \\ENQ\EOT\SOH\STX\SOH\EOT\DC2\ETX \EOT\f\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\SOH\ENQ\DC2\ETX\SUB\r\DC3\n\
+    \\ENQ\EOT\SOH\STX\SOH\ENQ\DC2\ETX \r\DC3\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\SOH\SOH\DC2\ETX\SUB\DC4'\n\
+    \\ENQ\EOT\SOH\STX\SOH\SOH\DC2\ETX \DC4'\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\SOH\ETX\DC2\ETX\SUB*+\n\
+    \\ENQ\EOT\SOH\STX\SOH\ETX\DC2\ETX *+\n\
     \G\n\
-    \\EOT\EOT\SOH\STX\STX\DC2\ETX\FS\EOTE\SUB: The versioning behavior this workflow is currently using\n\
+    \\EOT\EOT\SOH\STX\STX\DC2\ETX\"\EOTE\SUB: The versioning behavior this workflow is currently using\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\STX\ACK\DC2\ETX\FS\EOT,\n\
+    \\ENQ\EOT\SOH\STX\STX\ACK\DC2\ETX\"\EOT,\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\STX\SOH\DC2\ETX\FS-@\n\
+    \\ENQ\EOT\SOH\STX\STX\SOH\DC2\ETX\"-@\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\STX\ETX\DC2\ETX\FSCD\n\
+    \\ENQ\EOT\SOH\STX\STX\ETX\DC2\ETX\"CD\n\
     \7\n\
-    \\STX\EOT\STX\DC2\EOT \NUL$\SOH\SUB+ Failure to activate or execute a workflow\n\
+    \\STX\EOT\STX\DC2\EOT&\NUL*\SOH\SUB+ Failure to activate or execute a workflow\n\
     \\n\
     \\n\
     \\n\
-    \\ETX\EOT\STX\SOH\DC2\ETX \b\SI\n\
+    \\ETX\EOT\STX\SOH\DC2\ETX&\b\SI\n\
     \\v\n\
-    \\EOT\EOT\STX\STX\NUL\DC2\ETX!\EOT0\n\
+    \\EOT\EOT\STX\STX\NUL\DC2\ETX'\EOT0\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\NUL\ACK\DC2\ETX!\EOT#\n\
+    \\ENQ\EOT\STX\STX\NUL\ACK\DC2\ETX'\EOT#\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\NUL\SOH\DC2\ETX!$+\n\
+    \\ENQ\EOT\STX\STX\NUL\SOH\DC2\ETX'$+\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\NUL\ETX\DC2\ETX!./\n\
+    \\ENQ\EOT\STX\STX\NUL\ETX\DC2\ETX'./\n\
     \6\n\
-    \\EOT\EOT\STX\STX\SOH\DC2\ETX#\EOTB\SUB) Forces overriding the WFT failure cause\n\
+    \\EOT\EOT\STX\STX\SOH\DC2\ETX)\EOTB\SUB) Forces overriding the WFT failure cause\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\SOH\ACK\DC2\ETX#\EOT1\n\
+    \\ENQ\EOT\STX\STX\SOH\ACK\DC2\ETX)\EOT1\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\SOH\SOH\DC2\ETX#2=\n\
+    \\ENQ\EOT\STX\STX\SOH\SOH\DC2\ETX)2=\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\SOH\ETX\DC2\ETX#@Ab\ACKproto3"
+    \\ENQ\EOT\STX\STX\SOH\ETX\DC2\ETX)@Ab\ACKproto3"

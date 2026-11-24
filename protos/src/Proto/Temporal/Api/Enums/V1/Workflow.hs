@@ -6,6 +6,9 @@
 module Proto.Temporal.Api.Enums.V1.Workflow (
         ContinueAsNewInitiator(..), ContinueAsNewInitiator(),
         ContinueAsNewInitiator'UnrecognizedValue,
+        ContinueAsNewVersioningBehavior(..),
+        ContinueAsNewVersioningBehavior(),
+        ContinueAsNewVersioningBehavior'UnrecognizedValue,
         HistoryEventFilterType(..), HistoryEventFilterType(),
         HistoryEventFilterType'UnrecognizedValue, ParentClosePolicy(..),
         ParentClosePolicy(), ParentClosePolicy'UnrecognizedValue,
@@ -13,7 +16,9 @@ module Proto.Temporal.Api.Enums.V1.Workflow (
         PendingActivityState'UnrecognizedValue,
         PendingWorkflowTaskState(..), PendingWorkflowTaskState(),
         PendingWorkflowTaskState'UnrecognizedValue, RetryState(..),
-        RetryState(), RetryState'UnrecognizedValue, TimeoutType(..),
+        RetryState(), RetryState'UnrecognizedValue,
+        SuggestContinueAsNewReason(..), SuggestContinueAsNewReason(),
+        SuggestContinueAsNewReason'UnrecognizedValue, TimeoutType(..),
         TimeoutType(), TimeoutType'UnrecognizedValue,
         VersioningBehavior(..), VersioningBehavior(),
         VersioningBehavior'UnrecognizedValue, WorkflowExecutionStatus(..),
@@ -141,6 +146,94 @@ instance Prelude.Enum ContinueAsNewInitiator where
 instance Data.ProtoLens.FieldDefault ContinueAsNewInitiator where
   fieldDefault = CONTINUE_AS_NEW_INITIATOR_UNSPECIFIED
 instance Control.DeepSeq.NFData ContinueAsNewInitiator where
+  rnf x__ = Prelude.seq x__ ()
+newtype ContinueAsNewVersioningBehavior'UnrecognizedValue
+  = ContinueAsNewVersioningBehavior'UnrecognizedValue Data.Int.Int32
+  deriving stock (Prelude.Eq, Prelude.Ord, Prelude.Show)
+data ContinueAsNewVersioningBehavior
+  = CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_UNSPECIFIED |
+    CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_AUTO_UPGRADE |
+    CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_USE_RAMPING_VERSION |
+    ContinueAsNewVersioningBehavior'Unrecognized !ContinueAsNewVersioningBehavior'UnrecognizedValue
+  deriving stock (Prelude.Show, Prelude.Eq, Prelude.Ord)
+instance Data.ProtoLens.MessageEnum ContinueAsNewVersioningBehavior where
+  maybeToEnum 0
+    = Prelude.Just CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_UNSPECIFIED
+  maybeToEnum 1
+    = Prelude.Just CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_AUTO_UPGRADE
+  maybeToEnum 2
+    = Prelude.Just
+        CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_USE_RAMPING_VERSION
+  maybeToEnum k
+    = Prelude.Just
+        (ContinueAsNewVersioningBehavior'Unrecognized
+           (ContinueAsNewVersioningBehavior'UnrecognizedValue
+              (Prelude.fromIntegral k)))
+  showEnum CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_UNSPECIFIED
+    = "CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_UNSPECIFIED"
+  showEnum CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_AUTO_UPGRADE
+    = "CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_AUTO_UPGRADE"
+  showEnum CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_USE_RAMPING_VERSION
+    = "CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_USE_RAMPING_VERSION"
+  showEnum
+    (ContinueAsNewVersioningBehavior'Unrecognized (ContinueAsNewVersioningBehavior'UnrecognizedValue k))
+    = Prelude.show k
+  readEnum k
+    | (Prelude.==) k "CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_UNSPECIFIED"
+    = Prelude.Just CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_UNSPECIFIED
+    | (Prelude.==) k "CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_AUTO_UPGRADE"
+    = Prelude.Just CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_AUTO_UPGRADE
+    | (Prelude.==)
+        k "CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_USE_RAMPING_VERSION"
+    = Prelude.Just
+        CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_USE_RAMPING_VERSION
+    | Prelude.otherwise
+    = (Prelude.>>=) (Text.Read.readMaybe k) Data.ProtoLens.maybeToEnum
+instance Prelude.Bounded ContinueAsNewVersioningBehavior where
+  minBound = CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_UNSPECIFIED
+  maxBound = CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_USE_RAMPING_VERSION
+instance Prelude.Enum ContinueAsNewVersioningBehavior where
+  toEnum k__
+    = Prelude.maybe
+        (Prelude.error
+           ((Prelude.++)
+              "toEnum: unknown value for enum ContinueAsNewVersioningBehavior: "
+              (Prelude.show k__)))
+        Prelude.id (Data.ProtoLens.maybeToEnum k__)
+  fromEnum CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_UNSPECIFIED = 0
+  fromEnum CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_AUTO_UPGRADE = 1
+  fromEnum CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_USE_RAMPING_VERSION
+    = 2
+  fromEnum
+    (ContinueAsNewVersioningBehavior'Unrecognized (ContinueAsNewVersioningBehavior'UnrecognizedValue k))
+    = Prelude.fromIntegral k
+  succ CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_USE_RAMPING_VERSION
+    = Prelude.error
+        "ContinueAsNewVersioningBehavior.succ: bad argument CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_USE_RAMPING_VERSION. This value would be out of bounds."
+  succ CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_UNSPECIFIED
+    = CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_AUTO_UPGRADE
+  succ CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_AUTO_UPGRADE
+    = CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_USE_RAMPING_VERSION
+  succ (ContinueAsNewVersioningBehavior'Unrecognized _)
+    = Prelude.error
+        "ContinueAsNewVersioningBehavior.succ: bad argument: unrecognized value"
+  pred CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_UNSPECIFIED
+    = Prelude.error
+        "ContinueAsNewVersioningBehavior.pred: bad argument CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_UNSPECIFIED. This value would be out of bounds."
+  pred CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_AUTO_UPGRADE
+    = CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_UNSPECIFIED
+  pred CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_USE_RAMPING_VERSION
+    = CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_AUTO_UPGRADE
+  pred (ContinueAsNewVersioningBehavior'Unrecognized _)
+    = Prelude.error
+        "ContinueAsNewVersioningBehavior.pred: bad argument: unrecognized value"
+  enumFrom = Data.ProtoLens.Message.Enum.messageEnumFrom
+  enumFromTo = Data.ProtoLens.Message.Enum.messageEnumFromTo
+  enumFromThen = Data.ProtoLens.Message.Enum.messageEnumFromThen
+  enumFromThenTo = Data.ProtoLens.Message.Enum.messageEnumFromThenTo
+instance Data.ProtoLens.FieldDefault ContinueAsNewVersioningBehavior where
+  fieldDefault = CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_UNSPECIFIED
+instance Control.DeepSeq.NFData ContinueAsNewVersioningBehavior where
   rnf x__ = Prelude.seq x__ ()
 newtype HistoryEventFilterType'UnrecognizedValue
   = HistoryEventFilterType'UnrecognizedValue Data.Int.Int32
@@ -627,6 +720,108 @@ instance Data.ProtoLens.FieldDefault RetryState where
   fieldDefault = RETRY_STATE_UNSPECIFIED
 instance Control.DeepSeq.NFData RetryState where
   rnf x__ = Prelude.seq x__ ()
+newtype SuggestContinueAsNewReason'UnrecognizedValue
+  = SuggestContinueAsNewReason'UnrecognizedValue Data.Int.Int32
+  deriving stock (Prelude.Eq, Prelude.Ord, Prelude.Show)
+data SuggestContinueAsNewReason
+  = SUGGEST_CONTINUE_AS_NEW_REASON_UNSPECIFIED |
+    SUGGEST_CONTINUE_AS_NEW_REASON_HISTORY_SIZE_TOO_LARGE |
+    SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_HISTORY_EVENTS |
+    SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_UPDATES |
+    SuggestContinueAsNewReason'Unrecognized !SuggestContinueAsNewReason'UnrecognizedValue
+  deriving stock (Prelude.Show, Prelude.Eq, Prelude.Ord)
+instance Data.ProtoLens.MessageEnum SuggestContinueAsNewReason where
+  maybeToEnum 0
+    = Prelude.Just SUGGEST_CONTINUE_AS_NEW_REASON_UNSPECIFIED
+  maybeToEnum 1
+    = Prelude.Just
+        SUGGEST_CONTINUE_AS_NEW_REASON_HISTORY_SIZE_TOO_LARGE
+  maybeToEnum 2
+    = Prelude.Just
+        SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_HISTORY_EVENTS
+  maybeToEnum 3
+    = Prelude.Just SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_UPDATES
+  maybeToEnum k
+    = Prelude.Just
+        (SuggestContinueAsNewReason'Unrecognized
+           (SuggestContinueAsNewReason'UnrecognizedValue
+              (Prelude.fromIntegral k)))
+  showEnum SUGGEST_CONTINUE_AS_NEW_REASON_UNSPECIFIED
+    = "SUGGEST_CONTINUE_AS_NEW_REASON_UNSPECIFIED"
+  showEnum SUGGEST_CONTINUE_AS_NEW_REASON_HISTORY_SIZE_TOO_LARGE
+    = "SUGGEST_CONTINUE_AS_NEW_REASON_HISTORY_SIZE_TOO_LARGE"
+  showEnum SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_HISTORY_EVENTS
+    = "SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_HISTORY_EVENTS"
+  showEnum SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_UPDATES
+    = "SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_UPDATES"
+  showEnum
+    (SuggestContinueAsNewReason'Unrecognized (SuggestContinueAsNewReason'UnrecognizedValue k))
+    = Prelude.show k
+  readEnum k
+    | (Prelude.==) k "SUGGEST_CONTINUE_AS_NEW_REASON_UNSPECIFIED"
+    = Prelude.Just SUGGEST_CONTINUE_AS_NEW_REASON_UNSPECIFIED
+    | (Prelude.==)
+        k "SUGGEST_CONTINUE_AS_NEW_REASON_HISTORY_SIZE_TOO_LARGE"
+    = Prelude.Just
+        SUGGEST_CONTINUE_AS_NEW_REASON_HISTORY_SIZE_TOO_LARGE
+    | (Prelude.==)
+        k "SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_HISTORY_EVENTS"
+    = Prelude.Just
+        SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_HISTORY_EVENTS
+    | (Prelude.==) k "SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_UPDATES"
+    = Prelude.Just SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_UPDATES
+    | Prelude.otherwise
+    = (Prelude.>>=) (Text.Read.readMaybe k) Data.ProtoLens.maybeToEnum
+instance Prelude.Bounded SuggestContinueAsNewReason where
+  minBound = SUGGEST_CONTINUE_AS_NEW_REASON_UNSPECIFIED
+  maxBound = SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_UPDATES
+instance Prelude.Enum SuggestContinueAsNewReason where
+  toEnum k__
+    = Prelude.maybe
+        (Prelude.error
+           ((Prelude.++)
+              "toEnum: unknown value for enum SuggestContinueAsNewReason: "
+              (Prelude.show k__)))
+        Prelude.id (Data.ProtoLens.maybeToEnum k__)
+  fromEnum SUGGEST_CONTINUE_AS_NEW_REASON_UNSPECIFIED = 0
+  fromEnum SUGGEST_CONTINUE_AS_NEW_REASON_HISTORY_SIZE_TOO_LARGE = 1
+  fromEnum SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_HISTORY_EVENTS = 2
+  fromEnum SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_UPDATES = 3
+  fromEnum
+    (SuggestContinueAsNewReason'Unrecognized (SuggestContinueAsNewReason'UnrecognizedValue k))
+    = Prelude.fromIntegral k
+  succ SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_UPDATES
+    = Prelude.error
+        "SuggestContinueAsNewReason.succ: bad argument SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_UPDATES. This value would be out of bounds."
+  succ SUGGEST_CONTINUE_AS_NEW_REASON_UNSPECIFIED
+    = SUGGEST_CONTINUE_AS_NEW_REASON_HISTORY_SIZE_TOO_LARGE
+  succ SUGGEST_CONTINUE_AS_NEW_REASON_HISTORY_SIZE_TOO_LARGE
+    = SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_HISTORY_EVENTS
+  succ SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_HISTORY_EVENTS
+    = SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_UPDATES
+  succ (SuggestContinueAsNewReason'Unrecognized _)
+    = Prelude.error
+        "SuggestContinueAsNewReason.succ: bad argument: unrecognized value"
+  pred SUGGEST_CONTINUE_AS_NEW_REASON_UNSPECIFIED
+    = Prelude.error
+        "SuggestContinueAsNewReason.pred: bad argument SUGGEST_CONTINUE_AS_NEW_REASON_UNSPECIFIED. This value would be out of bounds."
+  pred SUGGEST_CONTINUE_AS_NEW_REASON_HISTORY_SIZE_TOO_LARGE
+    = SUGGEST_CONTINUE_AS_NEW_REASON_UNSPECIFIED
+  pred SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_HISTORY_EVENTS
+    = SUGGEST_CONTINUE_AS_NEW_REASON_HISTORY_SIZE_TOO_LARGE
+  pred SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_UPDATES
+    = SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_HISTORY_EVENTS
+  pred (SuggestContinueAsNewReason'Unrecognized _)
+    = Prelude.error
+        "SuggestContinueAsNewReason.pred: bad argument: unrecognized value"
+  enumFrom = Data.ProtoLens.Message.Enum.messageEnumFrom
+  enumFromTo = Data.ProtoLens.Message.Enum.messageEnumFromTo
+  enumFromThen = Data.ProtoLens.Message.Enum.messageEnumFromThen
+  enumFromThenTo = Data.ProtoLens.Message.Enum.messageEnumFromThenTo
+instance Data.ProtoLens.FieldDefault SuggestContinueAsNewReason where
+  fieldDefault = SUGGEST_CONTINUE_AS_NEW_REASON_UNSPECIFIED
+instance Control.DeepSeq.NFData SuggestContinueAsNewReason where
+  rnf x__ = Prelude.seq x__ ()
 newtype TimeoutType'UnrecognizedValue
   = TimeoutType'UnrecognizedValue Data.Int.Int32
   deriving stock (Prelude.Eq, Prelude.Ord, Prelude.Show)
@@ -807,6 +1002,7 @@ data WorkflowExecutionStatus
     WORKFLOW_EXECUTION_STATUS_TERMINATED |
     WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW |
     WORKFLOW_EXECUTION_STATUS_TIMED_OUT |
+    WORKFLOW_EXECUTION_STATUS_PAUSED |
     WorkflowExecutionStatus'Unrecognized !WorkflowExecutionStatus'UnrecognizedValue
   deriving stock (Prelude.Show, Prelude.Eq, Prelude.Ord)
 instance Data.ProtoLens.MessageEnum WorkflowExecutionStatus where
@@ -819,6 +1015,7 @@ instance Data.ProtoLens.MessageEnum WorkflowExecutionStatus where
   maybeToEnum 6
     = Prelude.Just WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW
   maybeToEnum 7 = Prelude.Just WORKFLOW_EXECUTION_STATUS_TIMED_OUT
+  maybeToEnum 8 = Prelude.Just WORKFLOW_EXECUTION_STATUS_PAUSED
   maybeToEnum k
     = Prelude.Just
         (WorkflowExecutionStatus'Unrecognized
@@ -840,6 +1037,8 @@ instance Data.ProtoLens.MessageEnum WorkflowExecutionStatus where
     = "WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW"
   showEnum WORKFLOW_EXECUTION_STATUS_TIMED_OUT
     = "WORKFLOW_EXECUTION_STATUS_TIMED_OUT"
+  showEnum WORKFLOW_EXECUTION_STATUS_PAUSED
+    = "WORKFLOW_EXECUTION_STATUS_PAUSED"
   showEnum
     (WorkflowExecutionStatus'Unrecognized (WorkflowExecutionStatus'UnrecognizedValue k))
     = Prelude.show k
@@ -860,11 +1059,13 @@ instance Data.ProtoLens.MessageEnum WorkflowExecutionStatus where
     = Prelude.Just WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW
     | (Prelude.==) k "WORKFLOW_EXECUTION_STATUS_TIMED_OUT"
     = Prelude.Just WORKFLOW_EXECUTION_STATUS_TIMED_OUT
+    | (Prelude.==) k "WORKFLOW_EXECUTION_STATUS_PAUSED"
+    = Prelude.Just WORKFLOW_EXECUTION_STATUS_PAUSED
     | Prelude.otherwise
     = (Prelude.>>=) (Text.Read.readMaybe k) Data.ProtoLens.maybeToEnum
 instance Prelude.Bounded WorkflowExecutionStatus where
   minBound = WORKFLOW_EXECUTION_STATUS_UNSPECIFIED
-  maxBound = WORKFLOW_EXECUTION_STATUS_TIMED_OUT
+  maxBound = WORKFLOW_EXECUTION_STATUS_PAUSED
 instance Prelude.Enum WorkflowExecutionStatus where
   toEnum k__
     = Prelude.maybe
@@ -881,12 +1082,13 @@ instance Prelude.Enum WorkflowExecutionStatus where
   fromEnum WORKFLOW_EXECUTION_STATUS_TERMINATED = 5
   fromEnum WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW = 6
   fromEnum WORKFLOW_EXECUTION_STATUS_TIMED_OUT = 7
+  fromEnum WORKFLOW_EXECUTION_STATUS_PAUSED = 8
   fromEnum
     (WorkflowExecutionStatus'Unrecognized (WorkflowExecutionStatus'UnrecognizedValue k))
     = Prelude.fromIntegral k
-  succ WORKFLOW_EXECUTION_STATUS_TIMED_OUT
+  succ WORKFLOW_EXECUTION_STATUS_PAUSED
     = Prelude.error
-        "WorkflowExecutionStatus.succ: bad argument WORKFLOW_EXECUTION_STATUS_TIMED_OUT. This value would be out of bounds."
+        "WorkflowExecutionStatus.succ: bad argument WORKFLOW_EXECUTION_STATUS_PAUSED. This value would be out of bounds."
   succ WORKFLOW_EXECUTION_STATUS_UNSPECIFIED
     = WORKFLOW_EXECUTION_STATUS_RUNNING
   succ WORKFLOW_EXECUTION_STATUS_RUNNING
@@ -901,6 +1103,8 @@ instance Prelude.Enum WorkflowExecutionStatus where
     = WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW
   succ WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW
     = WORKFLOW_EXECUTION_STATUS_TIMED_OUT
+  succ WORKFLOW_EXECUTION_STATUS_TIMED_OUT
+    = WORKFLOW_EXECUTION_STATUS_PAUSED
   succ (WorkflowExecutionStatus'Unrecognized _)
     = Prelude.error
         "WorkflowExecutionStatus.succ: bad argument: unrecognized value"
@@ -921,6 +1125,8 @@ instance Prelude.Enum WorkflowExecutionStatus where
     = WORKFLOW_EXECUTION_STATUS_TERMINATED
   pred WORKFLOW_EXECUTION_STATUS_TIMED_OUT
     = WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW
+  pred WORKFLOW_EXECUTION_STATUS_PAUSED
+    = WORKFLOW_EXECUTION_STATUS_TIMED_OUT
   pred (WorkflowExecutionStatus'Unrecognized _)
     = Prelude.error
         "WorkflowExecutionStatus.pred: bad argument: unrecognized value"

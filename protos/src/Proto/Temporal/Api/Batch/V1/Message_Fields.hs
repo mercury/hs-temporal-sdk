@@ -194,6 +194,12 @@ maybe'workflowExecutionOptions ::
   Lens.Family2.LensLike' f s a
 maybe'workflowExecutionOptions
   = Data.ProtoLens.Field.field @"maybe'workflowExecutionOptions"
+operationType ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "operationType" a) =>
+  Lens.Family2.LensLike' f s a
+operationType = Data.ProtoLens.Field.field @"operationType"
 options ::
   forall f s a.
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "options" a) =>
@@ -206,6 +212,11 @@ postResetOperations ::
   Lens.Family2.LensLike' f s a
 postResetOperations
   = Data.ProtoLens.Field.field @"postResetOperations"
+reason ::
+  forall f s a.
+  (Prelude.Functor f, Data.ProtoLens.Field.HasField s "reason" a) =>
+  Lens.Family2.LensLike' f s a
+reason = Data.ProtoLens.Field.field @"reason"
 resetAttempts ::
   forall f s a.
   (Prelude.Functor f,

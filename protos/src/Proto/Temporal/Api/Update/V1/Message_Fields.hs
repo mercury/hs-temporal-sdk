@@ -30,6 +30,7 @@ import qualified Data.ProtoLens.Runtime.Text.Read as Text.Read
 import qualified Proto.Temporal.Api.Common.V1.Message
 import qualified Proto.Temporal.Api.Enums.V1.Update
 import qualified Proto.Temporal.Api.Failure.V1.Message
+import qualified Proto.Temporal.Api.Nexus.V1.Message
 acceptedRequest ::
   forall f s a.
   (Prelude.Functor f,
@@ -55,6 +56,13 @@ args ::
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "args" a) =>
   Lens.Family2.LensLike' f s a
 args = Data.ProtoLens.Field.field @"args"
+completionCallbacks ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "completionCallbacks" a) =>
+  Lens.Family2.LensLike' f s a
+completionCallbacks
+  = Data.ProtoLens.Field.field @"completionCallbacks"
 failure ::
   forall f s a.
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "failure" a) =>
@@ -82,6 +90,11 @@ lifecycleStage ::
    Data.ProtoLens.Field.HasField s "lifecycleStage" a) =>
   Lens.Family2.LensLike' f s a
 lifecycleStage = Data.ProtoLens.Field.field @"lifecycleStage"
+links ::
+  forall f s a.
+  (Prelude.Functor f, Data.ProtoLens.Field.HasField s "links" a) =>
+  Lens.Family2.LensLike' f s a
+links = Data.ProtoLens.Field.field @"links"
 maybe'acceptedRequest ::
   forall f s a.
   (Prelude.Functor f,
@@ -125,6 +138,14 @@ maybe'outcome ::
    Data.ProtoLens.Field.HasField s "maybe'outcome" a) =>
   Lens.Family2.LensLike' f s a
 maybe'outcome = Data.ProtoLens.Field.field @"maybe'outcome"
+maybe'propagatedNexusSerializationContext ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'propagatedNexusSerializationContext" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'propagatedNexusSerializationContext
+  = Data.ProtoLens.Field.field
+      @"maybe'propagatedNexusSerializationContext"
 maybe'rejectedRequest ::
   forall f s a.
   (Prelude.Functor f,
@@ -166,6 +187,13 @@ outcome ::
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "outcome" a) =>
   Lens.Family2.LensLike' f s a
 outcome = Data.ProtoLens.Field.field @"outcome"
+propagatedNexusSerializationContext ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "propagatedNexusSerializationContext" a) =>
+  Lens.Family2.LensLike' f s a
+propagatedNexusSerializationContext
+  = Data.ProtoLens.Field.field @"propagatedNexusSerializationContext"
 rejectedRequest ::
   forall f s a.
   (Prelude.Functor f,
@@ -186,6 +214,12 @@ rejectedRequestSequencingEventId ::
   Lens.Family2.LensLike' f s a
 rejectedRequestSequencingEventId
   = Data.ProtoLens.Field.field @"rejectedRequestSequencingEventId"
+requestId ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "requestId" a) =>
+  Lens.Family2.LensLike' f s a
+requestId = Data.ProtoLens.Field.field @"requestId"
 success ::
   forall f s a.
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "success" a) =>
@@ -197,6 +231,19 @@ updateId ::
    Data.ProtoLens.Field.HasField s "updateId" a) =>
   Lens.Family2.LensLike' f s a
 updateId = Data.ProtoLens.Field.field @"updateId"
+vec'completionCallbacks ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "vec'completionCallbacks" a) =>
+  Lens.Family2.LensLike' f s a
+vec'completionCallbacks
+  = Data.ProtoLens.Field.field @"vec'completionCallbacks"
+vec'links ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "vec'links" a) =>
+  Lens.Family2.LensLike' f s a
+vec'links = Data.ProtoLens.Field.field @"vec'links"
 workflowExecution ::
   forall f s a.
   (Prelude.Functor f,

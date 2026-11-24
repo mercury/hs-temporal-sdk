@@ -97,6 +97,13 @@ pub struct TemporalDevServerConfigDef {
     pub log: (String, String),
     /// Additional arguments to Temporalite.
     pub extra_args: Vec<String>,
+    /// Core's default readiness timeout.
+    #[serde(skip, default = "default_startup_timeout")]
+    pub startup_timeout: Duration,
+}
+
+fn default_startup_timeout() -> Duration {
+    Duration::from_secs(5)
 }
 
 pub(crate) fn parse_dev_server_config(json: &[u8]) -> Result<TemporalDevServerConfig, String> {
@@ -133,7 +140,7 @@ fn start_server<C, F>(
     start: impl FnOnce(C) -> F + Send + 'static,
 ) where
     C: Send + 'static,
-    F: Future<Output = anyhow::Result<EphemeralServer>> + Send + 'static,
+    F: Future<Output = Result<EphemeralServer, EphemeralServerError>> + Send + 'static,
 {
     // The spawned future can outlive this C call and its borrowed `RuntimeRef`.
     // Capture an owned runtime before constructing the future so creating the
@@ -217,6 +224,9 @@ pub struct TestServerConfigDef {
     pub port: Option<u16>,
     /// Additional arguments to the test server.
     pub extra_args: Vec<String>,
+    /// Core's default readiness timeout.
+    #[serde(skip, default = "default_startup_timeout")]
+    pub startup_timeout: Duration,
 }
 
 // TODO: [publish-crate]

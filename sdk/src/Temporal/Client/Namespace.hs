@@ -66,6 +66,7 @@ namespaceStateFromProto = \case
   M.NAMESPACE_STATE_REGISTERED -> NamespaceStateRegistered
   M.NAMESPACE_STATE_DEPRECATED -> NamespaceStateDeprecated
   M.NAMESPACE_STATE_DELETED -> NamespaceStateDeleted
+  M.NAMESPACE_STATE_SOFT_DELETED -> NamespaceStateUnrecognized
   (M.NamespaceState'Unrecognized _) -> NamespaceStateUnrecognized
 
 data NamespaceInfo = NamespaceInfo

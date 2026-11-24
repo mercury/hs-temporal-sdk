@@ -32,8 +32,10 @@ import qualified Proto.Temporal.Api.Common.V1.Message
 import qualified Proto.Temporal.Api.Enums.V1.CommandType
 import qualified Proto.Temporal.Api.Enums.V1.Workflow
 import qualified Proto.Temporal.Api.Failure.V1.Message
+import qualified Proto.Temporal.Api.Sdk.V1.EventGroupMarker
 import qualified Proto.Temporal.Api.Sdk.V1.UserMetadata
 import qualified Proto.Temporal.Api.Taskqueue.V1.Message
+import qualified Proto.Temporal.Api.Workflow.V1.Message
 activityId ::
   forall f s a.
   (Prelude.Functor f,
@@ -118,6 +120,12 @@ endpoint ::
    Data.ProtoLens.Field.HasField s "endpoint" a) =>
   Lens.Family2.LensLike' f s a
 endpoint = Data.ProtoLens.Field.field @"endpoint"
+eventGroupMarkers ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "eventGroupMarkers" a) =>
+  Lens.Family2.LensLike' f s a
+eventGroupMarkers = Data.ProtoLens.Field.field @"eventGroupMarkers"
 execution ::
   forall f s a.
   (Prelude.Functor f,
@@ -154,6 +162,13 @@ inheritBuildId ::
    Data.ProtoLens.Field.HasField s "inheritBuildId" a) =>
   Lens.Family2.LensLike' f s a
 inheritBuildId = Data.ProtoLens.Field.field @"inheritBuildId"
+initialVersioningBehavior ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "initialVersioningBehavior" a) =>
+  Lens.Family2.LensLike' f s a
+initialVersioningBehavior
+  = Data.ProtoLens.Field.field @"initialVersioningBehavior"
 initiator ::
   forall f s a.
   (Prelude.Functor f,
@@ -465,6 +480,13 @@ maybe'value ::
    Data.ProtoLens.Field.HasField s "maybe'value" a) =>
   Lens.Family2.LensLike' f s a
 maybe'value = Data.ProtoLens.Field.field @"maybe'value"
+maybe'versioningOverride ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'versioningOverride" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'versioningOverride
+  = Data.ProtoLens.Field.field @"maybe'versioningOverride"
 maybe'workflowExecutionTimeout ::
   forall f s a.
   (Prelude.Functor f,
@@ -741,6 +763,20 @@ value ::
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "value" a) =>
   Lens.Family2.LensLike' f s a
 value = Data.ProtoLens.Field.field @"value"
+vec'eventGroupMarkers ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "vec'eventGroupMarkers" a) =>
+  Lens.Family2.LensLike' f s a
+vec'eventGroupMarkers
+  = Data.ProtoLens.Field.field @"vec'eventGroupMarkers"
+versioningOverride ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "versioningOverride" a) =>
+  Lens.Family2.LensLike' f s a
+versioningOverride
+  = Data.ProtoLens.Field.field @"versioningOverride"
 workflowExecutionTimeout ::
   forall f s a.
   (Prelude.Functor f,

@@ -30,6 +30,7 @@ import qualified Data.ProtoLens.Runtime.Text.Read as Text.Read
 import qualified Proto.Google.Protobuf.Duration
 import qualified Proto.Google.Protobuf.Timestamp
 import qualified Proto.Temporal.Api.Common.V1.Message
+import qualified Proto.Temporal.Api.Nexus.V1.Message
 import qualified Proto.Temporal.Sdk.Core.Common.Common
 activityId ::
   forall f s a.
@@ -65,6 +66,12 @@ details ::
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "details" a) =>
   Lens.Family2.LensLike' f s a
 details = Data.ProtoLens.Field.field @"details"
+failedTasks ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "failedTasks" a) =>
+  Lens.Family2.LensLike' f s a
+failedTasks = Data.ProtoLens.Field.field @"failedTasks"
 headerFields ::
   forall f s a.
   (Prelude.Functor f,
@@ -159,12 +166,27 @@ maybe'heartbeatTimeout ::
   Lens.Family2.LensLike' f s a
 maybe'heartbeatTimeout
   = Data.ProtoLens.Field.field @"maybe'heartbeatTimeout"
+maybe'previousStartedTime ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'previousStartedTime" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'previousStartedTime
+  = Data.ProtoLens.Field.field @"maybe'previousStartedTime"
 maybe'priority ::
   forall f s a.
   (Prelude.Functor f,
    Data.ProtoLens.Field.HasField s "maybe'priority" a) =>
   Lens.Family2.LensLike' f s a
 maybe'priority = Data.ProtoLens.Field.field @"maybe'priority"
+maybe'propagatedNexusSerializationContext ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'propagatedNexusSerializationContext" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'propagatedNexusSerializationContext
+  = Data.ProtoLens.Field.field
+      @"maybe'propagatedNexusSerializationContext"
 maybe'retryPolicy ::
   forall f s a.
   (Prelude.Functor f,
@@ -223,12 +245,46 @@ maybe'workflowExecution ::
   Lens.Family2.LensLike' f s a
 maybe'workflowExecution
   = Data.ProtoLens.Field.field @"maybe'workflowExecution"
+maybe'workflowTask ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'workflowTask" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'workflowTask
+  = Data.ProtoLens.Field.field @"maybe'workflowTask"
+previousAttempt ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "previousAttempt" a) =>
+  Lens.Family2.LensLike' f s a
+previousAttempt = Data.ProtoLens.Field.field @"previousAttempt"
+previousStartedEventId ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "previousStartedEventId" a) =>
+  Lens.Family2.LensLike' f s a
+previousStartedEventId
+  = Data.ProtoLens.Field.field @"previousStartedEventId"
+previousStartedTime ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "previousStartedTime" a) =>
+  Lens.Family2.LensLike' f s a
+previousStartedTime
+  = Data.ProtoLens.Field.field @"previousStartedTime"
 priority ::
   forall f s a.
   (Prelude.Functor f,
    Data.ProtoLens.Field.HasField s "priority" a) =>
   Lens.Family2.LensLike' f s a
 priority = Data.ProtoLens.Field.field @"priority"
+propagatedNexusSerializationContext ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "propagatedNexusSerializationContext" a) =>
+  Lens.Family2.LensLike' f s a
+propagatedNexusSerializationContext
+  = Data.ProtoLens.Field.field @"propagatedNexusSerializationContext"
 reason ::
   forall f s a.
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "reason" a) =>
@@ -240,6 +296,11 @@ retryPolicy ::
    Data.ProtoLens.Field.HasField s "retryPolicy" a) =>
   Lens.Family2.LensLike' f s a
 retryPolicy = Data.ProtoLens.Field.field @"retryPolicy"
+runId ::
+  forall f s a.
+  (Prelude.Functor f, Data.ProtoLens.Field.HasField s "runId" a) =>
+  Lens.Family2.LensLike' f s a
+runId = Data.ProtoLens.Field.field @"runId"
 scheduleToCloseTimeout ::
   forall f s a.
   (Prelude.Functor f,
@@ -265,6 +326,12 @@ startToCloseTimeout ::
   Lens.Family2.LensLike' f s a
 startToCloseTimeout
   = Data.ProtoLens.Field.field @"startToCloseTimeout"
+startedEventId ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "startedEventId" a) =>
+  Lens.Family2.LensLike' f s a
+startedEventId = Data.ProtoLens.Field.field @"startedEventId"
 startedTime ::
   forall f s a.
   (Prelude.Functor f,
@@ -282,6 +349,12 @@ value ::
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "value" a) =>
   Lens.Family2.LensLike' f s a
 value = Data.ProtoLens.Field.field @"value"
+vec'failedTasks ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "vec'failedTasks" a) =>
+  Lens.Family2.LensLike' f s a
+vec'failedTasks = Data.ProtoLens.Field.field @"vec'failedTasks"
 vec'heartbeatDetails ::
   forall f s a.
   (Prelude.Functor f,
@@ -307,6 +380,12 @@ workflowNamespace ::
    Data.ProtoLens.Field.HasField s "workflowNamespace" a) =>
   Lens.Family2.LensLike' f s a
 workflowNamespace = Data.ProtoLens.Field.field @"workflowNamespace"
+workflowTask ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "workflowTask" a) =>
+  Lens.Family2.LensLike' f s a
+workflowTask = Data.ProtoLens.Field.field @"workflowTask"
 workflowType ::
   forall f s a.
   (Prelude.Functor f,

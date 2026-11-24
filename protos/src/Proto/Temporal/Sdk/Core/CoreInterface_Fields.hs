@@ -44,6 +44,13 @@ activityType ::
    Data.ProtoLens.Field.HasField s "activityType" a) =>
   Lens.Family2.LensLike' f s a
 activityType = Data.ProtoLens.Field.field @"activityType"
+blobSizeLimitError ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "blobSizeLimitError" a) =>
+  Lens.Family2.LensLike' f s a
+blobSizeLimitError
+  = Data.ProtoLens.Field.field @"blobSizeLimitError"
 details ::
   forall f s a.
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "details" a) =>
@@ -55,12 +62,30 @@ isSticky ::
    Data.ProtoLens.Field.HasField s "isSticky" a) =>
   Lens.Family2.LensLike' f s a
 isSticky = Data.ProtoLens.Field.field @"isSticky"
+limits ::
+  forall f s a.
+  (Prelude.Functor f, Data.ProtoLens.Field.HasField s "limits" a) =>
+  Lens.Family2.LensLike' f s a
+limits = Data.ProtoLens.Field.field @"limits"
+maybe'limits ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'limits" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'limits = Data.ProtoLens.Field.field @"maybe'limits"
 maybe'result ::
   forall f s a.
   (Prelude.Functor f,
    Data.ProtoLens.Field.HasField s "maybe'result" a) =>
   Lens.Family2.LensLike' f s a
 maybe'result = Data.ProtoLens.Field.field @"maybe'result"
+memoSizeLimitError ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "memoSizeLimitError" a) =>
+  Lens.Family2.LensLike' f s a
+memoSizeLimitError
+  = Data.ProtoLens.Field.field @"memoSizeLimitError"
 operation ::
   forall f s a.
   (Prelude.Functor f,

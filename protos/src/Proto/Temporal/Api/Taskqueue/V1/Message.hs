@@ -7,15 +7,17 @@ module Proto.Temporal.Api.Taskqueue.V1.Message (
         BuildIdAssignmentRule(), BuildIdAssignmentRule'Ramp(..),
         _BuildIdAssignmentRule'PercentageRamp, BuildIdReachability(),
         CompatibleBuildIdRedirectRule(), CompatibleVersionSet(),
-        ConfigMetadata(), PollerInfo(), PollerScalingDecision(),
-        RampByPercentage(), RateLimit(), RateLimitConfig(),
-        StickyExecutionAttributes(), TaskIdBlock(), TaskQueue(),
-        TaskQueueConfig(), TaskQueueMetadata(),
-        TaskQueuePartitionMetadata(), TaskQueueReachability(),
-        TaskQueueStats(), TaskQueueStatus(), TaskQueueTypeInfo(),
-        TaskQueueVersionInfo(), TaskQueueVersionInfo'TypesInfoEntry(),
-        TaskQueueVersionSelection(), TaskQueueVersioningInfo(),
-        TimestampedBuildIdAssignmentRule(),
+        ConcurrencyLimit(), ConcurrencyLimitConfig(), ConfigMetadata(),
+        PollerGroupInfo(), PollerGroupsInfo(), PollerInfo(),
+        PollerPoolInfo(), PollerScalingDecision(), RampByPercentage(),
+        RateLimit(), RateLimitConfig(), StickyExecutionAttributes(),
+        TaskIdBlock(), TaskQueue(), TaskQueueConfig(),
+        TaskQueueConfig'FairnessWeightOverridesEntry(),
+        TaskQueueMetadata(), TaskQueuePartitionMetadata(),
+        TaskQueueReachability(), TaskQueueStats(), TaskQueueStatus(),
+        TaskQueueTypeInfo(), TaskQueueVersionInfo(),
+        TaskQueueVersionInfo'TypesInfoEntry(), TaskQueueVersionSelection(),
+        TaskQueueVersioningInfo(), TimestampedBuildIdAssignmentRule(),
         TimestampedCompatibleBuildIdRedirectRule()
     ) where
 import qualified Data.ProtoLens.Runtime.Control.DeepSeq as Control.DeepSeq
@@ -759,6 +761,300 @@ instance Control.DeepSeq.NFData CompatibleVersionSet where
              (Control.DeepSeq.deepseq (_CompatibleVersionSet'buildIds x__) ())
 {- | Fields :
      
+         * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.concurrentTasks' @:: Lens' ConcurrencyLimit Data.Int.Int32@ -}
+data ConcurrencyLimit
+  = ConcurrencyLimit'_constructor {_ConcurrencyLimit'concurrentTasks :: !Data.Int.Int32,
+                                   _ConcurrencyLimit'_unknownFields :: !Data.ProtoLens.FieldSet}
+  deriving stock (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show ConcurrencyLimit where
+  showsPrec _ __x __s
+    = Prelude.showChar
+        '{'
+        (Prelude.showString
+           (Data.ProtoLens.showMessageShort __x) (Prelude.showChar '}' __s))
+instance Data.ProtoLens.Field.HasField ConcurrencyLimit "concurrentTasks" Data.Int.Int32 where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _ConcurrencyLimit'concurrentTasks
+           (\ x__ y__ -> x__ {_ConcurrencyLimit'concurrentTasks = y__}))
+        Prelude.id
+instance Data.ProtoLens.Message ConcurrencyLimit where
+  messageName _
+    = Data.Text.pack "temporal.api.taskqueue.v1.ConcurrencyLimit"
+  packedMessageDescriptor _
+    = "\n\
+      \\DLEConcurrencyLimit\DC2)\n\
+      \\DLEconcurrent_tasks\CAN\SOH \SOH(\ENQR\SIconcurrentTasks"
+  packedFileDescriptor _ = packedFileDescriptor
+  fieldsByTag
+    = let
+        concurrentTasks__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "concurrent_tasks"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.Int32Field ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Int.Int32)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"concurrentTasks")) ::
+              Data.ProtoLens.FieldDescriptor ConcurrencyLimit
+      in
+        Data.Map.fromList
+          [(Data.ProtoLens.Tag 1, concurrentTasks__field_descriptor)]
+  unknownFields
+    = Lens.Family2.Unchecked.lens
+        _ConcurrencyLimit'_unknownFields
+        (\ x__ y__ -> x__ {_ConcurrencyLimit'_unknownFields = y__})
+  defMessage
+    = ConcurrencyLimit'_constructor
+        {_ConcurrencyLimit'concurrentTasks = Data.ProtoLens.fieldDefault,
+         _ConcurrencyLimit'_unknownFields = []}
+  parseMessage
+    = let
+        loop ::
+          ConcurrencyLimit
+          -> Data.ProtoLens.Encoding.Bytes.Parser ConcurrencyLimit
+        loop x
+          = do end <- Data.ProtoLens.Encoding.Bytes.atEnd
+               if end then
+                   do (let missing = []
+                       in
+                         if Prelude.null missing then
+                             Prelude.return ()
+                         else
+                             Prelude.fail
+                               ((Prelude.++)
+                                  "Missing required fields: "
+                                  (Prelude.show (missing :: [Prelude.String]))))
+                      Prelude.return
+                        (Lens.Family2.over
+                           Data.ProtoLens.unknownFields (\ !t -> Prelude.reverse t) x)
+               else
+                   do tag <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                      case tag of
+                        8 -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (Prelude.fmap
+                                          Prelude.fromIntegral
+                                          Data.ProtoLens.Encoding.Bytes.getVarInt)
+                                       "concurrent_tasks"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field @"concurrentTasks") y x)
+                        wire
+                          -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
+                                        wire
+                                loop
+                                  (Lens.Family2.over
+                                     Data.ProtoLens.unknownFields (\ !t -> (:) y t) x)
+      in
+        (Data.ProtoLens.Encoding.Bytes.<?>)
+          (do loop Data.ProtoLens.defMessage) "ConcurrencyLimit"
+  buildMessage
+    = \ _x
+        -> (Data.Monoid.<>)
+             (let
+                _v
+                  = Lens.Family2.view
+                      (Data.ProtoLens.Field.field @"concurrentTasks") _x
+              in
+                if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                    Data.Monoid.mempty
+                else
+                    (Data.Monoid.<>)
+                      (Data.ProtoLens.Encoding.Bytes.putVarInt 8)
+                      ((Prelude..)
+                         Data.ProtoLens.Encoding.Bytes.putVarInt Prelude.fromIntegral _v))
+             (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                (Lens.Family2.view Data.ProtoLens.unknownFields _x))
+instance Control.DeepSeq.NFData ConcurrencyLimit where
+  rnf
+    = \ x__
+        -> Control.DeepSeq.deepseq
+             (_ConcurrencyLimit'_unknownFields x__)
+             (Control.DeepSeq.deepseq
+                (_ConcurrencyLimit'concurrentTasks x__) ())
+{- | Fields :
+     
+         * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.concurrencyLimit' @:: Lens' ConcurrencyLimitConfig ConcurrencyLimit@
+         * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.maybe'concurrencyLimit' @:: Lens' ConcurrencyLimitConfig (Prelude.Maybe ConcurrencyLimit)@
+         * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.metadata' @:: Lens' ConcurrencyLimitConfig ConfigMetadata@
+         * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.maybe'metadata' @:: Lens' ConcurrencyLimitConfig (Prelude.Maybe ConfigMetadata)@ -}
+data ConcurrencyLimitConfig
+  = ConcurrencyLimitConfig'_constructor {_ConcurrencyLimitConfig'concurrencyLimit :: !(Prelude.Maybe ConcurrencyLimit),
+                                         _ConcurrencyLimitConfig'metadata :: !(Prelude.Maybe ConfigMetadata),
+                                         _ConcurrencyLimitConfig'_unknownFields :: !Data.ProtoLens.FieldSet}
+  deriving stock (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show ConcurrencyLimitConfig where
+  showsPrec _ __x __s
+    = Prelude.showChar
+        '{'
+        (Prelude.showString
+           (Data.ProtoLens.showMessageShort __x) (Prelude.showChar '}' __s))
+instance Data.ProtoLens.Field.HasField ConcurrencyLimitConfig "concurrencyLimit" ConcurrencyLimit where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _ConcurrencyLimitConfig'concurrencyLimit
+           (\ x__ y__
+              -> x__ {_ConcurrencyLimitConfig'concurrencyLimit = y__}))
+        (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
+instance Data.ProtoLens.Field.HasField ConcurrencyLimitConfig "maybe'concurrencyLimit" (Prelude.Maybe ConcurrencyLimit) where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _ConcurrencyLimitConfig'concurrencyLimit
+           (\ x__ y__
+              -> x__ {_ConcurrencyLimitConfig'concurrencyLimit = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField ConcurrencyLimitConfig "metadata" ConfigMetadata where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _ConcurrencyLimitConfig'metadata
+           (\ x__ y__ -> x__ {_ConcurrencyLimitConfig'metadata = y__}))
+        (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
+instance Data.ProtoLens.Field.HasField ConcurrencyLimitConfig "maybe'metadata" (Prelude.Maybe ConfigMetadata) where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _ConcurrencyLimitConfig'metadata
+           (\ x__ y__ -> x__ {_ConcurrencyLimitConfig'metadata = y__}))
+        Prelude.id
+instance Data.ProtoLens.Message ConcurrencyLimitConfig where
+  messageName _
+    = Data.Text.pack "temporal.api.taskqueue.v1.ConcurrencyLimitConfig"
+  packedMessageDescriptor _
+    = "\n\
+      \\SYNConcurrencyLimitConfig\DC2X\n\
+      \\DC1concurrency_limit\CAN\SOH \SOH(\v2+.temporal.api.taskqueue.v1.ConcurrencyLimitR\DLEconcurrencyLimit\DC2E\n\
+      \\bmetadata\CAN\STX \SOH(\v2).temporal.api.taskqueue.v1.ConfigMetadataR\bmetadata"
+  packedFileDescriptor _ = packedFileDescriptor
+  fieldsByTag
+    = let
+        concurrencyLimit__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "concurrency_limit"
+              (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                 Data.ProtoLens.FieldTypeDescriptor ConcurrencyLimit)
+              (Data.ProtoLens.OptionalField
+                 (Data.ProtoLens.Field.field @"maybe'concurrencyLimit")) ::
+              Data.ProtoLens.FieldDescriptor ConcurrencyLimitConfig
+        metadata__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "metadata"
+              (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                 Data.ProtoLens.FieldTypeDescriptor ConfigMetadata)
+              (Data.ProtoLens.OptionalField
+                 (Data.ProtoLens.Field.field @"maybe'metadata")) ::
+              Data.ProtoLens.FieldDescriptor ConcurrencyLimitConfig
+      in
+        Data.Map.fromList
+          [(Data.ProtoLens.Tag 1, concurrencyLimit__field_descriptor),
+           (Data.ProtoLens.Tag 2, metadata__field_descriptor)]
+  unknownFields
+    = Lens.Family2.Unchecked.lens
+        _ConcurrencyLimitConfig'_unknownFields
+        (\ x__ y__ -> x__ {_ConcurrencyLimitConfig'_unknownFields = y__})
+  defMessage
+    = ConcurrencyLimitConfig'_constructor
+        {_ConcurrencyLimitConfig'concurrencyLimit = Prelude.Nothing,
+         _ConcurrencyLimitConfig'metadata = Prelude.Nothing,
+         _ConcurrencyLimitConfig'_unknownFields = []}
+  parseMessage
+    = let
+        loop ::
+          ConcurrencyLimitConfig
+          -> Data.ProtoLens.Encoding.Bytes.Parser ConcurrencyLimitConfig
+        loop x
+          = do end <- Data.ProtoLens.Encoding.Bytes.atEnd
+               if end then
+                   do (let missing = []
+                       in
+                         if Prelude.null missing then
+                             Prelude.return ()
+                         else
+                             Prelude.fail
+                               ((Prelude.++)
+                                  "Missing required fields: "
+                                  (Prelude.show (missing :: [Prelude.String]))))
+                      Prelude.return
+                        (Lens.Family2.over
+                           Data.ProtoLens.unknownFields (\ !t -> Prelude.reverse t) x)
+               else
+                   do tag <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                      case tag of
+                        10
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.isolate
+                                             (Prelude.fromIntegral len) Data.ProtoLens.parseMessage)
+                                       "concurrency_limit"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field @"concurrencyLimit") y x)
+                        18
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.isolate
+                                             (Prelude.fromIntegral len) Data.ProtoLens.parseMessage)
+                                       "metadata"
+                                loop
+                                  (Lens.Family2.set (Data.ProtoLens.Field.field @"metadata") y x)
+                        wire
+                          -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
+                                        wire
+                                loop
+                                  (Lens.Family2.over
+                                     Data.ProtoLens.unknownFields (\ !t -> (:) y t) x)
+      in
+        (Data.ProtoLens.Encoding.Bytes.<?>)
+          (do loop Data.ProtoLens.defMessage) "ConcurrencyLimitConfig"
+  buildMessage
+    = \ _x
+        -> (Data.Monoid.<>)
+             (case
+                  Lens.Family2.view
+                    (Data.ProtoLens.Field.field @"maybe'concurrencyLimit") _x
+              of
+                Prelude.Nothing -> Data.Monoid.mempty
+                (Prelude.Just _v)
+                  -> (Data.Monoid.<>)
+                       (Data.ProtoLens.Encoding.Bytes.putVarInt 10)
+                       ((Prelude..)
+                          (\ bs
+                             -> (Data.Monoid.<>)
+                                  (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                     (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                  (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                          Data.ProtoLens.encodeMessage _v))
+             ((Data.Monoid.<>)
+                (case
+                     Lens.Family2.view (Data.ProtoLens.Field.field @"maybe'metadata") _x
+                 of
+                   Prelude.Nothing -> Data.Monoid.mempty
+                   (Prelude.Just _v)
+                     -> (Data.Monoid.<>)
+                          (Data.ProtoLens.Encoding.Bytes.putVarInt 18)
+                          ((Prelude..)
+                             (\ bs
+                                -> (Data.Monoid.<>)
+                                     (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                        (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                     (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                             Data.ProtoLens.encodeMessage _v))
+                (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                   (Lens.Family2.view Data.ProtoLens.unknownFields _x)))
+instance Control.DeepSeq.NFData ConcurrencyLimitConfig where
+  rnf
+    = \ x__
+        -> Control.DeepSeq.deepseq
+             (_ConcurrencyLimitConfig'_unknownFields x__)
+             (Control.DeepSeq.deepseq
+                (_ConcurrencyLimitConfig'concurrencyLimit x__)
+                (Control.DeepSeq.deepseq
+                   (_ConcurrencyLimitConfig'metadata x__) ()))
+{- | Fields :
+     
          * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.reason' @:: Lens' ConfigMetadata Data.Text.Text@
          * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.updateIdentity' @:: Lens' ConfigMetadata Data.Text.Text@
          * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.updateTime' @:: Lens' ConfigMetadata Proto.Google.Protobuf.Timestamp.Timestamp@
@@ -976,6 +1272,338 @@ instance Control.DeepSeq.NFData ConfigMetadata where
                 (Control.DeepSeq.deepseq
                    (_ConfigMetadata'updateIdentity x__)
                    (Control.DeepSeq.deepseq (_ConfigMetadata'updateTime x__) ())))
+{- | Fields :
+     
+         * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.id' @:: Lens' PollerGroupInfo Data.Text.Text@
+         * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.weight' @:: Lens' PollerGroupInfo Prelude.Float@ -}
+data PollerGroupInfo
+  = PollerGroupInfo'_constructor {_PollerGroupInfo'id :: !Data.Text.Text,
+                                  _PollerGroupInfo'weight :: !Prelude.Float,
+                                  _PollerGroupInfo'_unknownFields :: !Data.ProtoLens.FieldSet}
+  deriving stock (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show PollerGroupInfo where
+  showsPrec _ __x __s
+    = Prelude.showChar
+        '{'
+        (Prelude.showString
+           (Data.ProtoLens.showMessageShort __x) (Prelude.showChar '}' __s))
+instance Data.ProtoLens.Field.HasField PollerGroupInfo "id" Data.Text.Text where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _PollerGroupInfo'id (\ x__ y__ -> x__ {_PollerGroupInfo'id = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField PollerGroupInfo "weight" Prelude.Float where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _PollerGroupInfo'weight
+           (\ x__ y__ -> x__ {_PollerGroupInfo'weight = y__}))
+        Prelude.id
+instance Data.ProtoLens.Message PollerGroupInfo where
+  messageName _
+    = Data.Text.pack "temporal.api.taskqueue.v1.PollerGroupInfo"
+  packedMessageDescriptor _
+    = "\n\
+      \\SIPollerGroupInfo\DC2\SO\n\
+      \\STXid\CAN\SOH \SOH(\tR\STXid\DC2\SYN\n\
+      \\ACKweight\CAN\STX \SOH(\STXR\ACKweight"
+  packedFileDescriptor _ = packedFileDescriptor
+  fieldsByTag
+    = let
+        id__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "id"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.StringField ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Text.Text)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional (Data.ProtoLens.Field.field @"id")) ::
+              Data.ProtoLens.FieldDescriptor PollerGroupInfo
+        weight__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "weight"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.FloatField ::
+                 Data.ProtoLens.FieldTypeDescriptor Prelude.Float)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional (Data.ProtoLens.Field.field @"weight")) ::
+              Data.ProtoLens.FieldDescriptor PollerGroupInfo
+      in
+        Data.Map.fromList
+          [(Data.ProtoLens.Tag 1, id__field_descriptor),
+           (Data.ProtoLens.Tag 2, weight__field_descriptor)]
+  unknownFields
+    = Lens.Family2.Unchecked.lens
+        _PollerGroupInfo'_unknownFields
+        (\ x__ y__ -> x__ {_PollerGroupInfo'_unknownFields = y__})
+  defMessage
+    = PollerGroupInfo'_constructor
+        {_PollerGroupInfo'id = Data.ProtoLens.fieldDefault,
+         _PollerGroupInfo'weight = Data.ProtoLens.fieldDefault,
+         _PollerGroupInfo'_unknownFields = []}
+  parseMessage
+    = let
+        loop ::
+          PollerGroupInfo
+          -> Data.ProtoLens.Encoding.Bytes.Parser PollerGroupInfo
+        loop x
+          = do end <- Data.ProtoLens.Encoding.Bytes.atEnd
+               if end then
+                   do (let missing = []
+                       in
+                         if Prelude.null missing then
+                             Prelude.return ()
+                         else
+                             Prelude.fail
+                               ((Prelude.++)
+                                  "Missing required fields: "
+                                  (Prelude.show (missing :: [Prelude.String]))))
+                      Prelude.return
+                        (Lens.Family2.over
+                           Data.ProtoLens.unknownFields (\ !t -> Prelude.reverse t) x)
+               else
+                   do tag <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                      case tag of
+                        10
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.getText
+                                             (Prelude.fromIntegral len))
+                                       "id"
+                                loop (Lens.Family2.set (Data.ProtoLens.Field.field @"id") y x)
+                        21
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (Prelude.fmap
+                                          Data.ProtoLens.Encoding.Bytes.wordToFloat
+                                          Data.ProtoLens.Encoding.Bytes.getFixed32)
+                                       "weight"
+                                loop (Lens.Family2.set (Data.ProtoLens.Field.field @"weight") y x)
+                        wire
+                          -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
+                                        wire
+                                loop
+                                  (Lens.Family2.over
+                                     Data.ProtoLens.unknownFields (\ !t -> (:) y t) x)
+      in
+        (Data.ProtoLens.Encoding.Bytes.<?>)
+          (do loop Data.ProtoLens.defMessage) "PollerGroupInfo"
+  buildMessage
+    = \ _x
+        -> (Data.Monoid.<>)
+             (let _v = Lens.Family2.view (Data.ProtoLens.Field.field @"id") _x
+              in
+                if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                    Data.Monoid.mempty
+                else
+                    (Data.Monoid.<>)
+                      (Data.ProtoLens.Encoding.Bytes.putVarInt 10)
+                      ((Prelude..)
+                         (\ bs
+                            -> (Data.Monoid.<>)
+                                 (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                    (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                 (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                         Data.Text.Encoding.encodeUtf8 _v))
+             ((Data.Monoid.<>)
+                (let
+                   _v = Lens.Family2.view (Data.ProtoLens.Field.field @"weight") _x
+                 in
+                   if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                       Data.Monoid.mempty
+                   else
+                       (Data.Monoid.<>)
+                         (Data.ProtoLens.Encoding.Bytes.putVarInt 21)
+                         ((Prelude..)
+                            Data.ProtoLens.Encoding.Bytes.putFixed32
+                            Data.ProtoLens.Encoding.Bytes.floatToWord _v))
+                (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                   (Lens.Family2.view Data.ProtoLens.unknownFields _x)))
+instance Control.DeepSeq.NFData PollerGroupInfo where
+  rnf
+    = \ x__
+        -> Control.DeepSeq.deepseq
+             (_PollerGroupInfo'_unknownFields x__)
+             (Control.DeepSeq.deepseq
+                (_PollerGroupInfo'id x__)
+                (Control.DeepSeq.deepseq (_PollerGroupInfo'weight x__) ()))
+{- | Fields :
+     
+         * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.version' @:: Lens' PollerGroupsInfo Data.Int.Int64@
+         * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.pollerGroups' @:: Lens' PollerGroupsInfo [PollerGroupInfo]@
+         * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.vec'pollerGroups' @:: Lens' PollerGroupsInfo (Data.Vector.Vector PollerGroupInfo)@ -}
+data PollerGroupsInfo
+  = PollerGroupsInfo'_constructor {_PollerGroupsInfo'version :: !Data.Int.Int64,
+                                   _PollerGroupsInfo'pollerGroups :: !(Data.Vector.Vector PollerGroupInfo),
+                                   _PollerGroupsInfo'_unknownFields :: !Data.ProtoLens.FieldSet}
+  deriving stock (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show PollerGroupsInfo where
+  showsPrec _ __x __s
+    = Prelude.showChar
+        '{'
+        (Prelude.showString
+           (Data.ProtoLens.showMessageShort __x) (Prelude.showChar '}' __s))
+instance Data.ProtoLens.Field.HasField PollerGroupsInfo "version" Data.Int.Int64 where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _PollerGroupsInfo'version
+           (\ x__ y__ -> x__ {_PollerGroupsInfo'version = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField PollerGroupsInfo "pollerGroups" [PollerGroupInfo] where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _PollerGroupsInfo'pollerGroups
+           (\ x__ y__ -> x__ {_PollerGroupsInfo'pollerGroups = y__}))
+        (Lens.Family2.Unchecked.lens
+           Data.Vector.Generic.toList
+           (\ _ y__ -> Data.Vector.Generic.fromList y__))
+instance Data.ProtoLens.Field.HasField PollerGroupsInfo "vec'pollerGroups" (Data.Vector.Vector PollerGroupInfo) where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _PollerGroupsInfo'pollerGroups
+           (\ x__ y__ -> x__ {_PollerGroupsInfo'pollerGroups = y__}))
+        Prelude.id
+instance Data.ProtoLens.Message PollerGroupsInfo where
+  messageName _
+    = Data.Text.pack "temporal.api.taskqueue.v1.PollerGroupsInfo"
+  packedMessageDescriptor _
+    = "\n\
+      \\DLEPollerGroupsInfo\DC2\CAN\n\
+      \\aversion\CAN\SOH \SOH(\ETXR\aversion\DC2O\n\
+      \\rpoller_groups\CAN\STX \ETX(\v2*.temporal.api.taskqueue.v1.PollerGroupInfoR\fpollerGroups"
+  packedFileDescriptor _ = packedFileDescriptor
+  fieldsByTag
+    = let
+        version__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "version"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.Int64Field ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Int.Int64)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional (Data.ProtoLens.Field.field @"version")) ::
+              Data.ProtoLens.FieldDescriptor PollerGroupsInfo
+        pollerGroups__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "poller_groups"
+              (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                 Data.ProtoLens.FieldTypeDescriptor PollerGroupInfo)
+              (Data.ProtoLens.RepeatedField
+                 Data.ProtoLens.Unpacked
+                 (Data.ProtoLens.Field.field @"pollerGroups")) ::
+              Data.ProtoLens.FieldDescriptor PollerGroupsInfo
+      in
+        Data.Map.fromList
+          [(Data.ProtoLens.Tag 1, version__field_descriptor),
+           (Data.ProtoLens.Tag 2, pollerGroups__field_descriptor)]
+  unknownFields
+    = Lens.Family2.Unchecked.lens
+        _PollerGroupsInfo'_unknownFields
+        (\ x__ y__ -> x__ {_PollerGroupsInfo'_unknownFields = y__})
+  defMessage
+    = PollerGroupsInfo'_constructor
+        {_PollerGroupsInfo'version = Data.ProtoLens.fieldDefault,
+         _PollerGroupsInfo'pollerGroups = Data.Vector.Generic.empty,
+         _PollerGroupsInfo'_unknownFields = []}
+  parseMessage
+    = let
+        loop ::
+          PollerGroupsInfo
+          -> Data.ProtoLens.Encoding.Growing.Growing Data.Vector.Vector Data.ProtoLens.Encoding.Growing.RealWorld PollerGroupInfo
+             -> Data.ProtoLens.Encoding.Bytes.Parser PollerGroupsInfo
+        loop x mutable'pollerGroups
+          = do end <- Data.ProtoLens.Encoding.Bytes.atEnd
+               if end then
+                   do frozen'pollerGroups <- Data.ProtoLens.Encoding.Parser.Unsafe.unsafeLiftIO
+                                               (Data.ProtoLens.Encoding.Growing.unsafeFreeze
+                                                  mutable'pollerGroups)
+                      (let missing = []
+                       in
+                         if Prelude.null missing then
+                             Prelude.return ()
+                         else
+                             Prelude.fail
+                               ((Prelude.++)
+                                  "Missing required fields: "
+                                  (Prelude.show (missing :: [Prelude.String]))))
+                      Prelude.return
+                        (Lens.Family2.over
+                           Data.ProtoLens.unknownFields (\ !t -> Prelude.reverse t)
+                           (Lens.Family2.set
+                              (Data.ProtoLens.Field.field @"vec'pollerGroups")
+                              frozen'pollerGroups x))
+               else
+                   do tag <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                      case tag of
+                        8 -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (Prelude.fmap
+                                          Prelude.fromIntegral
+                                          Data.ProtoLens.Encoding.Bytes.getVarInt)
+                                       "version"
+                                loop
+                                  (Lens.Family2.set (Data.ProtoLens.Field.field @"version") y x)
+                                  mutable'pollerGroups
+                        18
+                          -> do !y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                        (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                            Data.ProtoLens.Encoding.Bytes.isolate
+                                              (Prelude.fromIntegral len)
+                                              Data.ProtoLens.parseMessage)
+                                        "poller_groups"
+                                v <- Data.ProtoLens.Encoding.Parser.Unsafe.unsafeLiftIO
+                                       (Data.ProtoLens.Encoding.Growing.append
+                                          mutable'pollerGroups y)
+                                loop x v
+                        wire
+                          -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
+                                        wire
+                                loop
+                                  (Lens.Family2.over
+                                     Data.ProtoLens.unknownFields (\ !t -> (:) y t) x)
+                                  mutable'pollerGroups
+      in
+        (Data.ProtoLens.Encoding.Bytes.<?>)
+          (do mutable'pollerGroups <- Data.ProtoLens.Encoding.Parser.Unsafe.unsafeLiftIO
+                                        Data.ProtoLens.Encoding.Growing.new
+              loop Data.ProtoLens.defMessage mutable'pollerGroups)
+          "PollerGroupsInfo"
+  buildMessage
+    = \ _x
+        -> (Data.Monoid.<>)
+             (let
+                _v = Lens.Family2.view (Data.ProtoLens.Field.field @"version") _x
+              in
+                if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                    Data.Monoid.mempty
+                else
+                    (Data.Monoid.<>)
+                      (Data.ProtoLens.Encoding.Bytes.putVarInt 8)
+                      ((Prelude..)
+                         Data.ProtoLens.Encoding.Bytes.putVarInt Prelude.fromIntegral _v))
+             ((Data.Monoid.<>)
+                (Data.ProtoLens.Encoding.Bytes.foldMapBuilder
+                   (\ _v
+                      -> (Data.Monoid.<>)
+                           (Data.ProtoLens.Encoding.Bytes.putVarInt 18)
+                           ((Prelude..)
+                              (\ bs
+                                 -> (Data.Monoid.<>)
+                                      (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                         (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                      (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                              Data.ProtoLens.encodeMessage _v))
+                   (Lens.Family2.view
+                      (Data.ProtoLens.Field.field @"vec'pollerGroups") _x))
+                (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                   (Lens.Family2.view Data.ProtoLens.unknownFields _x)))
+instance Control.DeepSeq.NFData PollerGroupsInfo where
+  rnf
+    = \ x__
+        -> Control.DeepSeq.deepseq
+             (_PollerGroupsInfo'_unknownFields x__)
+             (Control.DeepSeq.deepseq
+                (_PollerGroupsInfo'version x__)
+                (Control.DeepSeq.deepseq (_PollerGroupsInfo'pollerGroups x__) ()))
 {- | Fields :
      
          * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.lastAccessTime' @:: Lens' PollerInfo Proto.Google.Protobuf.Timestamp.Timestamp@
@@ -1305,6 +1933,119 @@ instance Control.DeepSeq.NFData PollerInfo where
                          (_PollerInfo'workerVersionCapabilities x__)
                          (Control.DeepSeq.deepseq
                             (_PollerInfo'deploymentOptions x__) ())))))
+{- | Fields :
+     
+         * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.targetPollers' @:: Lens' PollerPoolInfo Data.Int.Int32@ -}
+data PollerPoolInfo
+  = PollerPoolInfo'_constructor {_PollerPoolInfo'targetPollers :: !Data.Int.Int32,
+                                 _PollerPoolInfo'_unknownFields :: !Data.ProtoLens.FieldSet}
+  deriving stock (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show PollerPoolInfo where
+  showsPrec _ __x __s
+    = Prelude.showChar
+        '{'
+        (Prelude.showString
+           (Data.ProtoLens.showMessageShort __x) (Prelude.showChar '}' __s))
+instance Data.ProtoLens.Field.HasField PollerPoolInfo "targetPollers" Data.Int.Int32 where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _PollerPoolInfo'targetPollers
+           (\ x__ y__ -> x__ {_PollerPoolInfo'targetPollers = y__}))
+        Prelude.id
+instance Data.ProtoLens.Message PollerPoolInfo where
+  messageName _
+    = Data.Text.pack "temporal.api.taskqueue.v1.PollerPoolInfo"
+  packedMessageDescriptor _
+    = "\n\
+      \\SOPollerPoolInfo\DC2%\n\
+      \\SOtarget_pollers\CAN\SOH \SOH(\ENQR\rtargetPollers"
+  packedFileDescriptor _ = packedFileDescriptor
+  fieldsByTag
+    = let
+        targetPollers__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "target_pollers"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.Int32Field ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Int.Int32)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"targetPollers")) ::
+              Data.ProtoLens.FieldDescriptor PollerPoolInfo
+      in
+        Data.Map.fromList
+          [(Data.ProtoLens.Tag 1, targetPollers__field_descriptor)]
+  unknownFields
+    = Lens.Family2.Unchecked.lens
+        _PollerPoolInfo'_unknownFields
+        (\ x__ y__ -> x__ {_PollerPoolInfo'_unknownFields = y__})
+  defMessage
+    = PollerPoolInfo'_constructor
+        {_PollerPoolInfo'targetPollers = Data.ProtoLens.fieldDefault,
+         _PollerPoolInfo'_unknownFields = []}
+  parseMessage
+    = let
+        loop ::
+          PollerPoolInfo
+          -> Data.ProtoLens.Encoding.Bytes.Parser PollerPoolInfo
+        loop x
+          = do end <- Data.ProtoLens.Encoding.Bytes.atEnd
+               if end then
+                   do (let missing = []
+                       in
+                         if Prelude.null missing then
+                             Prelude.return ()
+                         else
+                             Prelude.fail
+                               ((Prelude.++)
+                                  "Missing required fields: "
+                                  (Prelude.show (missing :: [Prelude.String]))))
+                      Prelude.return
+                        (Lens.Family2.over
+                           Data.ProtoLens.unknownFields (\ !t -> Prelude.reverse t) x)
+               else
+                   do tag <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                      case tag of
+                        8 -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (Prelude.fmap
+                                          Prelude.fromIntegral
+                                          Data.ProtoLens.Encoding.Bytes.getVarInt)
+                                       "target_pollers"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field @"targetPollers") y x)
+                        wire
+                          -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
+                                        wire
+                                loop
+                                  (Lens.Family2.over
+                                     Data.ProtoLens.unknownFields (\ !t -> (:) y t) x)
+      in
+        (Data.ProtoLens.Encoding.Bytes.<?>)
+          (do loop Data.ProtoLens.defMessage) "PollerPoolInfo"
+  buildMessage
+    = \ _x
+        -> (Data.Monoid.<>)
+             (let
+                _v
+                  = Lens.Family2.view
+                      (Data.ProtoLens.Field.field @"targetPollers") _x
+              in
+                if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                    Data.Monoid.mempty
+                else
+                    (Data.Monoid.<>)
+                      (Data.ProtoLens.Encoding.Bytes.putVarInt 8)
+                      ((Prelude..)
+                         Data.ProtoLens.Encoding.Bytes.putVarInt Prelude.fromIntegral _v))
+             (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                (Lens.Family2.view Data.ProtoLens.unknownFields _x))
+instance Control.DeepSeq.NFData PollerPoolInfo where
+  rnf
+    = \ x__
+        -> Control.DeepSeq.deepseq
+             (_PollerPoolInfo'_unknownFields x__)
+             (Control.DeepSeq.deepseq (_PollerPoolInfo'targetPollers x__) ())
 {- | Fields :
      
          * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.pollRequestDeltaSuggestion' @:: Lens' PollerScalingDecision Data.Int.Int32@ -}
@@ -2364,10 +3105,15 @@ instance Control.DeepSeq.NFData TaskQueue where
          * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.queueRateLimit' @:: Lens' TaskQueueConfig RateLimitConfig@
          * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.maybe'queueRateLimit' @:: Lens' TaskQueueConfig (Prelude.Maybe RateLimitConfig)@
          * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.fairnessKeysRateLimitDefault' @:: Lens' TaskQueueConfig RateLimitConfig@
-         * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.maybe'fairnessKeysRateLimitDefault' @:: Lens' TaskQueueConfig (Prelude.Maybe RateLimitConfig)@ -}
+         * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.maybe'fairnessKeysRateLimitDefault' @:: Lens' TaskQueueConfig (Prelude.Maybe RateLimitConfig)@
+         * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.fairnessWeightOverrides' @:: Lens' TaskQueueConfig (Data.Map.Map Data.Text.Text Prelude.Float)@
+         * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.queueConcurrencyLimit' @:: Lens' TaskQueueConfig ConcurrencyLimitConfig@
+         * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.maybe'queueConcurrencyLimit' @:: Lens' TaskQueueConfig (Prelude.Maybe ConcurrencyLimitConfig)@ -}
 data TaskQueueConfig
   = TaskQueueConfig'_constructor {_TaskQueueConfig'queueRateLimit :: !(Prelude.Maybe RateLimitConfig),
                                   _TaskQueueConfig'fairnessKeysRateLimitDefault :: !(Prelude.Maybe RateLimitConfig),
+                                  _TaskQueueConfig'fairnessWeightOverrides :: !(Data.Map.Map Data.Text.Text Prelude.Float),
+                                  _TaskQueueConfig'queueConcurrencyLimit :: !(Prelude.Maybe ConcurrencyLimitConfig),
                                   _TaskQueueConfig'_unknownFields :: !Data.ProtoLens.FieldSet}
   deriving stock (Prelude.Eq, Prelude.Ord)
 instance Prelude.Show TaskQueueConfig where
@@ -2406,6 +3152,28 @@ instance Data.ProtoLens.Field.HasField TaskQueueConfig "maybe'fairnessKeysRateLi
            (\ x__ y__
               -> x__ {_TaskQueueConfig'fairnessKeysRateLimitDefault = y__}))
         Prelude.id
+instance Data.ProtoLens.Field.HasField TaskQueueConfig "fairnessWeightOverrides" (Data.Map.Map Data.Text.Text Prelude.Float) where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _TaskQueueConfig'fairnessWeightOverrides
+           (\ x__ y__
+              -> x__ {_TaskQueueConfig'fairnessWeightOverrides = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField TaskQueueConfig "queueConcurrencyLimit" ConcurrencyLimitConfig where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _TaskQueueConfig'queueConcurrencyLimit
+           (\ x__ y__ -> x__ {_TaskQueueConfig'queueConcurrencyLimit = y__}))
+        (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
+instance Data.ProtoLens.Field.HasField TaskQueueConfig "maybe'queueConcurrencyLimit" (Prelude.Maybe ConcurrencyLimitConfig) where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _TaskQueueConfig'queueConcurrencyLimit
+           (\ x__ y__ -> x__ {_TaskQueueConfig'queueConcurrencyLimit = y__}))
+        Prelude.id
 instance Data.ProtoLens.Message TaskQueueConfig where
   messageName _
     = Data.Text.pack "temporal.api.taskqueue.v1.TaskQueueConfig"
@@ -2413,7 +3181,12 @@ instance Data.ProtoLens.Message TaskQueueConfig where
     = "\n\
       \\SITaskQueueConfig\DC2T\n\
       \\DLEqueue_rate_limit\CAN\SOH \SOH(\v2*.temporal.api.taskqueue.v1.RateLimitConfigR\SOqueueRateLimit\DC2r\n\
-      \ fairness_keys_rate_limit_default\CAN\STX \SOH(\v2*.temporal.api.taskqueue.v1.RateLimitConfigR\FSfairnessKeysRateLimitDefault"
+      \ fairness_keys_rate_limit_default\CAN\STX \SOH(\v2*.temporal.api.taskqueue.v1.RateLimitConfigR\FSfairnessKeysRateLimitDefault\DC2\131\SOH\n\
+      \\EMfairness_weight_overrides\CAN\ETX \ETX(\v2G.temporal.api.taskqueue.v1.TaskQueueConfig.FairnessWeightOverridesEntryR\ETBfairnessWeightOverrides\DC2i\n\
+      \\ETBqueue_concurrency_limit\CAN\EOT \SOH(\v21.temporal.api.taskqueue.v1.ConcurrencyLimitConfigR\NAKqueueConcurrencyLimit\SUBJ\n\
+      \\FSFairnessWeightOverridesEntry\DC2\DLE\n\
+      \\ETXkey\CAN\SOH \SOH(\tR\ETXkey\DC2\DC4\n\
+      \\ENQvalue\CAN\STX \SOH(\STXR\ENQvalue:\STX8\SOH"
   packedFileDescriptor _ = packedFileDescriptor
   fieldsByTag
     = let
@@ -2434,11 +3207,31 @@ instance Data.ProtoLens.Message TaskQueueConfig where
                  (Data.ProtoLens.Field.field
                     @"maybe'fairnessKeysRateLimitDefault")) ::
               Data.ProtoLens.FieldDescriptor TaskQueueConfig
+        fairnessWeightOverrides__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "fairness_weight_overrides"
+              (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                 Data.ProtoLens.FieldTypeDescriptor TaskQueueConfig'FairnessWeightOverridesEntry)
+              (Data.ProtoLens.MapField
+                 (Data.ProtoLens.Field.field @"key")
+                 (Data.ProtoLens.Field.field @"value")
+                 (Data.ProtoLens.Field.field @"fairnessWeightOverrides")) ::
+              Data.ProtoLens.FieldDescriptor TaskQueueConfig
+        queueConcurrencyLimit__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "queue_concurrency_limit"
+              (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                 Data.ProtoLens.FieldTypeDescriptor ConcurrencyLimitConfig)
+              (Data.ProtoLens.OptionalField
+                 (Data.ProtoLens.Field.field @"maybe'queueConcurrencyLimit")) ::
+              Data.ProtoLens.FieldDescriptor TaskQueueConfig
       in
         Data.Map.fromList
           [(Data.ProtoLens.Tag 1, queueRateLimit__field_descriptor),
            (Data.ProtoLens.Tag 2, 
-            fairnessKeysRateLimitDefault__field_descriptor)]
+            fairnessKeysRateLimitDefault__field_descriptor),
+           (Data.ProtoLens.Tag 3, fairnessWeightOverrides__field_descriptor),
+           (Data.ProtoLens.Tag 4, queueConcurrencyLimit__field_descriptor)]
   unknownFields
     = Lens.Family2.Unchecked.lens
         _TaskQueueConfig'_unknownFields
@@ -2447,6 +3240,8 @@ instance Data.ProtoLens.Message TaskQueueConfig where
     = TaskQueueConfig'_constructor
         {_TaskQueueConfig'queueRateLimit = Prelude.Nothing,
          _TaskQueueConfig'fairnessKeysRateLimitDefault = Prelude.Nothing,
+         _TaskQueueConfig'fairnessWeightOverrides = Data.Map.empty,
+         _TaskQueueConfig'queueConcurrencyLimit = Prelude.Nothing,
          _TaskQueueConfig'_unknownFields = []}
   parseMessage
     = let
@@ -2490,6 +3285,32 @@ instance Data.ProtoLens.Message TaskQueueConfig where
                                   (Lens.Family2.set
                                      (Data.ProtoLens.Field.field @"fairnessKeysRateLimitDefault") y
                                      x)
+                        26
+                          -> do !(entry :: TaskQueueConfig'FairnessWeightOverridesEntry) <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                                                                              (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                                                                                  Data.ProtoLens.Encoding.Bytes.isolate
+                                                                                                    (Prelude.fromIntegral
+                                                                                                       len)
+                                                                                                    Data.ProtoLens.parseMessage)
+                                                                                              "fairness_weight_overrides"
+                                (let
+                                   key = Lens.Family2.view (Data.ProtoLens.Field.field @"key") entry
+                                   value
+                                     = Lens.Family2.view (Data.ProtoLens.Field.field @"value") entry
+                                 in
+                                   loop
+                                     (Lens.Family2.over
+                                        (Data.ProtoLens.Field.field @"fairnessWeightOverrides")
+                                        (\ !t -> Data.Map.insert key value t) x))
+                        34
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.isolate
+                                             (Prelude.fromIntegral len) Data.ProtoLens.parseMessage)
+                                       "queue_concurrency_limit"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field @"queueConcurrencyLimit") y x)
                         wire
                           -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
                                         wire
@@ -2534,8 +3355,46 @@ instance Data.ProtoLens.Message TaskQueueConfig where
                                         (Prelude.fromIntegral (Data.ByteString.length bs)))
                                      (Data.ProtoLens.Encoding.Bytes.putBytes bs))
                              Data.ProtoLens.encodeMessage _v))
-                (Data.ProtoLens.Encoding.Wire.buildFieldSet
-                   (Lens.Family2.view Data.ProtoLens.unknownFields _x)))
+                ((Data.Monoid.<>)
+                   (Data.Monoid.mconcat
+                      (Prelude.map
+                         (\ _v
+                            -> (Data.Monoid.<>)
+                                 (Data.ProtoLens.Encoding.Bytes.putVarInt 26)
+                                 ((Prelude..)
+                                    (\ bs
+                                       -> (Data.Monoid.<>)
+                                            (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                               (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                            (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                                    Data.ProtoLens.encodeMessage
+                                    (Lens.Family2.set
+                                       (Data.ProtoLens.Field.field @"key") (Prelude.fst _v)
+                                       (Lens.Family2.set
+                                          (Data.ProtoLens.Field.field @"value") (Prelude.snd _v)
+                                          (Data.ProtoLens.defMessage ::
+                                             TaskQueueConfig'FairnessWeightOverridesEntry)))))
+                         (Data.Map.toList
+                            (Lens.Family2.view
+                               (Data.ProtoLens.Field.field @"fairnessWeightOverrides") _x))))
+                   ((Data.Monoid.<>)
+                      (case
+                           Lens.Family2.view
+                             (Data.ProtoLens.Field.field @"maybe'queueConcurrencyLimit") _x
+                       of
+                         Prelude.Nothing -> Data.Monoid.mempty
+                         (Prelude.Just _v)
+                           -> (Data.Monoid.<>)
+                                (Data.ProtoLens.Encoding.Bytes.putVarInt 34)
+                                ((Prelude..)
+                                   (\ bs
+                                      -> (Data.Monoid.<>)
+                                           (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                              (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                           (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                                   Data.ProtoLens.encodeMessage _v))
+                      (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                         (Lens.Family2.view Data.ProtoLens.unknownFields _x)))))
 instance Control.DeepSeq.NFData TaskQueueConfig where
   rnf
     = \ x__
@@ -2544,7 +3403,172 @@ instance Control.DeepSeq.NFData TaskQueueConfig where
              (Control.DeepSeq.deepseq
                 (_TaskQueueConfig'queueRateLimit x__)
                 (Control.DeepSeq.deepseq
-                   (_TaskQueueConfig'fairnessKeysRateLimitDefault x__) ()))
+                   (_TaskQueueConfig'fairnessKeysRateLimitDefault x__)
+                   (Control.DeepSeq.deepseq
+                      (_TaskQueueConfig'fairnessWeightOverrides x__)
+                      (Control.DeepSeq.deepseq
+                         (_TaskQueueConfig'queueConcurrencyLimit x__) ()))))
+{- | Fields :
+     
+         * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.key' @:: Lens' TaskQueueConfig'FairnessWeightOverridesEntry Data.Text.Text@
+         * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.value' @:: Lens' TaskQueueConfig'FairnessWeightOverridesEntry Prelude.Float@ -}
+data TaskQueueConfig'FairnessWeightOverridesEntry
+  = TaskQueueConfig'FairnessWeightOverridesEntry'_constructor {_TaskQueueConfig'FairnessWeightOverridesEntry'key :: !Data.Text.Text,
+                                                               _TaskQueueConfig'FairnessWeightOverridesEntry'value :: !Prelude.Float,
+                                                               _TaskQueueConfig'FairnessWeightOverridesEntry'_unknownFields :: !Data.ProtoLens.FieldSet}
+  deriving stock (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show TaskQueueConfig'FairnessWeightOverridesEntry where
+  showsPrec _ __x __s
+    = Prelude.showChar
+        '{'
+        (Prelude.showString
+           (Data.ProtoLens.showMessageShort __x) (Prelude.showChar '}' __s))
+instance Data.ProtoLens.Field.HasField TaskQueueConfig'FairnessWeightOverridesEntry "key" Data.Text.Text where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _TaskQueueConfig'FairnessWeightOverridesEntry'key
+           (\ x__ y__
+              -> x__ {_TaskQueueConfig'FairnessWeightOverridesEntry'key = y__}))
+        Prelude.id
+instance Data.ProtoLens.Field.HasField TaskQueueConfig'FairnessWeightOverridesEntry "value" Prelude.Float where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _TaskQueueConfig'FairnessWeightOverridesEntry'value
+           (\ x__ y__
+              -> x__
+                   {_TaskQueueConfig'FairnessWeightOverridesEntry'value = y__}))
+        Prelude.id
+instance Data.ProtoLens.Message TaskQueueConfig'FairnessWeightOverridesEntry where
+  messageName _
+    = Data.Text.pack
+        "temporal.api.taskqueue.v1.TaskQueueConfig.FairnessWeightOverridesEntry"
+  packedMessageDescriptor _
+    = "\n\
+      \\FSFairnessWeightOverridesEntry\DC2\DLE\n\
+      \\ETXkey\CAN\SOH \SOH(\tR\ETXkey\DC2\DC4\n\
+      \\ENQvalue\CAN\STX \SOH(\STXR\ENQvalue:\STX8\SOH"
+  packedFileDescriptor _ = packedFileDescriptor
+  fieldsByTag
+    = let
+        key__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "key"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.StringField ::
+                 Data.ProtoLens.FieldTypeDescriptor Data.Text.Text)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional (Data.ProtoLens.Field.field @"key")) ::
+              Data.ProtoLens.FieldDescriptor TaskQueueConfig'FairnessWeightOverridesEntry
+        value__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "value"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.FloatField ::
+                 Data.ProtoLens.FieldTypeDescriptor Prelude.Float)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional (Data.ProtoLens.Field.field @"value")) ::
+              Data.ProtoLens.FieldDescriptor TaskQueueConfig'FairnessWeightOverridesEntry
+      in
+        Data.Map.fromList
+          [(Data.ProtoLens.Tag 1, key__field_descriptor),
+           (Data.ProtoLens.Tag 2, value__field_descriptor)]
+  unknownFields
+    = Lens.Family2.Unchecked.lens
+        _TaskQueueConfig'FairnessWeightOverridesEntry'_unknownFields
+        (\ x__ y__
+           -> x__
+                {_TaskQueueConfig'FairnessWeightOverridesEntry'_unknownFields = y__})
+  defMessage
+    = TaskQueueConfig'FairnessWeightOverridesEntry'_constructor
+        {_TaskQueueConfig'FairnessWeightOverridesEntry'key = Data.ProtoLens.fieldDefault,
+         _TaskQueueConfig'FairnessWeightOverridesEntry'value = Data.ProtoLens.fieldDefault,
+         _TaskQueueConfig'FairnessWeightOverridesEntry'_unknownFields = []}
+  parseMessage
+    = let
+        loop ::
+          TaskQueueConfig'FairnessWeightOverridesEntry
+          -> Data.ProtoLens.Encoding.Bytes.Parser TaskQueueConfig'FairnessWeightOverridesEntry
+        loop x
+          = do end <- Data.ProtoLens.Encoding.Bytes.atEnd
+               if end then
+                   do (let missing = []
+                       in
+                         if Prelude.null missing then
+                             Prelude.return ()
+                         else
+                             Prelude.fail
+                               ((Prelude.++)
+                                  "Missing required fields: "
+                                  (Prelude.show (missing :: [Prelude.String]))))
+                      Prelude.return
+                        (Lens.Family2.over
+                           Data.ProtoLens.unknownFields (\ !t -> Prelude.reverse t) x)
+               else
+                   do tag <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                      case tag of
+                        10
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.getText
+                                             (Prelude.fromIntegral len))
+                                       "key"
+                                loop (Lens.Family2.set (Data.ProtoLens.Field.field @"key") y x)
+                        21
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (Prelude.fmap
+                                          Data.ProtoLens.Encoding.Bytes.wordToFloat
+                                          Data.ProtoLens.Encoding.Bytes.getFixed32)
+                                       "value"
+                                loop (Lens.Family2.set (Data.ProtoLens.Field.field @"value") y x)
+                        wire
+                          -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
+                                        wire
+                                loop
+                                  (Lens.Family2.over
+                                     Data.ProtoLens.unknownFields (\ !t -> (:) y t) x)
+      in
+        (Data.ProtoLens.Encoding.Bytes.<?>)
+          (do loop Data.ProtoLens.defMessage) "FairnessWeightOverridesEntry"
+  buildMessage
+    = \ _x
+        -> (Data.Monoid.<>)
+             (let _v = Lens.Family2.view (Data.ProtoLens.Field.field @"key") _x
+              in
+                if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                    Data.Monoid.mempty
+                else
+                    (Data.Monoid.<>)
+                      (Data.ProtoLens.Encoding.Bytes.putVarInt 10)
+                      ((Prelude..)
+                         (\ bs
+                            -> (Data.Monoid.<>)
+                                 (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                    (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                 (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                         Data.Text.Encoding.encodeUtf8 _v))
+             ((Data.Monoid.<>)
+                (let
+                   _v = Lens.Family2.view (Data.ProtoLens.Field.field @"value") _x
+                 in
+                   if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                       Data.Monoid.mempty
+                   else
+                       (Data.Monoid.<>)
+                         (Data.ProtoLens.Encoding.Bytes.putVarInt 21)
+                         ((Prelude..)
+                            Data.ProtoLens.Encoding.Bytes.putFixed32
+                            Data.ProtoLens.Encoding.Bytes.floatToWord _v))
+                (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                   (Lens.Family2.view Data.ProtoLens.unknownFields _x)))
+instance Control.DeepSeq.NFData TaskQueueConfig'FairnessWeightOverridesEntry where
+  rnf
+    = \ x__
+        -> Control.DeepSeq.deepseq
+             (_TaskQueueConfig'FairnessWeightOverridesEntry'_unknownFields x__)
+             (Control.DeepSeq.deepseq
+                (_TaskQueueConfig'FairnessWeightOverridesEntry'key x__)
+                (Control.DeepSeq.deepseq
+                   (_TaskQueueConfig'FairnessWeightOverridesEntry'value x__) ()))
 {- | Fields :
      
          * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.maxTasksPerSecond' @:: Lens' TaskQueueMetadata Proto.Google.Protobuf.Wrappers.DoubleValue@
@@ -3065,12 +4089,14 @@ instance Control.DeepSeq.NFData TaskQueueReachability where
          * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.approximateBacklogAge' @:: Lens' TaskQueueStats Proto.Google.Protobuf.Duration.Duration@
          * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.maybe'approximateBacklogAge' @:: Lens' TaskQueueStats (Prelude.Maybe Proto.Google.Protobuf.Duration.Duration)@
          * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.tasksAddRate' @:: Lens' TaskQueueStats Prelude.Float@
-         * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.tasksDispatchRate' @:: Lens' TaskQueueStats Prelude.Float@ -}
+         * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.tasksDispatchRate' @:: Lens' TaskQueueStats Prelude.Float@
+         * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.rateLimitingActive' @:: Lens' TaskQueueStats Prelude.Bool@ -}
 data TaskQueueStats
   = TaskQueueStats'_constructor {_TaskQueueStats'approximateBacklogCount :: !Data.Int.Int64,
                                  _TaskQueueStats'approximateBacklogAge :: !(Prelude.Maybe Proto.Google.Protobuf.Duration.Duration),
                                  _TaskQueueStats'tasksAddRate :: !Prelude.Float,
                                  _TaskQueueStats'tasksDispatchRate :: !Prelude.Float,
+                                 _TaskQueueStats'rateLimitingActive :: !Prelude.Bool,
                                  _TaskQueueStats'_unknownFields :: !Data.ProtoLens.FieldSet}
   deriving stock (Prelude.Eq, Prelude.Ord)
 instance Prelude.Show TaskQueueStats where
@@ -3114,6 +4140,13 @@ instance Data.ProtoLens.Field.HasField TaskQueueStats "tasksDispatchRate" Prelud
            _TaskQueueStats'tasksDispatchRate
            (\ x__ y__ -> x__ {_TaskQueueStats'tasksDispatchRate = y__}))
         Prelude.id
+instance Data.ProtoLens.Field.HasField TaskQueueStats "rateLimitingActive" Prelude.Bool where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _TaskQueueStats'rateLimitingActive
+           (\ x__ y__ -> x__ {_TaskQueueStats'rateLimitingActive = y__}))
+        Prelude.id
 instance Data.ProtoLens.Message TaskQueueStats where
   messageName _
     = Data.Text.pack "temporal.api.taskqueue.v1.TaskQueueStats"
@@ -3123,7 +4156,8 @@ instance Data.ProtoLens.Message TaskQueueStats where
       \\EMapproximate_backlog_count\CAN\SOH \SOH(\ETXR\ETBapproximateBacklogCount\DC2Q\n\
       \\ETBapproximate_backlog_age\CAN\STX \SOH(\v2\EM.google.protobuf.DurationR\NAKapproximateBacklogAge\DC2$\n\
       \\SOtasks_add_rate\CAN\ETX \SOH(\STXR\ftasksAddRate\DC2.\n\
-      \\DC3tasks_dispatch_rate\CAN\EOT \SOH(\STXR\DC1tasksDispatchRate"
+      \\DC3tasks_dispatch_rate\CAN\EOT \SOH(\STXR\DC1tasksDispatchRate\DC20\n\
+      \\DC4rate_limiting_active\CAN\ENQ \SOH(\bR\DC2rateLimitingActive"
   packedFileDescriptor _ = packedFileDescriptor
   fieldsByTag
     = let
@@ -3162,12 +4196,22 @@ instance Data.ProtoLens.Message TaskQueueStats where
                  Data.ProtoLens.Optional
                  (Data.ProtoLens.Field.field @"tasksDispatchRate")) ::
               Data.ProtoLens.FieldDescriptor TaskQueueStats
+        rateLimitingActive__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "rate_limiting_active"
+              (Data.ProtoLens.ScalarField Data.ProtoLens.BoolField ::
+                 Data.ProtoLens.FieldTypeDescriptor Prelude.Bool)
+              (Data.ProtoLens.PlainField
+                 Data.ProtoLens.Optional
+                 (Data.ProtoLens.Field.field @"rateLimitingActive")) ::
+              Data.ProtoLens.FieldDescriptor TaskQueueStats
       in
         Data.Map.fromList
           [(Data.ProtoLens.Tag 1, approximateBacklogCount__field_descriptor),
            (Data.ProtoLens.Tag 2, approximateBacklogAge__field_descriptor),
            (Data.ProtoLens.Tag 3, tasksAddRate__field_descriptor),
-           (Data.ProtoLens.Tag 4, tasksDispatchRate__field_descriptor)]
+           (Data.ProtoLens.Tag 4, tasksDispatchRate__field_descriptor),
+           (Data.ProtoLens.Tag 5, rateLimitingActive__field_descriptor)]
   unknownFields
     = Lens.Family2.Unchecked.lens
         _TaskQueueStats'_unknownFields
@@ -3178,6 +4222,7 @@ instance Data.ProtoLens.Message TaskQueueStats where
          _TaskQueueStats'approximateBacklogAge = Prelude.Nothing,
          _TaskQueueStats'tasksAddRate = Data.ProtoLens.fieldDefault,
          _TaskQueueStats'tasksDispatchRate = Data.ProtoLens.fieldDefault,
+         _TaskQueueStats'rateLimitingActive = Data.ProtoLens.fieldDefault,
          _TaskQueueStats'_unknownFields = []}
   parseMessage
     = let
@@ -3237,6 +4282,14 @@ instance Data.ProtoLens.Message TaskQueueStats where
                                 loop
                                   (Lens.Family2.set
                                      (Data.ProtoLens.Field.field @"tasksDispatchRate") y x)
+                        40
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (Prelude.fmap
+                                          ((Prelude./=) 0) Data.ProtoLens.Encoding.Bytes.getVarInt)
+                                       "rate_limiting_active"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field @"rateLimitingActive") y x)
                         wire
                           -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
                                         wire
@@ -3304,8 +4357,22 @@ instance Data.ProtoLens.Message TaskQueueStats where
                                ((Prelude..)
                                   Data.ProtoLens.Encoding.Bytes.putFixed32
                                   Data.ProtoLens.Encoding.Bytes.floatToWord _v))
-                      (Data.ProtoLens.Encoding.Wire.buildFieldSet
-                         (Lens.Family2.view Data.ProtoLens.unknownFields _x)))))
+                      ((Data.Monoid.<>)
+                         (let
+                            _v
+                              = Lens.Family2.view
+                                  (Data.ProtoLens.Field.field @"rateLimitingActive") _x
+                          in
+                            if (Prelude.==) _v Data.ProtoLens.fieldDefault then
+                                Data.Monoid.mempty
+                            else
+                                (Data.Monoid.<>)
+                                  (Data.ProtoLens.Encoding.Bytes.putVarInt 40)
+                                  ((Prelude..)
+                                     Data.ProtoLens.Encoding.Bytes.putVarInt
+                                     (\ b -> if b then 1 else 0) _v))
+                         (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                            (Lens.Family2.view Data.ProtoLens.unknownFields _x))))))
 instance Control.DeepSeq.NFData TaskQueueStats where
   rnf
     = \ x__
@@ -3318,7 +4385,9 @@ instance Control.DeepSeq.NFData TaskQueueStats where
                    (Control.DeepSeq.deepseq
                       (_TaskQueueStats'tasksAddRate x__)
                       (Control.DeepSeq.deepseq
-                         (_TaskQueueStats'tasksDispatchRate x__) ()))))
+                         (_TaskQueueStats'tasksDispatchRate x__)
+                         (Control.DeepSeq.deepseq
+                            (_TaskQueueStats'rateLimitingActive x__) ())))))
 {- | Fields :
      
          * 'Proto.Temporal.Api.Taskqueue.V1.Message_Fields.backlogCountHint' @:: Lens' TaskQueueStatus Data.Int.Int64@
@@ -5149,7 +6218,9 @@ packedFileDescriptor
     \\vnormal_name\CAN\ETX \SOH(\tR\n\
     \normalName\"b\n\
     \\DC1TaskQueueMetadata\DC2M\n\
-    \\DC4max_tasks_per_second\CAN\SOH \SOH(\v2\FS.google.protobuf.DoubleValueR\DC1maxTasksPerSecond\"\212\ETX\n\
+    \\DC4max_tasks_per_second\CAN\SOH \SOH(\v2\FS.google.protobuf.DoubleValueR\DC1maxTasksPerSecond\"7\n\
+    \\SOPollerPoolInfo\DC2%\n\
+    \\SOtarget_pollers\CAN\SOH \SOH(\ENQR\rtargetPollers\"\212\ETX\n\
     \\ETBTaskQueueVersioningInfo\DC2q\n\
     \\SUBcurrent_deployment_version\CAN\a \SOH(\v23.temporal.api.deployment.v1.WorkerDeploymentVersionR\CANcurrentDeploymentVersion\DC2+\n\
     \\SIcurrent_version\CAN\SOH \SOH(\tR\SOcurrentVersionB\STX\CAN\SOH\DC2q\n\
@@ -5172,12 +6243,13 @@ packedFileDescriptor
     \\ENQvalue\CAN\STX \SOH(\v2,.temporal.api.taskqueue.v1.TaskQueueTypeInfoR\ENQvalue:\STX8\SOH\"\149\SOH\n\
     \\DC1TaskQueueTypeInfo\DC2?\n\
     \\apollers\CAN\SOH \ETX(\v2%.temporal.api.taskqueue.v1.PollerInfoR\apollers\DC2?\n\
-    \\ENQstats\CAN\STX \SOH(\v2).temporal.api.taskqueue.v1.TaskQueueStatsR\ENQstats\"\245\SOH\n\
+    \\ENQstats\CAN\STX \SOH(\v2).temporal.api.taskqueue.v1.TaskQueueStatsR\ENQstats\"\167\STX\n\
     \\SOTaskQueueStats\DC2:\n\
     \\EMapproximate_backlog_count\CAN\SOH \SOH(\ETXR\ETBapproximateBacklogCount\DC2Q\n\
     \\ETBapproximate_backlog_age\CAN\STX \SOH(\v2\EM.google.protobuf.DurationR\NAKapproximateBacklogAge\DC2$\n\
     \\SOtasks_add_rate\CAN\ETX \SOH(\STXR\ftasksAddRate\DC2.\n\
-    \\DC3tasks_dispatch_rate\CAN\EOT \SOH(\STXR\DC1tasksDispatchRate\"\239\SOH\n\
+    \\DC3tasks_dispatch_rate\CAN\EOT \SOH(\STXR\DC1tasksDispatchRate\DC20\n\
+    \\DC4rate_limiting_active\CAN\ENQ \SOH(\bR\DC2rateLimitingActive\"\239\SOH\n\
     \\SITaskQueueStatus\DC2,\n\
     \\DC2backlog_count_hint\CAN\SOH \SOH(\ETXR\DLEbacklogCountHint\DC2\GS\n\
     \\n\
@@ -5226,11 +6298,19 @@ packedFileDescriptor
     \(TimestampedCompatibleBuildIdRedirectRule\DC2L\n\
     \\EOTrule\CAN\SOH \SOH(\v28.temporal.api.taskqueue.v1.CompatibleBuildIdRedirectRuleR\EOTrule\DC2;\n\
     \\vcreate_time\CAN\STX \SOH(\v2\SUB.google.protobuf.TimestampR\n\
-    \createTime\"Z\n\
+    \createTime\"9\n\
+    \\SIPollerGroupInfo\DC2\SO\n\
+    \\STXid\CAN\SOH \SOH(\tR\STXid\DC2\SYN\n\
+    \\ACKweight\CAN\STX \SOH(\STXR\ACKweight\"}\n\
+    \\DLEPollerGroupsInfo\DC2\CAN\n\
+    \\aversion\CAN\SOH \SOH(\ETXR\aversion\DC2O\n\
+    \\rpoller_groups\CAN\STX \ETX(\v2*.temporal.api.taskqueue.v1.PollerGroupInfoR\fpollerGroups\"Z\n\
     \\NAKPollerScalingDecision\DC2A\n\
     \\GSpoll_request_delta_suggestion\CAN\SOH \SOH(\ENQR\SUBpollRequestDeltaSuggestion\";\n\
     \\tRateLimit\DC2.\n\
-    \\DC3requests_per_second\CAN\SOH \SOH(\STXR\DC1requestsPerSecond\"\142\SOH\n\
+    \\DC3requests_per_second\CAN\SOH \SOH(\STXR\DC1requestsPerSecond\"=\n\
+    \\DLEConcurrencyLimit\DC2)\n\
+    \\DLEconcurrent_tasks\CAN\SOH \SOH(\ENQR\SIconcurrentTasks\"\142\SOH\n\
     \\SOConfigMetadata\DC2\SYN\n\
     \\ACKreason\CAN\SOH \SOH(\tR\ACKreason\DC2'\n\
     \\SIupdate_identity\CAN\STX \SOH(\tR\SOupdateIdentity\DC2;\n\
@@ -5239,12 +6319,20 @@ packedFileDescriptor
     \\SIRateLimitConfig\DC2C\n\
     \\n\
     \rate_limit\CAN\SOH \SOH(\v2$.temporal.api.taskqueue.v1.RateLimitR\trateLimit\DC2E\n\
-    \\bmetadata\CAN\STX \SOH(\v2).temporal.api.taskqueue.v1.ConfigMetadataR\bmetadata\"\219\SOH\n\
+    \\bmetadata\CAN\STX \SOH(\v2).temporal.api.taskqueue.v1.ConfigMetadataR\bmetadata\"\185\SOH\n\
+    \\SYNConcurrencyLimitConfig\DC2X\n\
+    \\DC1concurrency_limit\CAN\SOH \SOH(\v2+.temporal.api.taskqueue.v1.ConcurrencyLimitR\DLEconcurrencyLimit\DC2E\n\
+    \\bmetadata\CAN\STX \SOH(\v2).temporal.api.taskqueue.v1.ConfigMetadataR\bmetadata\"\152\EOT\n\
     \\SITaskQueueConfig\DC2T\n\
     \\DLEqueue_rate_limit\CAN\SOH \SOH(\v2*.temporal.api.taskqueue.v1.RateLimitConfigR\SOqueueRateLimit\DC2r\n\
-    \ fairness_keys_rate_limit_default\CAN\STX \SOH(\v2*.temporal.api.taskqueue.v1.RateLimitConfigR\FSfairnessKeysRateLimitDefaultB\152\SOH\n\
-    \\FSio.temporal.api.taskqueue.v1B\fMessageProtoP\SOHZ)go.temporal.io/api/taskqueue/v1;taskqueue\170\STX\ESCTemporalio.Api.TaskQueue.V1\234\STX\RSTemporalio::Api::TaskQueue::V1J\166~\n\
-    \\a\DC2\ENQ\NUL\NUL\217\STX\SOH\n\
+    \ fairness_keys_rate_limit_default\CAN\STX \SOH(\v2*.temporal.api.taskqueue.v1.RateLimitConfigR\FSfairnessKeysRateLimitDefault\DC2\131\SOH\n\
+    \\EMfairness_weight_overrides\CAN\ETX \ETX(\v2G.temporal.api.taskqueue.v1.TaskQueueConfig.FairnessWeightOverridesEntryR\ETBfairnessWeightOverrides\DC2i\n\
+    \\ETBqueue_concurrency_limit\CAN\EOT \SOH(\v21.temporal.api.taskqueue.v1.ConcurrencyLimitConfigR\NAKqueueConcurrencyLimit\SUBJ\n\
+    \\FSFairnessWeightOverridesEntry\DC2\DLE\n\
+    \\ETXkey\CAN\SOH \SOH(\tR\ETXkey\DC2\DC4\n\
+    \\ENQvalue\CAN\STX \SOH(\STXR\ENQvalue:\STX8\SOHB\152\SOH\n\
+    \\FSio.temporal.api.taskqueue.v1B\fMessageProtoP\SOHZ)go.temporal.io/api/taskqueue/v1;taskqueue\170\STX\ESCTemporalio.Api.TaskQueue.V1\234\STX\RSTemporalio::Api::TaskQueue::V1J\252\142\SOH\n\
+    \\a\DC2\ENQ\NUL\NUL\136\ETX\SOH\n\
     \\b\n\
     \\SOH\f\DC2\ETX\NUL\NUL\DC2\n\
     \\b\n\
@@ -5336,141 +6424,158 @@ packedFileDescriptor
     \\ENQ\EOT\SOH\STX\NUL\SOH\DC2\ETX  4\n\
     \\f\n\
     \\ENQ\EOT\SOH\STX\NUL\ETX\DC2\ETX 78\n\
-    \m\n\
-    \\STX\EOT\STX\DC2\EOT$\NUL>\SOH\SUBa Experimental. Worker Deployments are experimental and might significantly change in the future.\n\
+    \I\n\
+    \\STX\EOT\STX\DC2\EOT$\NUL(\SOH\SUB= Worker-reported state about the poller pool issuing a poll.\n\
     \\n\
     \\n\
     \\n\
-    \\ETX\EOT\STX\SOH\DC2\ETX$\b\US\n\
+    \\ETX\EOT\STX\SOH\DC2\ETX$\b\SYN\n\
+    \\145\SOH\n\
+    \\EOT\EOT\STX\STX\NUL\DC2\ETX'\EOT\GS\SUB\131\SOH Number of pollers this worker is targeting for this task queue and task type.\n\
+    \ 0 if unknown, such as a poller pool of fixed size.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\STX\STX\NUL\ENQ\DC2\ETX'\EOT\t\n\
+    \\f\n\
+    \\ENQ\EOT\STX\STX\NUL\SOH\DC2\ETX'\n\
+    \\CAN\n\
+    \\f\n\
+    \\ENQ\EOT\STX\STX\NUL\ETX\DC2\ETX'\ESC\FS\n\
+    \\n\
+    \\n\
+    \\STX\EOT\ETX\DC2\EOT*\NULD\SOH\n\
+    \\n\
+    \\n\
+    \\ETX\EOT\ETX\SOH\DC2\ETX*\b\US\n\
     \\200\ETX\n\
-    \\EOT\EOT\STX\STX\NUL\DC2\ETX*\EOTV\SUB\186\ETX Specifies which Deployment Version should receive new workflow executions and tasks of\n\
+    \\EOT\EOT\ETX\STX\NUL\DC2\ETX0\EOTV\SUB\186\ETX Specifies which Deployment Version should receive new workflow executions and tasks of\n\
     \ existing unversioned or AutoUpgrade workflows.\n\
     \ Nil value represents all the unversioned workers (those with `UNVERSIONED` (or unspecified) `WorkerVersioningMode`.)\n\
     \ Note: Current Version is overridden by the Ramping Version for a portion of traffic when ramp percentage\n\
     \ is non-zero (see `ramping_deployment_version` and `ramping_version_percentage`).\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\NUL\ACK\DC2\ETX*\EOT6\n\
+    \\ENQ\EOT\ETX\STX\NUL\ACK\DC2\ETX0\EOT6\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\NUL\SOH\DC2\ETX*7Q\n\
+    \\ENQ\EOT\ETX\STX\NUL\SOH\DC2\ETX07Q\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\NUL\ETX\DC2\ETX*TU\n\
+    \\ENQ\EOT\ETX\STX\NUL\ETX\DC2\ETX0TU\n\
     \<\n\
-    \\EOT\EOT\STX\STX\SOH\DC2\ETX,\EOT3\SUB/ Deprecated. Use `current_deployment_version`.\n\
+    \\EOT\EOT\ETX\STX\SOH\DC2\ETX2\EOT3\SUB/ Deprecated. Use `current_deployment_version`.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\SOH\ENQ\DC2\ETX,\EOT\n\
+    \\ENQ\EOT\ETX\STX\SOH\ENQ\DC2\ETX2\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\SOH\SOH\DC2\ETX,\v\SUB\n\
+    \\ENQ\EOT\ETX\STX\SOH\SOH\DC2\ETX2\v\SUB\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\SOH\ETX\DC2\ETX,\GS\RS\n\
+    \\ENQ\EOT\ETX\STX\SOH\ETX\DC2\ETX2\GS\RS\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\SOH\b\DC2\ETX,\US2\n\
+    \\ENQ\EOT\ETX\STX\SOH\b\DC2\ETX2\US2\n\
     \\r\n\
-    \\ACK\EOT\STX\STX\SOH\b\ETX\DC2\ETX, 1\n\
+    \\ACK\EOT\ETX\STX\SOH\b\ETX\DC2\ETX2 1\n\
     \\254\ETX\n\
-    \\EOT\EOT\STX\STX\STX\DC2\ETX3\EOTV\SUB\240\ETX When ramp percentage is non-zero, that portion of traffic is shifted from the Current Version to the Ramping Version.\n\
+    \\EOT\EOT\ETX\STX\STX\DC2\ETX9\EOTV\SUB\240\ETX When ramp percentage is non-zero, that portion of traffic is shifted from the Current Version to the Ramping Version.\n\
     \ Must always be different from `current_deployment_version` unless both are nil.\n\
     \ Nil value represents all the unversioned workers (those with `UNVERSIONED` (or unspecified) `WorkerVersioningMode`.)\n\
     \ Note that it is possible to ramp from one Version to another Version, or from unversioned\n\
     \ workers to a particular Version, or from a particular Version to unversioned workers.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\STX\ACK\DC2\ETX3\EOT6\n\
+    \\ENQ\EOT\ETX\STX\STX\ACK\DC2\ETX9\EOT6\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\STX\SOH\DC2\ETX37Q\n\
+    \\ENQ\EOT\ETX\STX\STX\SOH\DC2\ETX97Q\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\STX\ETX\DC2\ETX3TU\n\
+    \\ENQ\EOT\ETX\STX\STX\ETX\DC2\ETX9TU\n\
     \<\n\
-    \\EOT\EOT\STX\STX\ETX\DC2\ETX5\EOT3\SUB/ Deprecated. Use `ramping_deployment_version`.\n\
+    \\EOT\EOT\ETX\STX\ETX\DC2\ETX;\EOT3\SUB/ Deprecated. Use `ramping_deployment_version`.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\ETX\ENQ\DC2\ETX5\EOT\n\
+    \\ENQ\EOT\ETX\STX\ETX\ENQ\DC2\ETX;\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\ETX\SOH\DC2\ETX5\v\SUB\n\
+    \\ENQ\EOT\ETX\STX\ETX\SOH\DC2\ETX;\v\SUB\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\ETX\ETX\DC2\ETX5\GS\RS\n\
+    \\ENQ\EOT\ETX\STX\ETX\ETX\DC2\ETX;\GS\RS\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\ETX\b\DC2\ETX5\US2\n\
+    \\ENQ\EOT\ETX\STX\ETX\b\DC2\ETX;\US2\n\
     \\r\n\
-    \\ACK\EOT\STX\STX\ETX\b\ETX\DC2\ETX5 1\n\
+    \\ACK\EOT\ETX\STX\ETX\b\ETX\DC2\ETX; 1\n\
     \\216\STX\n\
-    \\EOT\EOT\STX\STX\EOT\DC2\ETX;\EOT)\SUB\202\STX Percentage of tasks that are routed to the Ramping Version instead of the Current Version.\n\
+    \\EOT\EOT\ETX\STX\EOT\DC2\ETXA\EOT)\SUB\202\STX Percentage of tasks that are routed to the Ramping Version instead of the Current Version.\n\
     \ Valid range: [0, 100]. A 100% value means the Ramping Version is receiving full traffic but\n\
     \ not yet \"promoted\" to be the Current Version, likely due to pending validations.\n\
     \ A 0% value means the Ramping Version is receiving no traffic.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\EOT\ENQ\DC2\ETX;\EOT\t\n\
+    \\ENQ\EOT\ETX\STX\EOT\ENQ\DC2\ETXA\EOT\t\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\EOT\SOH\DC2\ETX;\n\
+    \\ENQ\EOT\ETX\STX\EOT\SOH\DC2\ETXA\n\
     \$\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\EOT\ETX\DC2\ETX;'(\n\
+    \\ENQ\EOT\ETX\STX\EOT\ETX\DC2\ETXA'(\n\
     \K\n\
-    \\EOT\EOT\STX\STX\ENQ\DC2\ETX=\EOT.\SUB> Last time versioning information of this Task Queue changed.\n\
+    \\EOT\EOT\ETX\STX\ENQ\DC2\ETXC\EOT.\SUB> Last time versioning information of this Task Queue changed.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\ENQ\ACK\DC2\ETX=\EOT\GS\n\
+    \\ENQ\EOT\ETX\STX\ENQ\ACK\DC2\ETXC\EOT\GS\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\ENQ\SOH\DC2\ETX=\RS)\n\
+    \\ENQ\EOT\ETX\STX\ENQ\SOH\DC2\ETXC\RS)\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\ENQ\ETX\DC2\ETX=,-\n\
+    \\ENQ\EOT\ETX\STX\ENQ\ETX\DC2\ETXC,-\n\
     \G\n\
-    \\STX\EOT\ETX\DC2\EOTA\NULI\SOH\SUB; Used for specifying versions the caller is interested in.\n\
+    \\STX\EOT\EOT\DC2\EOTG\NULO\SOH\SUB; Used for specifying versions the caller is interested in.\n\
     \\n\
     \\n\
     \\n\
-    \\ETX\EOT\ETX\SOH\DC2\ETXA\b!\n\
+    \\ETX\EOT\EOT\SOH\DC2\ETXG\b!\n\
     \*\n\
-    \\EOT\EOT\ETX\STX\NUL\DC2\ETXC\EOT\"\SUB\GS Include specific Build IDs.\n\
+    \\EOT\EOT\EOT\STX\NUL\DC2\ETXI\EOT\"\SUB\GS Include specific Build IDs.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\ETX\STX\NUL\EOT\DC2\ETXC\EOT\f\n\
+    \\ENQ\EOT\EOT\STX\NUL\EOT\DC2\ETXI\EOT\f\n\
     \\f\n\
-    \\ENQ\EOT\ETX\STX\NUL\ENQ\DC2\ETXC\r\DC3\n\
+    \\ENQ\EOT\EOT\STX\NUL\ENQ\DC2\ETXI\r\DC3\n\
     \\f\n\
-    \\ENQ\EOT\ETX\STX\NUL\SOH\DC2\ETXC\DC4\GS\n\
+    \\ENQ\EOT\EOT\STX\NUL\SOH\DC2\ETXI\DC4\GS\n\
     \\f\n\
-    \\ENQ\EOT\ETX\STX\NUL\ETX\DC2\ETXC !\n\
+    \\ENQ\EOT\EOT\STX\NUL\ETX\DC2\ETXI !\n\
     \-\n\
-    \\EOT\EOT\ETX\STX\SOH\DC2\ETXE\EOT\EM\SUB  Include the unversioned queue.\n\
+    \\EOT\EOT\EOT\STX\SOH\DC2\ETXK\EOT\EM\SUB  Include the unversioned queue.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\ETX\STX\SOH\ENQ\DC2\ETXE\EOT\b\n\
+    \\ENQ\EOT\EOT\STX\SOH\ENQ\DC2\ETXK\EOT\b\n\
     \\f\n\
-    \\ENQ\EOT\ETX\STX\SOH\SOH\DC2\ETXE\t\DC4\n\
+    \\ENQ\EOT\EOT\STX\SOH\SOH\DC2\ETXK\t\DC4\n\
     \\f\n\
-    \\ENQ\EOT\ETX\STX\SOH\ETX\DC2\ETXE\ETB\CAN\n\
+    \\ENQ\EOT\EOT\STX\SOH\ETX\DC2\ETXK\ETB\CAN\n\
     \\196\SOH\n\
-    \\EOT\EOT\ETX\STX\STX\DC2\ETXH\EOT\CAN\SUB\182\SOH Include all active versions. A version is considered active if, in the last few minutes,\n\
+    \\EOT\EOT\EOT\STX\STX\DC2\ETXN\EOT\CAN\SUB\182\SOH Include all active versions. A version is considered active if, in the last few minutes,\n\
     \ it has had new tasks or polls, or it has been the subject of certain task queue API calls.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\ETX\STX\STX\ENQ\DC2\ETXH\EOT\b\n\
+    \\ENQ\EOT\EOT\STX\STX\ENQ\DC2\ETXN\EOT\b\n\
     \\f\n\
-    \\ENQ\EOT\ETX\STX\STX\SOH\DC2\ETXH\t\DC3\n\
+    \\ENQ\EOT\EOT\STX\STX\SOH\DC2\ETXN\t\DC3\n\
     \\f\n\
-    \\ENQ\EOT\ETX\STX\STX\ETX\DC2\ETXH\SYN\ETB\n\
+    \\ENQ\EOT\EOT\STX\STX\ETX\DC2\ETXN\SYN\ETB\n\
     \\n\
     \\n\
-    \\STX\EOT\EOT\DC2\EOTK\NULY\SOH\n\
+    \\STX\EOT\ENQ\DC2\EOTQ\NUL_\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\EOT\SOH\DC2\ETXK\b\FS\n\
+    \\ETX\EOT\ENQ\SOH\DC2\ETXQ\b\FS\n\
     \y\n\
-    \\EOT\EOT\EOT\STX\NUL\DC2\ETXM\EOT1\SUBl Task Queue info per Task Type. Key is the numerical value of the temporal.api.enums.v1.TaskQueueType enum.\n\
+    \\EOT\EOT\ENQ\STX\NUL\DC2\ETXS\EOT1\SUBl Task Queue info per Task Type. Key is the numerical value of the temporal.api.enums.v1.TaskQueueType enum.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\NUL\ACK\DC2\ETXM\EOT!\n\
+    \\ENQ\EOT\ENQ\STX\NUL\ACK\DC2\ETXS\EOT!\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\NUL\SOH\DC2\ETXM\",\n\
+    \\ENQ\EOT\ENQ\STX\NUL\SOH\DC2\ETXS\",\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\NUL\ETX\DC2\ETXM/0\n\
+    \\ENQ\EOT\ENQ\STX\NUL\ETX\DC2\ETXS/0\n\
     \\235\ENQ\n\
-    \\EOT\EOT\EOT\STX\SOH\DC2\ETXX\EOTH\SUB\221\ENQ Task Reachability is eventually consistent; there may be a delay until it converges to the most\n\
+    \\EOT\EOT\ENQ\STX\SOH\DC2\ETX^\EOTH\SUB\221\ENQ Task Reachability is eventually consistent; there may be a delay until it converges to the most\n\
     \ accurate value but it is designed in a way to take the more conservative side until it converges.\n\
     \ For example REACHABLE is more conservative than CLOSED_WORKFLOWS_ONLY.\n\
     \\n\
@@ -5481,47 +6586,47 @@ packedFileDescriptor
     \ sure to query reachability for the parent/previous workflow's Task Queue as well.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\SOH\ACK\DC2\ETXX\EOT1\n\
+    \\ENQ\EOT\ENQ\STX\SOH\ACK\DC2\ETX^\EOT1\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\SOH\SOH\DC2\ETXX2C\n\
+    \\ENQ\EOT\ENQ\STX\SOH\SOH\DC2\ETX^2C\n\
     \\f\n\
-    \\ENQ\EOT\EOT\STX\SOH\ETX\DC2\ETXXFG\n\
+    \\ENQ\EOT\ENQ\STX\SOH\ETX\DC2\ETX^FG\n\
     \\n\
     \\n\
-    \\STX\EOT\ENQ\DC2\EOT[\NUL_\SOH\n\
+    \\STX\EOT\ACK\DC2\EOTa\NULe\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\ENQ\SOH\DC2\ETX[\b\EM\n\
+    \\ETX\EOT\ACK\SOH\DC2\ETXa\b\EM\n\
     \\DEL\n\
-    \\EOT\EOT\ENQ\STX\NUL\DC2\ETX]\EOT$\SUBr Unversioned workers (with `useVersioning=false`) are reported in unversioned result even if they set a Build ID.\n\
+    \\EOT\EOT\ACK\STX\NUL\DC2\ETXc\EOT$\SUBr Unversioned workers (with `useVersioning=false`) are reported in unversioned result even if they set a Build ID.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\NUL\EOT\DC2\ETX]\EOT\f\n\
+    \\ENQ\EOT\ACK\STX\NUL\EOT\DC2\ETXc\EOT\f\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\NUL\ACK\DC2\ETX]\r\ETB\n\
+    \\ENQ\EOT\ACK\STX\NUL\ACK\DC2\ETXc\r\ETB\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\NUL\SOH\DC2\ETX]\CAN\US\n\
+    \\ENQ\EOT\ACK\STX\NUL\SOH\DC2\ETXc\CAN\US\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\NUL\ETX\DC2\ETX]\"#\n\
+    \\ENQ\EOT\ACK\STX\NUL\ETX\DC2\ETXc\"#\n\
     \\v\n\
-    \\EOT\EOT\ENQ\STX\SOH\DC2\ETX^\EOT\GS\n\
+    \\EOT\EOT\ACK\STX\SOH\DC2\ETXd\EOT\GS\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\SOH\ACK\DC2\ETX^\EOT\DC2\n\
+    \\ENQ\EOT\ACK\STX\SOH\ACK\DC2\ETXd\EOT\DC2\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\SOH\SOH\DC2\ETX^\DC3\CAN\n\
+    \\ENQ\EOT\ACK\STX\SOH\SOH\DC2\ETXd\DC3\CAN\n\
     \\f\n\
-    \\ENQ\EOT\ENQ\STX\SOH\ETX\DC2\ETX^\ESC\FS\n\
+    \\ENQ\EOT\ACK\STX\SOH\ETX\DC2\ETXd\ESC\FS\n\
     \\179\STX\n\
-    \\STX\EOT\ACK\DC2\ENQe\NUL\146\SOH\SOH\SUB\165\STX TaskQueueStats contains statistics about task queue backlog and activity.\n\
+    \\STX\EOT\a\DC2\ENQk\NUL\158\SOH\SOH\SUB\165\STX TaskQueueStats contains statistics about task queue backlog and activity.\n\
     \\n\
     \ For workflow task queue type, this result is partial because tasks sent to sticky queues are not included. Read\n\
     \ comments above each metric to understand the impact of sticky queue exclusion on that metric accuracy.\n\
     \\n\
     \\n\
     \\n\
-    \\ETX\EOT\ACK\SOH\DC2\ETXe\b\SYN\n\
+    \\ETX\EOT\a\SOH\DC2\ETXk\b\SYN\n\
     \\161\ETX\n\
-    \\EOT\EOT\ACK\STX\NUL\DC2\ETXl\EOT(\SUB\147\ETX The approximate number of tasks backlogged in this task queue. May count expired tasks but eventually\n\
+    \\EOT\EOT\a\STX\NUL\DC2\ETXr\EOT(\SUB\147\ETX The approximate number of tasks backlogged in this task queue. May count expired tasks but eventually\n\
     \ converges to the right value. Can be relied upon for scaling decisions.\n\
     \\n\
     \ Special note for workflow task queue type: this metric does not count sticky queue tasks. However, because\n\
@@ -5529,14 +6634,14 @@ packedFileDescriptor
     \ grows.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\NUL\ENQ\DC2\ETXl\EOT\t\n\
+    \\ENQ\EOT\a\STX\NUL\ENQ\DC2\ETXr\EOT\t\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\NUL\SOH\DC2\ETXl\n\
+    \\ENQ\EOT\a\STX\NUL\SOH\DC2\ETXr\n\
     \#\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\NUL\ETX\DC2\ETXl&'\n\
+    \\ENQ\EOT\a\STX\NUL\ETX\DC2\ETXr&'\n\
     \\151\ETX\n\
-    \\EOT\EOT\ACK\STX\SOH\DC2\ETXs\EOT9\SUB\137\ETX Approximate age of the oldest task in the backlog based on the creation time of the task at the head of\n\
+    \\EOT\EOT\a\STX\SOH\DC2\ETXy\EOT9\SUB\137\ETX Approximate age of the oldest task in the backlog based on the creation time of the task at the head of\n\
     \ the queue. Can be relied upon for scaling decisions.\n\
     \\n\
     \ Special note for workflow task queue type: this metric does not count sticky queue tasks. However, because\n\
@@ -5544,13 +6649,13 @@ packedFileDescriptor
     \ few seconds.\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\SOH\ACK\DC2\ETXs\EOT\FS\n\
+    \\ENQ\EOT\a\STX\SOH\ACK\DC2\ETXy\EOT\FS\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\SOH\SOH\DC2\ETXs\GS4\n\
+    \\ENQ\EOT\a\STX\SOH\SOH\DC2\ETXy\GS4\n\
     \\f\n\
-    \\ENQ\EOT\ACK\STX\SOH\ETX\DC2\ETXs78\n\
+    \\ENQ\EOT\a\STX\SOH\ETX\DC2\ETXy78\n\
     \\188\a\n\
-    \\EOT\EOT\ACK\STX\STX\DC2\EOT\130\SOH\EOT\GS\SUB\173\a The approximate tasks per second added to the task queue, averaging the last 30 seconds. These includes tasks\n\
+    \\EOT\EOT\a\STX\STX\DC2\EOT\136\SOH\EOT\GS\SUB\173\a The approximate tasks per second added to the task queue, averaging the last 30 seconds. These includes tasks\n\
     \ whether or not they were added to/dispatched from the backlog or they were dispatched immediately without going\n\
     \ to the backlog (sync-matched).\n\
     \\n\
@@ -5566,14 +6671,14 @@ packedFileDescriptor
     \   worker instance.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\ACK\STX\STX\ENQ\DC2\EOT\130\SOH\EOT\t\n\
+    \\ENQ\EOT\a\STX\STX\ENQ\DC2\EOT\136\SOH\EOT\t\n\
     \\r\n\
-    \\ENQ\EOT\ACK\STX\STX\SOH\DC2\EOT\130\SOH\n\
+    \\ENQ\EOT\a\STX\STX\SOH\DC2\EOT\136\SOH\n\
     \\CAN\n\
     \\r\n\
-    \\ENQ\EOT\ACK\STX\STX\ETX\DC2\EOT\130\SOH\ESC\FS\n\
+    \\ENQ\EOT\a\STX\STX\ETX\DC2\EOT\136\SOH\ESC\FS\n\
     \\200\a\n\
-    \\EOT\EOT\ACK\STX\ETX\DC2\EOT\145\SOH\EOT\"\SUB\185\a The approximate tasks per second dispatched from the task queue, averaging the last 30 seconds. These includes\n\
+    \\EOT\EOT\a\STX\ETX\DC2\EOT\151\SOH\EOT\"\SUB\185\a The approximate tasks per second dispatched from the task queue, averaging the last 30 seconds. These includes\n\
     \ tasks whether or not they were added to/dispatched from the backlog or they were dispatched immediately without\n\
     \ going to the backlog (sync-matched).\n\
     \\n\
@@ -5589,291 +6694,289 @@ packedFileDescriptor
     \   worker instance.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\ACK\STX\ETX\ENQ\DC2\EOT\145\SOH\EOT\t\n\
+    \\ENQ\EOT\a\STX\ETX\ENQ\DC2\EOT\151\SOH\EOT\t\n\
     \\r\n\
-    \\ENQ\EOT\ACK\STX\ETX\SOH\DC2\EOT\145\SOH\n\
+    \\ENQ\EOT\a\STX\ETX\SOH\DC2\EOT\151\SOH\n\
     \\GS\n\
     \\r\n\
-    \\ENQ\EOT\ACK\STX\ETX\ETX\DC2\EOT\145\SOH !\n\
+    \\ENQ\EOT\a\STX\ETX\ETX\DC2\EOT\151\SOH !\n\
+    \\194\STX\n\
+    \\EOT\EOT\a\STX\EOT\DC2\EOT\157\SOH\EOT\"\SUB\179\STX Whether rate limiting blocked any dispatches within the recent observation window (approximately\n\
+    \ 30 seconds). When true, adding more workers will not increase throughput \226\128\148 the bottleneck is the\n\
+    \ rate limit, not worker count. This field is useful for auto-scaling systems to avoid unnecessary\n\
+    \ scale-up.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\a\STX\EOT\ENQ\DC2\EOT\157\SOH\EOT\b\n\
+    \\r\n\
+    \\ENQ\EOT\a\STX\EOT\SOH\DC2\EOT\157\SOH\t\GS\n\
+    \\r\n\
+    \\ENQ\EOT\a\STX\EOT\ETX\DC2\EOT\157\SOH !\n\
     \{\n\
-    \\STX\EOT\a\DC2\ACK\149\SOH\NUL\155\SOH\SOH\SUBm Deprecated. Use `InternalTaskQueueStatus`. This is kept until `DescribeTaskQueue` supports legacy behavior.\n\
+    \\STX\EOT\b\DC2\ACK\161\SOH\NUL\167\SOH\SOH\SUBm Deprecated. Use `InternalTaskQueueStatus`. This is kept until `DescribeTaskQueue` supports legacy behavior.\n\
     \\n\
     \\v\n\
-    \\ETX\EOT\a\SOH\DC2\EOT\149\SOH\b\ETB\n\
+    \\ETX\EOT\b\SOH\DC2\EOT\161\SOH\b\ETB\n\
     \\f\n\
-    \\EOT\EOT\a\STX\NUL\DC2\EOT\150\SOH\EOT!\n\
+    \\EOT\EOT\b\STX\NUL\DC2\EOT\162\SOH\EOT!\n\
     \\r\n\
-    \\ENQ\EOT\a\STX\NUL\ENQ\DC2\EOT\150\SOH\EOT\t\n\
+    \\ENQ\EOT\b\STX\NUL\ENQ\DC2\EOT\162\SOH\EOT\t\n\
     \\r\n\
-    \\ENQ\EOT\a\STX\NUL\SOH\DC2\EOT\150\SOH\n\
+    \\ENQ\EOT\b\STX\NUL\SOH\DC2\EOT\162\SOH\n\
     \\FS\n\
     \\r\n\
-    \\ENQ\EOT\a\STX\NUL\ETX\DC2\EOT\150\SOH\US \n\
+    \\ENQ\EOT\b\STX\NUL\ETX\DC2\EOT\162\SOH\US \n\
     \\f\n\
-    \\EOT\EOT\a\STX\SOH\DC2\EOT\151\SOH\EOT\EM\n\
+    \\EOT\EOT\b\STX\SOH\DC2\EOT\163\SOH\EOT\EM\n\
     \\r\n\
-    \\ENQ\EOT\a\STX\SOH\ENQ\DC2\EOT\151\SOH\EOT\t\n\
+    \\ENQ\EOT\b\STX\SOH\ENQ\DC2\EOT\163\SOH\EOT\t\n\
     \\r\n\
-    \\ENQ\EOT\a\STX\SOH\SOH\DC2\EOT\151\SOH\n\
+    \\ENQ\EOT\b\STX\SOH\SOH\DC2\EOT\163\SOH\n\
     \\DC4\n\
     \\r\n\
-    \\ENQ\EOT\a\STX\SOH\ETX\DC2\EOT\151\SOH\ETB\CAN\n\
+    \\ENQ\EOT\b\STX\SOH\ETX\DC2\EOT\163\SOH\ETB\CAN\n\
     \\f\n\
-    \\EOT\EOT\a\STX\STX\DC2\EOT\152\SOH\EOT\CAN\n\
+    \\EOT\EOT\b\STX\STX\DC2\EOT\164\SOH\EOT\CAN\n\
     \\r\n\
-    \\ENQ\EOT\a\STX\STX\ENQ\DC2\EOT\152\SOH\EOT\t\n\
+    \\ENQ\EOT\b\STX\STX\ENQ\DC2\EOT\164\SOH\EOT\t\n\
     \\r\n\
-    \\ENQ\EOT\a\STX\STX\SOH\DC2\EOT\152\SOH\n\
+    \\ENQ\EOT\b\STX\STX\SOH\DC2\EOT\164\SOH\n\
     \\DC3\n\
     \\r\n\
-    \\ENQ\EOT\a\STX\STX\ETX\DC2\EOT\152\SOH\SYN\ETB\n\
+    \\ENQ\EOT\b\STX\STX\ETX\DC2\EOT\164\SOH\SYN\ETB\n\
     \\f\n\
-    \\EOT\EOT\a\STX\ETX\DC2\EOT\153\SOH\EOT\US\n\
+    \\EOT\EOT\b\STX\ETX\DC2\EOT\165\SOH\EOT\US\n\
     \\r\n\
-    \\ENQ\EOT\a\STX\ETX\ENQ\DC2\EOT\153\SOH\EOT\n\
+    \\ENQ\EOT\b\STX\ETX\ENQ\DC2\EOT\165\SOH\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\a\STX\ETX\SOH\DC2\EOT\153\SOH\v\SUB\n\
+    \\ENQ\EOT\b\STX\ETX\SOH\DC2\EOT\165\SOH\v\SUB\n\
     \\r\n\
-    \\ENQ\EOT\a\STX\ETX\ETX\DC2\EOT\153\SOH\GS\RS\n\
+    \\ENQ\EOT\b\STX\ETX\ETX\DC2\EOT\165\SOH\GS\RS\n\
     \\f\n\
-    \\EOT\EOT\a\STX\EOT\DC2\EOT\154\SOH\EOT\"\n\
+    \\EOT\EOT\b\STX\EOT\DC2\EOT\166\SOH\EOT\"\n\
     \\r\n\
-    \\ENQ\EOT\a\STX\EOT\ACK\DC2\EOT\154\SOH\EOT\SI\n\
+    \\ENQ\EOT\b\STX\EOT\ACK\DC2\EOT\166\SOH\EOT\SI\n\
     \\r\n\
-    \\ENQ\EOT\a\STX\EOT\SOH\DC2\EOT\154\SOH\DLE\GS\n\
+    \\ENQ\EOT\b\STX\EOT\SOH\DC2\EOT\166\SOH\DLE\GS\n\
     \\r\n\
-    \\ENQ\EOT\a\STX\EOT\ETX\DC2\EOT\154\SOH !\n\
+    \\ENQ\EOT\b\STX\EOT\ETX\DC2\EOT\166\SOH !\n\
     \\f\n\
-    \\STX\EOT\b\DC2\ACK\157\SOH\NUL\160\SOH\SOH\n\
+    \\STX\EOT\t\DC2\ACK\169\SOH\NUL\172\SOH\SOH\n\
     \\v\n\
-    \\ETX\EOT\b\SOH\DC2\EOT\157\SOH\b\DC3\n\
+    \\ETX\EOT\t\SOH\DC2\EOT\169\SOH\b\DC3\n\
     \\f\n\
-    \\EOT\EOT\b\STX\NUL\DC2\EOT\158\SOH\EOT\ETB\n\
+    \\EOT\EOT\t\STX\NUL\DC2\EOT\170\SOH\EOT\ETB\n\
     \\r\n\
-    \\ENQ\EOT\b\STX\NUL\ENQ\DC2\EOT\158\SOH\EOT\t\n\
+    \\ENQ\EOT\t\STX\NUL\ENQ\DC2\EOT\170\SOH\EOT\t\n\
     \\r\n\
-    \\ENQ\EOT\b\STX\NUL\SOH\DC2\EOT\158\SOH\n\
+    \\ENQ\EOT\t\STX\NUL\SOH\DC2\EOT\170\SOH\n\
     \\DC2\n\
     \\r\n\
-    \\ENQ\EOT\b\STX\NUL\ETX\DC2\EOT\158\SOH\NAK\SYN\n\
+    \\ENQ\EOT\t\STX\NUL\ETX\DC2\EOT\170\SOH\NAK\SYN\n\
     \\f\n\
-    \\EOT\EOT\b\STX\SOH\DC2\EOT\159\SOH\EOT\NAK\n\
+    \\EOT\EOT\t\STX\SOH\DC2\EOT\171\SOH\EOT\NAK\n\
     \\r\n\
-    \\ENQ\EOT\b\STX\SOH\ENQ\DC2\EOT\159\SOH\EOT\t\n\
+    \\ENQ\EOT\t\STX\SOH\ENQ\DC2\EOT\171\SOH\EOT\t\n\
     \\r\n\
-    \\ENQ\EOT\b\STX\SOH\SOH\DC2\EOT\159\SOH\n\
+    \\ENQ\EOT\t\STX\SOH\SOH\DC2\EOT\171\SOH\n\
     \\DLE\n\
     \\r\n\
-    \\ENQ\EOT\b\STX\SOH\ETX\DC2\EOT\159\SOH\DC3\DC4\n\
-    \\f\n\
-    \\STX\EOT\t\DC2\ACK\162\SOH\NUL\165\SOH\SOH\n\
-    \\v\n\
-    \\ETX\EOT\t\SOH\DC2\EOT\162\SOH\b\"\n\
-    \\f\n\
-    \\EOT\EOT\t\STX\NUL\DC2\EOT\163\SOH\EOT\DC3\n\
-    \\r\n\
-    \\ENQ\EOT\t\STX\NUL\ENQ\DC2\EOT\163\SOH\EOT\n\
-    \\n\
-    \\r\n\
-    \\ENQ\EOT\t\STX\NUL\SOH\DC2\EOT\163\SOH\v\SO\n\
-    \\r\n\
-    \\ENQ\EOT\t\STX\NUL\ETX\DC2\EOT\163\SOH\DC1\DC2\n\
-    \\f\n\
-    \\EOT\EOT\t\STX\SOH\DC2\EOT\164\SOH\EOT\US\n\
-    \\r\n\
-    \\ENQ\EOT\t\STX\SOH\ENQ\DC2\EOT\164\SOH\EOT\n\
-    \\n\
-    \\r\n\
-    \\ENQ\EOT\t\STX\SOH\SOH\DC2\EOT\164\SOH\v\SUB\n\
-    \\r\n\
-    \\ENQ\EOT\t\STX\SOH\ETX\DC2\EOT\164\SOH\GS\RS\n\
+    \\ENQ\EOT\t\STX\SOH\ETX\DC2\EOT\171\SOH\DC3\DC4\n\
     \\f\n\
     \\STX\EOT\n\
-    \\DC2\ACK\167\SOH\NUL\177\SOH\SOH\n\
+    \\DC2\ACK\174\SOH\NUL\177\SOH\SOH\n\
     \\v\n\
     \\ETX\EOT\n\
-    \\SOH\DC2\EOT\167\SOH\b\DC2\n\
+    \\SOH\DC2\EOT\174\SOH\b\"\n\
     \\f\n\
     \\EOT\EOT\n\
-    \\STX\NUL\DC2\EOT\168\SOH\EOT3\n\
+    \\STX\NUL\DC2\EOT\175\SOH\EOT\DC3\n\
     \\r\n\
     \\ENQ\EOT\n\
-    \\STX\NUL\ACK\DC2\EOT\168\SOH\EOT\GS\n\
-    \\r\n\
-    \\ENQ\EOT\n\
-    \\STX\NUL\SOH\DC2\EOT\168\SOH\RS.\n\
-    \\r\n\
-    \\ENQ\EOT\n\
-    \\STX\NUL\ETX\DC2\EOT\168\SOH12\n\
-    \\f\n\
-    \\EOT\EOT\n\
-    \\STX\SOH\DC2\EOT\169\SOH\EOT\CAN\n\
-    \\r\n\
-    \\ENQ\EOT\n\
-    \\STX\SOH\ENQ\DC2\EOT\169\SOH\EOT\n\
+    \\STX\NUL\ENQ\DC2\EOT\175\SOH\EOT\n\
     \\n\
     \\r\n\
     \\ENQ\EOT\n\
-    \\STX\SOH\SOH\DC2\EOT\169\SOH\v\DC3\n\
+    \\STX\NUL\SOH\DC2\EOT\175\SOH\v\SO\n\
     \\r\n\
     \\ENQ\EOT\n\
-    \\STX\SOH\ETX\DC2\EOT\169\SOH\SYN\ETB\n\
+    \\STX\NUL\ETX\DC2\EOT\175\SOH\DC1\DC2\n\
     \\f\n\
     \\EOT\EOT\n\
-    \\STX\STX\DC2\EOT\170\SOH\EOT\US\n\
+    \\STX\SOH\DC2\EOT\176\SOH\EOT\US\n\
     \\r\n\
     \\ENQ\EOT\n\
-    \\STX\STX\ENQ\DC2\EOT\170\SOH\EOT\n\
+    \\STX\SOH\ENQ\DC2\EOT\176\SOH\EOT\n\
     \\n\
     \\r\n\
     \\ENQ\EOT\n\
-    \\STX\STX\SOH\DC2\EOT\170\SOH\v\SUB\n\
+    \\STX\SOH\SOH\DC2\EOT\176\SOH\v\SUB\n\
     \\r\n\
     \\ENQ\EOT\n\
-    \\STX\STX\ETX\DC2\EOT\170\SOH\GS\RS\n\
+    \\STX\SOH\ETX\DC2\EOT\176\SOH\GS\RS\n\
+    \\f\n\
+    \\STX\EOT\v\DC2\ACK\179\SOH\NUL\189\SOH\SOH\n\
+    \\v\n\
+    \\ETX\EOT\v\SOH\DC2\EOT\179\SOH\b\DC2\n\
+    \\f\n\
+    \\EOT\EOT\v\STX\NUL\DC2\EOT\180\SOH\EOT3\n\
+    \\r\n\
+    \\ENQ\EOT\v\STX\NUL\ACK\DC2\EOT\180\SOH\EOT\GS\n\
+    \\r\n\
+    \\ENQ\EOT\v\STX\NUL\SOH\DC2\EOT\180\SOH\RS.\n\
+    \\r\n\
+    \\ENQ\EOT\v\STX\NUL\ETX\DC2\EOT\180\SOH12\n\
+    \\f\n\
+    \\EOT\EOT\v\STX\SOH\DC2\EOT\181\SOH\EOT\CAN\n\
+    \\r\n\
+    \\ENQ\EOT\v\STX\SOH\ENQ\DC2\EOT\181\SOH\EOT\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\v\STX\SOH\SOH\DC2\EOT\181\SOH\v\DC3\n\
+    \\r\n\
+    \\ENQ\EOT\v\STX\SOH\ETX\DC2\EOT\181\SOH\SYN\ETB\n\
+    \\f\n\
+    \\EOT\EOT\v\STX\STX\DC2\EOT\182\SOH\EOT\US\n\
+    \\r\n\
+    \\ENQ\EOT\v\STX\STX\ENQ\DC2\EOT\182\SOH\EOT\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\v\STX\STX\SOH\DC2\EOT\182\SOH\v\SUB\n\
+    \\r\n\
+    \\ENQ\EOT\v\STX\STX\ETX\DC2\EOT\182\SOH\GS\RS\n\
     \\169\SOH\n\
-    \\EOT\EOT\n\
-    \\STX\ETX\DC2\EOT\174\SOH\EOTi\SUB\154\SOH If a worker has opted into the worker versioning feature while polling, its capabilities will\n\
+    \\EOT\EOT\v\STX\ETX\DC2\EOT\186\SOH\EOTi\SUB\154\SOH If a worker has opted into the worker versioning feature while polling, its capabilities will\n\
     \ appear here.\n\
     \ Deprecated. Replaced by deployment_options.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\n\
-    \\STX\ETX\ACK\DC2\EOT\174\SOH\EOT4\n\
+    \\ENQ\EOT\v\STX\ETX\ACK\DC2\EOT\186\SOH\EOT4\n\
     \\r\n\
-    \\ENQ\EOT\n\
-    \\STX\ETX\SOH\DC2\EOT\174\SOH5P\n\
+    \\ENQ\EOT\v\STX\ETX\SOH\DC2\EOT\186\SOH5P\n\
     \\r\n\
-    \\ENQ\EOT\n\
-    \\STX\ETX\ETX\DC2\EOT\174\SOHST\n\
+    \\ENQ\EOT\v\STX\ETX\ETX\DC2\EOT\186\SOHST\n\
     \\r\n\
-    \\ENQ\EOT\n\
-    \\STX\ETX\b\DC2\EOT\174\SOHUh\n\
+    \\ENQ\EOT\v\STX\ETX\b\DC2\EOT\186\SOHUh\n\
     \\SO\n\
-    \\ACK\EOT\n\
-    \\STX\ETX\b\ETX\DC2\EOT\174\SOHVg\n\
+    \\ACK\EOT\v\STX\ETX\b\ETX\DC2\EOT\186\SOHVg\n\
     \B\n\
-    \\EOT\EOT\n\
-    \\STX\EOT\DC2\EOT\176\SOH\EOTN\SUB4 Worker deployment options that SDK sent to server.\n\
+    \\EOT\EOT\v\STX\EOT\DC2\EOT\188\SOH\EOTN\SUB4 Worker deployment options that SDK sent to server.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\n\
-    \\STX\EOT\ACK\DC2\EOT\176\SOH\EOT6\n\
+    \\ENQ\EOT\v\STX\EOT\ACK\DC2\EOT\188\SOH\EOT6\n\
     \\r\n\
-    \\ENQ\EOT\n\
-    \\STX\EOT\SOH\DC2\EOT\176\SOH7I\n\
+    \\ENQ\EOT\v\STX\EOT\SOH\DC2\EOT\188\SOH7I\n\
     \\r\n\
-    \\ENQ\EOT\n\
-    \\STX\EOT\ETX\DC2\EOT\176\SOHLM\n\
+    \\ENQ\EOT\v\STX\EOT\ETX\DC2\EOT\188\SOHLM\n\
     \\f\n\
-    \\STX\EOT\v\DC2\ACK\179\SOH\NUL\184\SOH\SOH\n\
+    \\STX\EOT\f\DC2\ACK\191\SOH\NUL\196\SOH\SOH\n\
     \\v\n\
-    \\ETX\EOT\v\SOH\DC2\EOT\179\SOH\b!\n\
+    \\ETX\EOT\f\SOH\DC2\EOT\191\SOH\b!\n\
     \\f\n\
-    \\EOT\EOT\v\STX\NUL\DC2\EOT\180\SOH\EOT$\n\
+    \\EOT\EOT\f\STX\NUL\DC2\EOT\192\SOH\EOT$\n\
     \\r\n\
-    \\ENQ\EOT\v\STX\NUL\ACK\DC2\EOT\180\SOH\EOT\r\n\
+    \\ENQ\EOT\f\STX\NUL\ACK\DC2\EOT\192\SOH\EOT\r\n\
     \\r\n\
-    \\ENQ\EOT\v\STX\NUL\SOH\DC2\EOT\180\SOH\SO\US\n\
+    \\ENQ\EOT\f\STX\NUL\SOH\DC2\EOT\192\SOH\SO\US\n\
     \\r\n\
-    \\ENQ\EOT\v\STX\NUL\ETX\DC2\EOT\180\SOH\"#\n\
+    \\ENQ\EOT\f\STX\NUL\ETX\DC2\EOT\192\SOH\"#\n\
     \\132\SOH\n\
-    \\EOT\EOT\v\STX\SOH\DC2\EOT\183\SOH\EOT;\SUBv (-- api-linter: core::0140::prepositions=disabled\n\
+    \\EOT\EOT\f\STX\SOH\DC2\EOT\195\SOH\EOT;\SUBv (-- api-linter: core::0140::prepositions=disabled\n\
     \     aip.dev/not-precedent: \"to\" is used to indicate interval. --)\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\v\STX\SOH\ACK\DC2\EOT\183\SOH\EOT\FS\n\
+    \\ENQ\EOT\f\STX\SOH\ACK\DC2\EOT\195\SOH\EOT\FS\n\
     \\r\n\
-    \\ENQ\EOT\v\STX\SOH\SOH\DC2\EOT\183\SOH\GS6\n\
+    \\ENQ\EOT\f\STX\SOH\SOH\DC2\EOT\195\SOH\GS6\n\
     \\r\n\
-    \\ENQ\EOT\v\STX\SOH\ETX\DC2\EOT\183\SOH9:\n\
+    \\ENQ\EOT\f\STX\SOH\ETX\DC2\EOT\195\SOH9:\n\
     \\212\SOH\n\
-    \\STX\EOT\f\DC2\ACK\188\SOH\NUL\191\SOH\SOH\SUB\197\SOH Used by the worker versioning APIs, represents an unordered set of one or more versions which are\n\
+    \\STX\EOT\r\DC2\ACK\200\SOH\NUL\203\SOH\SOH\SUB\197\SOH Used by the worker versioning APIs, represents an unordered set of one or more versions which are\n\
     \ considered to be compatible with each other. Currently the versions are always worker build IDs.\n\
     \\n\
     \\v\n\
-    \\ETX\EOT\f\SOH\DC2\EOT\188\SOH\b\FS\n\
+    \\ETX\EOT\r\SOH\DC2\EOT\200\SOH\b\FS\n\
     \{\n\
-    \\EOT\EOT\f\STX\NUL\DC2\EOT\190\SOH\EOT\"\SUBm All the compatible versions, unordered, except for the last element, which is considered the set \"default\".\n\
+    \\EOT\EOT\r\STX\NUL\DC2\EOT\202\SOH\EOT\"\SUBm All the compatible versions, unordered, except for the last element, which is considered the set \"default\".\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\f\STX\NUL\EOT\DC2\EOT\190\SOH\EOT\f\n\
+    \\ENQ\EOT\r\STX\NUL\EOT\DC2\EOT\202\SOH\EOT\f\n\
     \\r\n\
-    \\ENQ\EOT\f\STX\NUL\ENQ\DC2\EOT\190\SOH\r\DC3\n\
+    \\ENQ\EOT\r\STX\NUL\ENQ\DC2\EOT\202\SOH\r\DC3\n\
     \\r\n\
-    \\ENQ\EOT\f\STX\NUL\SOH\DC2\EOT\190\SOH\DC4\GS\n\
+    \\ENQ\EOT\r\STX\NUL\SOH\DC2\EOT\202\SOH\DC4\GS\n\
     \\r\n\
-    \\ENQ\EOT\f\STX\NUL\ETX\DC2\EOT\190\SOH !\n\
+    \\ENQ\EOT\r\STX\NUL\ETX\DC2\EOT\202\SOH !\n\
     \J\n\
-    \\STX\EOT\r\DC2\ACK\194\SOH\NUL\200\SOH\SOH\SUB< Reachability of tasks for a worker on a single task queue.\n\
+    \\STX\EOT\SO\DC2\ACK\206\SOH\NUL\212\SOH\SOH\SUB< Reachability of tasks for a worker on a single task queue.\n\
     \\n\
     \\v\n\
-    \\ETX\EOT\r\SOH\DC2\EOT\194\SOH\b\GS\n\
+    \\ETX\EOT\SO\SOH\DC2\EOT\206\SOH\b\GS\n\
     \\f\n\
-    \\EOT\EOT\r\STX\NUL\DC2\EOT\195\SOH\EOT\SUB\n\
+    \\EOT\EOT\SO\STX\NUL\DC2\EOT\207\SOH\EOT\SUB\n\
     \\r\n\
-    \\ENQ\EOT\r\STX\NUL\ENQ\DC2\EOT\195\SOH\EOT\n\
+    \\ENQ\EOT\SO\STX\NUL\ENQ\DC2\EOT\207\SOH\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\r\STX\NUL\SOH\DC2\EOT\195\SOH\v\NAK\n\
+    \\ENQ\EOT\SO\STX\NUL\SOH\DC2\EOT\207\SOH\v\NAK\n\
     \\r\n\
-    \\ENQ\EOT\r\STX\NUL\ETX\DC2\EOT\195\SOH\CAN\EM\n\
+    \\ENQ\EOT\SO\STX\NUL\ETX\DC2\EOT\207\SOH\CAN\EM\n\
     \\233\SOH\n\
-    \\EOT\EOT\r\STX\SOH\DC2\EOT\199\SOH\EOTE\SUB\218\SOH Task reachability for a worker in a single task queue.\n\
+    \\EOT\EOT\SO\STX\SOH\DC2\EOT\211\SOH\EOTE\SUB\218\SOH Task reachability for a worker in a single task queue.\n\
     \ See the TaskReachability docstring for information about each enum variant.\n\
     \ If reachability is empty, this worker is considered unreachable in this task queue.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\r\STX\SOH\EOT\DC2\EOT\199\SOH\EOT\f\n\
+    \\ENQ\EOT\SO\STX\SOH\EOT\DC2\EOT\211\SOH\EOT\f\n\
     \\r\n\
-    \\ENQ\EOT\r\STX\SOH\ACK\DC2\EOT\199\SOH\r3\n\
+    \\ENQ\EOT\SO\STX\SOH\ACK\DC2\EOT\211\SOH\r3\n\
     \\r\n\
-    \\ENQ\EOT\r\STX\SOH\SOH\DC2\EOT\199\SOH4@\n\
+    \\ENQ\EOT\SO\STX\SOH\SOH\DC2\EOT\211\SOH4@\n\
     \\r\n\
-    \\ENQ\EOT\r\STX\SOH\ETX\DC2\EOT\199\SOHCD\n\
+    \\ENQ\EOT\SO\STX\SOH\ETX\DC2\EOT\211\SOHCD\n\
     \[\n\
-    \\STX\EOT\SO\DC2\ACK\203\SOH\NUL\208\SOH\SOH\SUBM Reachability of tasks for a worker by build id, in one or more task queues.\n\
+    \\STX\EOT\SI\DC2\ACK\215\SOH\NUL\220\SOH\SOH\SUBM Reachability of tasks for a worker by build id, in one or more task queues.\n\
     \\n\
     \\v\n\
-    \\ETX\EOT\SO\SOH\DC2\EOT\203\SOH\b\ESC\n\
+    \\ETX\EOT\SI\SOH\DC2\EOT\215\SOH\b\ESC\n\
     \3\n\
-    \\EOT\EOT\SO\STX\NUL\DC2\EOT\205\SOH\EOT\CAN\SUB% A build id or empty if unversioned.\n\
+    \\EOT\EOT\SI\STX\NUL\DC2\EOT\217\SOH\EOT\CAN\SUB% A build id or empty if unversioned.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\SO\STX\NUL\ENQ\DC2\EOT\205\SOH\EOT\n\
+    \\ENQ\EOT\SI\STX\NUL\ENQ\DC2\EOT\217\SOH\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\SO\STX\NUL\SOH\DC2\EOT\205\SOH\v\DC3\n\
+    \\ENQ\EOT\SI\STX\NUL\SOH\DC2\EOT\217\SOH\v\DC3\n\
     \\r\n\
-    \\ENQ\EOT\SO\STX\NUL\ETX\DC2\EOT\205\SOH\SYN\ETB\n\
+    \\ENQ\EOT\SI\STX\NUL\ETX\DC2\EOT\217\SOH\SYN\ETB\n\
     \,\n\
-    \\EOT\EOT\SO\STX\SOH\DC2\EOT\207\SOH\EOT?\SUB\RS Reachability per task queue.\n\
+    \\EOT\EOT\SI\STX\SOH\DC2\EOT\219\SOH\EOT?\SUB\RS Reachability per task queue.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\SO\STX\SOH\EOT\DC2\EOT\207\SOH\EOT\f\n\
+    \\ENQ\EOT\SI\STX\SOH\EOT\DC2\EOT\219\SOH\EOT\f\n\
     \\r\n\
-    \\ENQ\EOT\SO\STX\SOH\ACK\DC2\EOT\207\SOH\r\"\n\
+    \\ENQ\EOT\SI\STX\SOH\ACK\DC2\EOT\219\SOH\r\"\n\
     \\r\n\
-    \\ENQ\EOT\SO\STX\SOH\SOH\DC2\EOT\207\SOH#:\n\
+    \\ENQ\EOT\SI\STX\SOH\SOH\DC2\EOT\219\SOH#:\n\
     \\r\n\
-    \\ENQ\EOT\SO\STX\SOH\ETX\DC2\EOT\207\SOH=>\n\
+    \\ENQ\EOT\SI\STX\SOH\ETX\DC2\EOT\219\SOH=>\n\
     \\f\n\
-    \\STX\EOT\SI\DC2\ACK\210\SOH\NUL\213\SOH\SOH\n\
+    \\STX\EOT\DLE\DC2\ACK\222\SOH\NUL\225\SOH\SOH\n\
     \\v\n\
-    \\ETX\EOT\SI\SOH\DC2\EOT\210\SOH\b\CAN\n\
+    \\ETX\EOT\DLE\SOH\DC2\EOT\222\SOH\b\CAN\n\
     \,\n\
-    \\EOT\EOT\SI\STX\NUL\DC2\EOT\212\SOH\EOT\RS\SUB\RS Acceptable range is [0,100).\n\
+    \\EOT\EOT\DLE\STX\NUL\DC2\EOT\224\SOH\EOT\RS\SUB\RS Acceptable range is [0,100).\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\SI\STX\NUL\ENQ\DC2\EOT\212\SOH\EOT\t\n\
+    \\ENQ\EOT\DLE\STX\NUL\ENQ\DC2\EOT\224\SOH\EOT\t\n\
     \\r\n\
-    \\ENQ\EOT\SI\STX\NUL\SOH\DC2\EOT\212\SOH\n\
+    \\ENQ\EOT\DLE\STX\NUL\SOH\DC2\EOT\224\SOH\n\
     \\EM\n\
     \\r\n\
-    \\ENQ\EOT\SI\STX\NUL\ETX\DC2\EOT\212\SOH\FS\GS\n\
+    \\ENQ\EOT\DLE\STX\NUL\ETX\DC2\EOT\224\SOH\FS\GS\n\
     \\190\SI\n\
-    \\STX\EOT\DLE\DC2\ACK\252\SOH\NUL\137\STX\SOH\SUB\175\SI Assignment rules are applied to *new* Workflow and Activity executions at\n\
+    \\STX\EOT\DC1\DC2\ACK\136\STX\NUL\149\STX\SOH\SUB\175\SI Assignment rules are applied to *new* Workflow and Activity executions at\n\
     \ schedule time to assign them to a Build ID.\n\
     \\n\
     \ Assignment rules will not be used in the following cases:\n\
@@ -5912,38 +7015,38 @@ packedFileDescriptor
     \ unversioned Worker.\n\
     \\n\
     \\v\n\
-    \\ETX\EOT\DLE\SOH\DC2\EOT\252\SOH\b\GS\n\
+    \\ETX\EOT\DC1\SOH\DC2\EOT\136\STX\b\GS\n\
     \\f\n\
-    \\EOT\EOT\DLE\STX\NUL\DC2\EOT\253\SOH\EOT\US\n\
+    \\EOT\EOT\DC1\STX\NUL\DC2\EOT\137\STX\EOT\US\n\
     \\r\n\
-    \\ENQ\EOT\DLE\STX\NUL\ENQ\DC2\EOT\253\SOH\EOT\n\
+    \\ENQ\EOT\DC1\STX\NUL\ENQ\DC2\EOT\137\STX\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DLE\STX\NUL\SOH\DC2\EOT\253\SOH\v\SUB\n\
+    \\ENQ\EOT\DC1\STX\NUL\SOH\DC2\EOT\137\STX\v\SUB\n\
     \\r\n\
-    \\ENQ\EOT\DLE\STX\NUL\ETX\DC2\EOT\253\SOH\GS\RS\n\
+    \\ENQ\EOT\DC1\STX\NUL\ETX\DC2\EOT\137\STX\GS\RS\n\
     \\240\SOH\n\
-    \\EOT\EOT\DLE\b\NUL\DC2\ACK\131\STX\EOT\136\STX\ENQ\SUB\223\SOH If a ramp is provided, this rule will be applied only to a sample of\n\
+    \\EOT\EOT\DC1\b\NUL\DC2\ACK\143\STX\EOT\148\STX\ENQ\SUB\223\SOH If a ramp is provided, this rule will be applied only to a sample of\n\
     \ tasks according to the provided percentage.\n\
     \ This option can be used only on \"terminal\" Build IDs (the ones not used\n\
     \ as source in any redirect rules).\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DLE\b\NUL\SOH\DC2\EOT\131\STX\n\
+    \\ENQ\EOT\DC1\b\NUL\SOH\DC2\EOT\143\STX\n\
     \\SO\n\
     \\167\SOH\n\
-    \\EOT\EOT\DLE\STX\SOH\DC2\EOT\135\STX\b-\SUB\152\SOH This ramp is useful for gradual Blue/Green deployments (and similar)\n\
+    \\EOT\EOT\DC1\STX\SOH\DC2\EOT\147\STX\b-\SUB\152\SOH This ramp is useful for gradual Blue/Green deployments (and similar)\n\
     \ where you want to send a certain portion of the traffic to the target\n\
     \ Build ID.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DLE\STX\SOH\ACK\DC2\EOT\135\STX\b\CAN\n\
+    \\ENQ\EOT\DC1\STX\SOH\ACK\DC2\EOT\147\STX\b\CAN\n\
     \\r\n\
-    \\ENQ\EOT\DLE\STX\SOH\SOH\DC2\EOT\135\STX\EM(\n\
+    \\ENQ\EOT\DC1\STX\SOH\SOH\DC2\EOT\147\STX\EM(\n\
     \\r\n\
-    \\ENQ\EOT\DLE\STX\SOH\ETX\DC2\EOT\135\STX+,\n\
+    \\ENQ\EOT\DC1\STX\SOH\ETX\DC2\EOT\147\STX+,\n\
     \\144\a\n\
-    \\STX\EOT\DC1\DC2\ACK\159\STX\NUL\166\STX\SOH\SUB\129\a These rules apply to tasks assigned to a particular Build ID\n\
+    \\STX\EOT\DC2\DC2\ACK\171\STX\NUL\178\STX\SOH\SUB\129\a These rules apply to tasks assigned to a particular Build ID\n\
     \ (`source_build_id`) to redirect them to another *compatible* Build ID\n\
     \ (`target_build_id`).\n\
     \\n\
@@ -5965,77 +7068,126 @@ packedFileDescriptor
     \ Redirect rules can be chained.\n\
     \\n\
     \\v\n\
-    \\ETX\EOT\DC1\SOH\DC2\EOT\159\STX\b%\n\
+    \\ETX\EOT\DC2\SOH\DC2\EOT\171\STX\b%\n\
     \\f\n\
-    \\EOT\EOT\DC1\STX\NUL\DC2\EOT\160\STX\EOT\US\n\
+    \\EOT\EOT\DC2\STX\NUL\DC2\EOT\172\STX\EOT\US\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\NUL\ENQ\DC2\EOT\160\STX\EOT\n\
+    \\ENQ\EOT\DC2\STX\NUL\ENQ\DC2\EOT\172\STX\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\NUL\SOH\DC2\EOT\160\STX\v\SUB\n\
+    \\ENQ\EOT\DC2\STX\NUL\SOH\DC2\EOT\172\STX\v\SUB\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\NUL\ETX\DC2\EOT\160\STX\GS\RS\n\
+    \\ENQ\EOT\DC2\STX\NUL\ETX\DC2\EOT\172\STX\GS\RS\n\
     \\240\SOH\n\
-    \\EOT\EOT\DC1\STX\SOH\DC2\EOT\165\STX\EOT\US\SUB\225\SOH Target Build ID must be compatible with the Source Build ID; that is it\n\
+    \\EOT\EOT\DC2\STX\SOH\DC2\EOT\177\STX\EOT\US\SUB\225\SOH Target Build ID must be compatible with the Source Build ID; that is it\n\
     \ must be able to process event histories made by the Source Build ID by\n\
     \ using [Patching](https://docs.temporal.io/workflows#patching) or other\n\
     \ means.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\SOH\ENQ\DC2\EOT\165\STX\EOT\n\
+    \\ENQ\EOT\DC2\STX\SOH\ENQ\DC2\EOT\177\STX\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\SOH\SOH\DC2\EOT\165\STX\v\SUB\n\
+    \\ENQ\EOT\DC2\STX\SOH\SOH\DC2\EOT\177\STX\v\SUB\n\
     \\r\n\
-    \\ENQ\EOT\DC1\STX\SOH\ETX\DC2\EOT\165\STX\GS\RS\n\
+    \\ENQ\EOT\DC2\STX\SOH\ETX\DC2\EOT\177\STX\GS\RS\n\
     \\f\n\
-    \\STX\EOT\DC2\DC2\ACK\168\STX\NUL\171\STX\SOH\n\
+    \\STX\EOT\DC3\DC2\ACK\180\STX\NUL\183\STX\SOH\n\
     \\v\n\
-    \\ETX\EOT\DC2\SOH\DC2\EOT\168\STX\b(\n\
+    \\ETX\EOT\DC3\SOH\DC2\EOT\180\STX\b(\n\
     \\f\n\
-    \\EOT\EOT\DC2\STX\NUL\DC2\EOT\169\STX\EOT#\n\
+    \\EOT\EOT\DC3\STX\NUL\DC2\EOT\181\STX\EOT#\n\
     \\r\n\
-    \\ENQ\EOT\DC2\STX\NUL\ACK\DC2\EOT\169\STX\EOT\EM\n\
+    \\ENQ\EOT\DC3\STX\NUL\ACK\DC2\EOT\181\STX\EOT\EM\n\
     \\r\n\
-    \\ENQ\EOT\DC2\STX\NUL\SOH\DC2\EOT\169\STX\SUB\RS\n\
+    \\ENQ\EOT\DC3\STX\NUL\SOH\DC2\EOT\181\STX\SUB\RS\n\
     \\r\n\
-    \\ENQ\EOT\DC2\STX\NUL\ETX\DC2\EOT\169\STX!\"\n\
+    \\ENQ\EOT\DC3\STX\NUL\ETX\DC2\EOT\181\STX!\"\n\
     \\f\n\
-    \\EOT\EOT\DC2\STX\SOH\DC2\EOT\170\STX\EOT.\n\
+    \\EOT\EOT\DC3\STX\SOH\DC2\EOT\182\STX\EOT.\n\
     \\r\n\
-    \\ENQ\EOT\DC2\STX\SOH\ACK\DC2\EOT\170\STX\EOT\GS\n\
+    \\ENQ\EOT\DC3\STX\SOH\ACK\DC2\EOT\182\STX\EOT\GS\n\
     \\r\n\
-    \\ENQ\EOT\DC2\STX\SOH\SOH\DC2\EOT\170\STX\RS)\n\
+    \\ENQ\EOT\DC3\STX\SOH\SOH\DC2\EOT\182\STX\RS)\n\
     \\r\n\
-    \\ENQ\EOT\DC2\STX\SOH\ETX\DC2\EOT\170\STX,-\n\
+    \\ENQ\EOT\DC3\STX\SOH\ETX\DC2\EOT\182\STX,-\n\
     \\f\n\
-    \\STX\EOT\DC3\DC2\ACK\173\STX\NUL\176\STX\SOH\n\
+    \\STX\EOT\DC4\DC2\ACK\185\STX\NUL\188\STX\SOH\n\
     \\v\n\
-    \\ETX\EOT\DC3\SOH\DC2\EOT\173\STX\b0\n\
+    \\ETX\EOT\DC4\SOH\DC2\EOT\185\STX\b0\n\
     \\f\n\
-    \\EOT\EOT\DC3\STX\NUL\DC2\EOT\174\STX\EOT+\n\
+    \\EOT\EOT\DC4\STX\NUL\DC2\EOT\186\STX\EOT+\n\
     \\r\n\
-    \\ENQ\EOT\DC3\STX\NUL\ACK\DC2\EOT\174\STX\EOT!\n\
+    \\ENQ\EOT\DC4\STX\NUL\ACK\DC2\EOT\186\STX\EOT!\n\
     \\r\n\
-    \\ENQ\EOT\DC3\STX\NUL\SOH\DC2\EOT\174\STX\"&\n\
+    \\ENQ\EOT\DC4\STX\NUL\SOH\DC2\EOT\186\STX\"&\n\
     \\r\n\
-    \\ENQ\EOT\DC3\STX\NUL\ETX\DC2\EOT\174\STX)*\n\
+    \\ENQ\EOT\DC4\STX\NUL\ETX\DC2\EOT\186\STX)*\n\
     \\f\n\
-    \\EOT\EOT\DC3\STX\SOH\DC2\EOT\175\STX\EOT.\n\
+    \\EOT\EOT\DC4\STX\SOH\DC2\EOT\187\STX\EOT.\n\
     \\r\n\
-    \\ENQ\EOT\DC3\STX\SOH\ACK\DC2\EOT\175\STX\EOT\GS\n\
+    \\ENQ\EOT\DC4\STX\SOH\ACK\DC2\EOT\187\STX\EOT\GS\n\
     \\r\n\
-    \\ENQ\EOT\DC3\STX\SOH\SOH\DC2\EOT\175\STX\RS)\n\
+    \\ENQ\EOT\DC4\STX\SOH\SOH\DC2\EOT\187\STX\RS)\n\
     \\r\n\
-    \\ENQ\EOT\DC3\STX\SOH\ETX\DC2\EOT\175\STX,-\n\
+    \\ENQ\EOT\DC4\STX\SOH\ETX\DC2\EOT\187\STX,-\n\
+    \\f\n\
+    \\STX\EOT\NAK\DC2\ACK\190\STX\NUL\193\STX\SOH\n\
+    \\v\n\
+    \\ETX\EOT\NAK\SOH\DC2\EOT\190\STX\b\ETB\n\
+    \\f\n\
+    \\EOT\EOT\NAK\STX\NUL\DC2\EOT\191\STX\STX\DLE\n\
+    \\r\n\
+    \\ENQ\EOT\NAK\STX\NUL\ENQ\DC2\EOT\191\STX\STX\b\n\
+    \\r\n\
+    \\ENQ\EOT\NAK\STX\NUL\SOH\DC2\EOT\191\STX\t\v\n\
+    \\r\n\
+    \\ENQ\EOT\NAK\STX\NUL\ETX\DC2\EOT\191\STX\SO\SI\n\
+    \\f\n\
+    \\EOT\EOT\NAK\STX\SOH\DC2\EOT\192\STX\STX\DC3\n\
+    \\r\n\
+    \\ENQ\EOT\NAK\STX\SOH\ENQ\DC2\EOT\192\STX\STX\a\n\
+    \\r\n\
+    \\ENQ\EOT\NAK\STX\SOH\SOH\DC2\EOT\192\STX\b\SO\n\
+    \\r\n\
+    \\ENQ\EOT\NAK\STX\SOH\ETX\DC2\EOT\192\STX\DC1\DC2\n\
+    \\246\SOH\n\
+    \\STX\EOT\SYN\DC2\ACK\198\STX\NUL\204\STX\SOH\SUB\231\SOH A versioned snapshot of the poller groups the client should use for future polls to a task\n\
+    \ queue. The version is monotonically increasing so that a client can ignore a snapshot that is\n\
+    \ older than the one it has already applied.\n\
+    \\n\
+    \\v\n\
+    \\ETX\EOT\SYN\SOH\DC2\EOT\198\STX\b\CAN\n\
+    \\163\SOH\n\
+    \\EOT\EOT\SYN\STX\NUL\DC2\EOT\201\STX\STX\DC4\SUB\148\SOH Monotonically increasing version of this snapshot. A client should ignore any snapshot whose\n\
+    \ version is not greater than the one it last applied.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\SYN\STX\NUL\ENQ\DC2\EOT\201\STX\STX\a\n\
+    \\r\n\
+    \\ENQ\EOT\SYN\STX\NUL\SOH\DC2\EOT\201\STX\b\SI\n\
+    \\r\n\
+    \\ENQ\EOT\SYN\STX\NUL\ETX\DC2\EOT\201\STX\DC2\DC3\n\
+    \m\n\
+    \\EOT\EOT\SYN\STX\SOH\DC2\EOT\203\STX\STX-\SUB_ The weighted list of poller groups the client should use for future polls to this task queue.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\SYN\STX\SOH\EOT\DC2\EOT\203\STX\STX\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\SYN\STX\SOH\ACK\DC2\EOT\203\STX\v\SUB\n\
+    \\r\n\
+    \\ENQ\EOT\SYN\STX\SOH\SOH\DC2\EOT\203\STX\ESC(\n\
+    \\r\n\
+    \\ENQ\EOT\SYN\STX\SOH\ETX\DC2\EOT\203\STX+,\n\
     \s\n\
-    \\STX\EOT\DC4\DC2\ACK\180\STX\NUL\188\STX\SOH\SUBe Attached to task responses to give hints to the SDK about how it may adjust its number of\n\
+    \\STX\EOT\ETB\DC2\ACK\208\STX\NUL\216\STX\SOH\SUBe Attached to task responses to give hints to the SDK about how it may adjust its number of\n\
     \ pollers.\n\
     \\n\
     \\v\n\
-    \\ETX\EOT\DC4\SOH\DC2\EOT\180\STX\b\GS\n\
+    \\ETX\EOT\ETB\SOH\DC2\EOT\208\STX\b\GS\n\
     \\220\STX\n\
-    \\EOT\EOT\DC4\STX\NUL\DC2\EOT\187\STX\STX*\SUB\205\STX How many poll requests to suggest should be added or removed, if any. As of now, server only\n\
+    \\EOT\EOT\ETB\STX\NUL\DC2\EOT\215\STX\STX*\SUB\205\STX How many poll requests to suggest should be added or removed, if any. As of now, server only\n\
     \ scales up or down by 1. However, SDKs should allow for other values (while staying within\n\
     \ defined min/max).\n\
     \\n\
@@ -6043,98 +7195,155 @@ packedFileDescriptor
     \ all slots are already occupied.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\DC4\STX\NUL\ENQ\DC2\EOT\187\STX\STX\a\n\
+    \\ENQ\EOT\ETB\STX\NUL\ENQ\DC2\EOT\215\STX\STX\a\n\
     \\r\n\
-    \\ENQ\EOT\DC4\STX\NUL\SOH\DC2\EOT\187\STX\b%\n\
+    \\ENQ\EOT\ETB\STX\NUL\SOH\DC2\EOT\215\STX\b%\n\
     \\r\n\
-    \\ENQ\EOT\DC4\STX\NUL\ETX\DC2\EOT\187\STX()\n\
+    \\ENQ\EOT\ETB\STX\NUL\ETX\DC2\EOT\215\STX()\n\
     \\f\n\
-    \\STX\EOT\NAK\DC2\ACK\190\STX\NUL\193\STX\SOH\n\
+    \\STX\EOT\CAN\DC2\ACK\218\STX\NUL\221\STX\SOH\n\
     \\v\n\
-    \\ETX\EOT\NAK\SOH\DC2\EOT\190\STX\b\DC1\n\
+    \\ETX\EOT\CAN\SOH\DC2\EOT\218\STX\b\DC1\n\
     \+\n\
-    \\EOT\EOT\NAK\STX\NUL\DC2\EOT\192\STX\EOT\"\SUB\GS Zero is a valid rate limit.\n\
+    \\EOT\EOT\CAN\STX\NUL\DC2\EOT\220\STX\EOT\"\SUB\GS Zero is a valid rate limit.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\NAK\STX\NUL\ENQ\DC2\EOT\192\STX\EOT\t\n\
+    \\ENQ\EOT\CAN\STX\NUL\ENQ\DC2\EOT\220\STX\EOT\t\n\
     \\r\n\
-    \\ENQ\EOT\NAK\STX\NUL\SOH\DC2\EOT\192\STX\n\
+    \\ENQ\EOT\CAN\STX\NUL\SOH\DC2\EOT\220\STX\n\
     \\GS\n\
     \\r\n\
-    \\ENQ\EOT\NAK\STX\NUL\ETX\DC2\EOT\192\STX !\n\
+    \\ENQ\EOT\CAN\STX\NUL\ETX\DC2\EOT\220\STX !\n\
     \\f\n\
-    \\STX\EOT\SYN\DC2\ACK\195\STX\NUL\205\STX\SOH\n\
+    \\STX\EOT\EM\DC2\ACK\223\STX\NUL\231\STX\SOH\n\
     \\v\n\
-    \\ETX\EOT\SYN\SOH\DC2\EOT\195\STX\b\SYN\n\
+    \\ETX\EOT\EM\SOH\DC2\EOT\223\STX\b\CAN\n\
+    \\234\STX\n\
+    \\EOT\EOT\EM\STX\NUL\DC2\EOT\230\STX\EOT\US\SUB\219\STX Maximum number of concurrent tasks that may be running at a time across the scope of the\n\
+    \ limit. e.g. in TaskQueueConfig, the scope is the whole task queue.\n\
+    \\n\
+    \ Note that in situations like network partitions, the server's idea of what is running on\n\
+    \ workers may be out of date, and this limit could be exceeded from the point of view of\n\
+    \ workers.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\EM\STX\NUL\ENQ\DC2\EOT\230\STX\EOT\t\n\
+    \\r\n\
+    \\ENQ\EOT\EM\STX\NUL\SOH\DC2\EOT\230\STX\n\
+    \\SUB\n\
+    \\r\n\
+    \\ENQ\EOT\EM\STX\NUL\ETX\DC2\EOT\230\STX\GS\RS\n\
+    \\f\n\
+    \\STX\EOT\SUB\DC2\ACK\233\STX\NUL\243\STX\SOH\n\
+    \\v\n\
+    \\ETX\EOT\SUB\SOH\DC2\EOT\233\STX\b\SYN\n\
     \2\n\
-    \\EOT\EOT\SYN\STX\NUL\DC2\EOT\197\STX\EOT\SYN\SUB$ Reason for why the config was set.\n\
+    \\EOT\EOT\SUB\STX\NUL\DC2\EOT\235\STX\EOT\SYN\SUB$ Reason for why the config was set.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\SYN\STX\NUL\ENQ\DC2\EOT\197\STX\EOT\n\
+    \\ENQ\EOT\SUB\STX\NUL\ENQ\DC2\EOT\235\STX\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\SYN\STX\NUL\SOH\DC2\EOT\197\STX\v\DC1\n\
+    \\ENQ\EOT\SUB\STX\NUL\SOH\DC2\EOT\235\STX\v\DC1\n\
     \\r\n\
-    \\ENQ\EOT\SYN\STX\NUL\ETX\DC2\EOT\197\STX\DC4\NAK\n\
+    \\ENQ\EOT\SUB\STX\NUL\ETX\DC2\EOT\235\STX\DC4\NAK\n\
     \S\n\
-    \\EOT\EOT\SYN\STX\SOH\DC2\EOT\201\STX\EOT\US\SUBE Identity of the last updater.\n\
+    \\EOT\EOT\SUB\STX\SOH\DC2\EOT\239\STX\EOT\US\SUBE Identity of the last updater.\n\
     \ Set by the request's identity field.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\SYN\STX\SOH\ENQ\DC2\EOT\201\STX\EOT\n\
+    \\ENQ\EOT\SUB\STX\SOH\ENQ\DC2\EOT\239\STX\EOT\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\SYN\STX\SOH\SOH\DC2\EOT\201\STX\v\SUB\n\
+    \\ENQ\EOT\SUB\STX\SOH\SOH\DC2\EOT\239\STX\v\SUB\n\
     \\r\n\
-    \\ENQ\EOT\SYN\STX\SOH\ETX\DC2\EOT\201\STX\GS\RS\n\
+    \\ENQ\EOT\SUB\STX\SOH\ETX\DC2\EOT\239\STX\GS\RS\n\
     \(\n\
-    \\EOT\EOT\SYN\STX\STX\DC2\EOT\204\STX\EOT.\SUB\SUB Time of the last update.\n\
+    \\EOT\EOT\SUB\STX\STX\DC2\EOT\242\STX\EOT.\SUB\SUB Time of the last update.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\SYN\STX\STX\ACK\DC2\EOT\204\STX\EOT\GS\n\
+    \\ENQ\EOT\SUB\STX\STX\ACK\DC2\EOT\242\STX\EOT\GS\n\
     \\r\n\
-    \\ENQ\EOT\SYN\STX\STX\SOH\DC2\EOT\204\STX\RS)\n\
+    \\ENQ\EOT\SUB\STX\STX\SOH\DC2\EOT\242\STX\RS)\n\
     \\r\n\
-    \\ENQ\EOT\SYN\STX\STX\ETX\DC2\EOT\204\STX,-\n\
+    \\ENQ\EOT\SUB\STX\STX\ETX\DC2\EOT\242\STX,-\n\
     \\f\n\
-    \\STX\EOT\ETB\DC2\ACK\207\STX\NUL\210\STX\SOH\n\
+    \\STX\EOT\ESC\DC2\ACK\245\STX\NUL\248\STX\SOH\n\
     \\v\n\
-    \\ETX\EOT\ETB\SOH\DC2\EOT\207\STX\b\ETB\n\
+    \\ETX\EOT\ESC\SOH\DC2\EOT\245\STX\b\ETB\n\
     \\f\n\
-    \\EOT\EOT\ETB\STX\NUL\DC2\EOT\208\STX\EOT\GS\n\
+    \\EOT\EOT\ESC\STX\NUL\DC2\EOT\246\STX\EOT\GS\n\
     \\r\n\
-    \\ENQ\EOT\ETB\STX\NUL\ACK\DC2\EOT\208\STX\EOT\r\n\
+    \\ENQ\EOT\ESC\STX\NUL\ACK\DC2\EOT\246\STX\EOT\r\n\
     \\r\n\
-    \\ENQ\EOT\ETB\STX\NUL\SOH\DC2\EOT\208\STX\SO\CAN\n\
+    \\ENQ\EOT\ESC\STX\NUL\SOH\DC2\EOT\246\STX\SO\CAN\n\
     \\r\n\
-    \\ENQ\EOT\ETB\STX\NUL\ETX\DC2\EOT\208\STX\ESC\FS\n\
+    \\ENQ\EOT\ESC\STX\NUL\ETX\DC2\EOT\246\STX\ESC\FS\n\
     \\f\n\
-    \\EOT\EOT\ETB\STX\SOH\DC2\EOT\209\STX\EOT \n\
+    \\EOT\EOT\ESC\STX\SOH\DC2\EOT\247\STX\EOT \n\
     \\r\n\
-    \\ENQ\EOT\ETB\STX\SOH\ACK\DC2\EOT\209\STX\EOT\DC2\n\
+    \\ENQ\EOT\ESC\STX\SOH\ACK\DC2\EOT\247\STX\EOT\DC2\n\
     \\r\n\
-    \\ENQ\EOT\ETB\STX\SOH\SOH\DC2\EOT\209\STX\DC3\ESC\n\
+    \\ENQ\EOT\ESC\STX\SOH\SOH\DC2\EOT\247\STX\DC3\ESC\n\
     \\r\n\
-    \\ENQ\EOT\ETB\STX\SOH\ETX\DC2\EOT\209\STX\RS\US\n\
+    \\ENQ\EOT\ESC\STX\SOH\ETX\DC2\EOT\247\STX\RS\US\n\
     \\f\n\
-    \\STX\EOT\CAN\DC2\ACK\212\STX\NUL\217\STX\SOH\n\
+    \\STX\EOT\FS\DC2\ACK\250\STX\NUL\253\STX\SOH\n\
     \\v\n\
-    \\ETX\EOT\CAN\SOH\DC2\EOT\212\STX\b\ETB\n\
-    \G\n\
-    \\EOT\EOT\CAN\STX\NUL\DC2\EOT\214\STX\EOT)\SUB9 Unless modified, this is the system-defined rate limit.\n\
+    \\ETX\EOT\FS\SOH\DC2\EOT\250\STX\b\RS\n\
+    \\f\n\
+    \\EOT\EOT\FS\STX\NUL\DC2\EOT\251\STX\EOT+\n\
+    \\r\n\
+    \\ENQ\EOT\FS\STX\NUL\ACK\DC2\EOT\251\STX\EOT\DC4\n\
+    \\r\n\
+    \\ENQ\EOT\FS\STX\NUL\SOH\DC2\EOT\251\STX\NAK&\n\
+    \\r\n\
+    \\ENQ\EOT\FS\STX\NUL\ETX\DC2\EOT\251\STX)*\n\
+    \\f\n\
+    \\EOT\EOT\FS\STX\SOH\DC2\EOT\252\STX\EOT \n\
+    \\r\n\
+    \\ENQ\EOT\FS\STX\SOH\ACK\DC2\EOT\252\STX\EOT\DC2\n\
+    \\r\n\
+    \\ENQ\EOT\FS\STX\SOH\SOH\DC2\EOT\252\STX\DC3\ESC\n\
+    \\r\n\
+    \\ENQ\EOT\FS\STX\SOH\ETX\DC2\EOT\252\STX\RS\US\n\
+    \\f\n\
+    \\STX\EOT\GS\DC2\ACK\255\STX\NUL\136\ETX\SOH\n\
+    \\v\n\
+    \\ETX\EOT\GS\SOH\DC2\EOT\255\STX\b\ETB\n\
+    \/\n\
+    \\EOT\EOT\GS\STX\NUL\DC2\EOT\129\ETX\EOT)\SUB! Rate limit for the whole queue.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\CAN\STX\NUL\ACK\DC2\EOT\214\STX\EOT\DC3\n\
+    \\ENQ\EOT\GS\STX\NUL\ACK\DC2\EOT\129\ETX\EOT\DC3\n\
     \\r\n\
-    \\ENQ\EOT\CAN\STX\NUL\SOH\DC2\EOT\214\STX\DC4$\n\
+    \\ENQ\EOT\GS\STX\NUL\SOH\DC2\EOT\129\ETX\DC4$\n\
     \\r\n\
-    \\ENQ\EOT\CAN\STX\NUL\ETX\DC2\EOT\214\STX'(\n\
+    \\ENQ\EOT\GS\STX\NUL\ETX\DC2\EOT\129\ETX'(\n\
     \|\n\
-    \\EOT\EOT\CAN\STX\SOH\DC2\EOT\216\STX\EOT9\SUBn If set, each individual fairness key will be limited to this rate, scaled by the weight of the fairness key.\n\
+    \\EOT\EOT\GS\STX\SOH\DC2\EOT\131\ETX\EOT9\SUBn If set, each individual fairness key will be limited to this rate, scaled by the weight of the fairness key.\n\
     \\n\
     \\r\n\
-    \\ENQ\EOT\CAN\STX\SOH\ACK\DC2\EOT\216\STX\EOT\DC3\n\
+    \\ENQ\EOT\GS\STX\SOH\ACK\DC2\EOT\131\ETX\EOT\DC3\n\
     \\r\n\
-    \\ENQ\EOT\CAN\STX\SOH\SOH\DC2\EOT\216\STX\DC44\n\
+    \\ENQ\EOT\GS\STX\SOH\SOH\DC2\EOT\131\ETX\DC44\n\
     \\r\n\
-    \\ENQ\EOT\CAN\STX\SOH\ETX\DC2\EOT\216\STX78b\ACKproto3"
+    \\ENQ\EOT\GS\STX\SOH\ETX\DC2\EOT\131\ETX78\n\
+    \[\n\
+    \\EOT\EOT\GS\STX\STX\DC2\EOT\133\ETX\EOT5\SUBM If set, overrides the fairness weights for the corresponding fairness keys.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\GS\STX\STX\ACK\DC2\EOT\133\ETX\EOT\SYN\n\
+    \\r\n\
+    \\ENQ\EOT\GS\STX\STX\SOH\DC2\EOT\133\ETX\ETB0\n\
+    \\r\n\
+    \\ENQ\EOT\GS\STX\STX\ETX\DC2\EOT\133\ETX34\n\
+    \6\n\
+    \\EOT\EOT\GS\STX\ETX\DC2\EOT\135\ETX\EOT7\SUB( Concurrency limit for the whole queue.\n\
+    \\n\
+    \\r\n\
+    \\ENQ\EOT\GS\STX\ETX\ACK\DC2\EOT\135\ETX\EOT\SUB\n\
+    \\r\n\
+    \\ENQ\EOT\GS\STX\ETX\SOH\DC2\EOT\135\ETX\ESC2\n\
+    \\r\n\
+    \\ENQ\EOT\GS\STX\ETX\ETX\DC2\EOT\135\ETX56b\ACKproto3"

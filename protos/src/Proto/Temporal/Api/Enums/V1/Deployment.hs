@@ -221,6 +221,7 @@ data WorkerDeploymentVersionStatus
     WORKER_DEPLOYMENT_VERSION_STATUS_RAMPING |
     WORKER_DEPLOYMENT_VERSION_STATUS_DRAINING |
     WORKER_DEPLOYMENT_VERSION_STATUS_DRAINED |
+    WORKER_DEPLOYMENT_VERSION_STATUS_CREATED |
     WorkerDeploymentVersionStatus'Unrecognized !WorkerDeploymentVersionStatus'UnrecognizedValue
   deriving stock (Prelude.Show, Prelude.Eq, Prelude.Ord)
 instance Data.ProtoLens.MessageEnum WorkerDeploymentVersionStatus where
@@ -236,6 +237,8 @@ instance Data.ProtoLens.MessageEnum WorkerDeploymentVersionStatus where
     = Prelude.Just WORKER_DEPLOYMENT_VERSION_STATUS_DRAINING
   maybeToEnum 5
     = Prelude.Just WORKER_DEPLOYMENT_VERSION_STATUS_DRAINED
+  maybeToEnum 6
+    = Prelude.Just WORKER_DEPLOYMENT_VERSION_STATUS_CREATED
   maybeToEnum k
     = Prelude.Just
         (WorkerDeploymentVersionStatus'Unrecognized
@@ -253,6 +256,8 @@ instance Data.ProtoLens.MessageEnum WorkerDeploymentVersionStatus where
     = "WORKER_DEPLOYMENT_VERSION_STATUS_DRAINING"
   showEnum WORKER_DEPLOYMENT_VERSION_STATUS_DRAINED
     = "WORKER_DEPLOYMENT_VERSION_STATUS_DRAINED"
+  showEnum WORKER_DEPLOYMENT_VERSION_STATUS_CREATED
+    = "WORKER_DEPLOYMENT_VERSION_STATUS_CREATED"
   showEnum
     (WorkerDeploymentVersionStatus'Unrecognized (WorkerDeploymentVersionStatus'UnrecognizedValue k))
     = Prelude.show k
@@ -269,11 +274,13 @@ instance Data.ProtoLens.MessageEnum WorkerDeploymentVersionStatus where
     = Prelude.Just WORKER_DEPLOYMENT_VERSION_STATUS_DRAINING
     | (Prelude.==) k "WORKER_DEPLOYMENT_VERSION_STATUS_DRAINED"
     = Prelude.Just WORKER_DEPLOYMENT_VERSION_STATUS_DRAINED
+    | (Prelude.==) k "WORKER_DEPLOYMENT_VERSION_STATUS_CREATED"
+    = Prelude.Just WORKER_DEPLOYMENT_VERSION_STATUS_CREATED
     | Prelude.otherwise
     = (Prelude.>>=) (Text.Read.readMaybe k) Data.ProtoLens.maybeToEnum
 instance Prelude.Bounded WorkerDeploymentVersionStatus where
   minBound = WORKER_DEPLOYMENT_VERSION_STATUS_UNSPECIFIED
-  maxBound = WORKER_DEPLOYMENT_VERSION_STATUS_DRAINED
+  maxBound = WORKER_DEPLOYMENT_VERSION_STATUS_CREATED
 instance Prelude.Enum WorkerDeploymentVersionStatus where
   toEnum k__
     = Prelude.maybe
@@ -288,12 +295,13 @@ instance Prelude.Enum WorkerDeploymentVersionStatus where
   fromEnum WORKER_DEPLOYMENT_VERSION_STATUS_RAMPING = 3
   fromEnum WORKER_DEPLOYMENT_VERSION_STATUS_DRAINING = 4
   fromEnum WORKER_DEPLOYMENT_VERSION_STATUS_DRAINED = 5
+  fromEnum WORKER_DEPLOYMENT_VERSION_STATUS_CREATED = 6
   fromEnum
     (WorkerDeploymentVersionStatus'Unrecognized (WorkerDeploymentVersionStatus'UnrecognizedValue k))
     = Prelude.fromIntegral k
-  succ WORKER_DEPLOYMENT_VERSION_STATUS_DRAINED
+  succ WORKER_DEPLOYMENT_VERSION_STATUS_CREATED
     = Prelude.error
-        "WorkerDeploymentVersionStatus.succ: bad argument WORKER_DEPLOYMENT_VERSION_STATUS_DRAINED. This value would be out of bounds."
+        "WorkerDeploymentVersionStatus.succ: bad argument WORKER_DEPLOYMENT_VERSION_STATUS_CREATED. This value would be out of bounds."
   succ WORKER_DEPLOYMENT_VERSION_STATUS_UNSPECIFIED
     = WORKER_DEPLOYMENT_VERSION_STATUS_INACTIVE
   succ WORKER_DEPLOYMENT_VERSION_STATUS_INACTIVE
@@ -304,6 +312,8 @@ instance Prelude.Enum WorkerDeploymentVersionStatus where
     = WORKER_DEPLOYMENT_VERSION_STATUS_DRAINING
   succ WORKER_DEPLOYMENT_VERSION_STATUS_DRAINING
     = WORKER_DEPLOYMENT_VERSION_STATUS_DRAINED
+  succ WORKER_DEPLOYMENT_VERSION_STATUS_DRAINED
+    = WORKER_DEPLOYMENT_VERSION_STATUS_CREATED
   succ (WorkerDeploymentVersionStatus'Unrecognized _)
     = Prelude.error
         "WorkerDeploymentVersionStatus.succ: bad argument: unrecognized value"
@@ -320,6 +330,8 @@ instance Prelude.Enum WorkerDeploymentVersionStatus where
     = WORKER_DEPLOYMENT_VERSION_STATUS_RAMPING
   pred WORKER_DEPLOYMENT_VERSION_STATUS_DRAINED
     = WORKER_DEPLOYMENT_VERSION_STATUS_DRAINING
+  pred WORKER_DEPLOYMENT_VERSION_STATUS_CREATED
+    = WORKER_DEPLOYMENT_VERSION_STATUS_DRAINED
   pred (WorkerDeploymentVersionStatus'Unrecognized _)
     = Prelude.error
         "WorkerDeploymentVersionStatus.pred: bad argument: unrecognized value"

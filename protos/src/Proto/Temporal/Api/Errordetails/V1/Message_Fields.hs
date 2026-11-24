@@ -95,6 +95,13 @@ failure ::
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "failure" a) =>
   Lens.Family2.LensLike' f s a
 failure = Data.ProtoLens.Field.field @"failure"
+firstExecutionRunId ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "firstExecutionRunId" a) =>
+  Lens.Family2.LensLike' f s a
+firstExecutionRunId
+  = Data.ProtoLens.Field.field @"firstExecutionRunId"
 maybe'failure ::
   forall f s a.
   (Prelude.Functor f,

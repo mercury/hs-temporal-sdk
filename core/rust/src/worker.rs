@@ -6,20 +6,17 @@ use std::marker::PhantomData;
 use std::str;
 use std::sync::Arc;
 use std::time::Duration;
-use temporalio_common::Worker;
-use temporalio_common::errors::{PollError, WorkflowErrorType};
 use temporalio_common::protos::coresdk::nexus::NexusTaskCompletion;
 use temporalio_common::protos::coresdk::workflow_completion::WorkflowActivationCompletion;
 use temporalio_common::protos::coresdk::{ActivityHeartbeat, ActivityTaskCompletion};
 use temporalio_common::protos::temporal::api::history::v1::History;
-use temporalio_common::worker::{
-    PollerBehavior, SlotInfoTrait, SlotKind, SlotMarkUsedContext, SlotReleaseContext,
-    SlotReservationContext, SlotSupplier, SlotSupplierPermit, WorkerVersioningStrategy,
-};
 use temporalio_sdk_core::replay::{HistoryForReplay, ReplayWorkerInput};
 use temporalio_sdk_core::{
-    FixedSizeSlotSupplier, ResourceBasedSlotsOptions, ResourceSlotOptions, SlotSupplierOptions,
-    TunerBuilder, TunerHolder, TunerHolderOptions,
+    FixedSizeSlotSupplier, PollError, PollerBehavior, ResourceBasedSlotsOptions,
+    ResourceSlotOptions, SlotInfo, SlotInfoTrait, SlotKind, SlotMarkUsedContext,
+    SlotReleaseContext, SlotReservationContext, SlotSupplier, SlotSupplierOptions,
+    SlotSupplierPermit, TunerBuilder, TunerHolder, TunerHolderOptions, WorkerVersioningStrategy,
+    WorkflowErrorType,
 };
 use tokio::sync::mpsc::{Sender, channel};
 use tokio_stream::wrappers::ReceiverStream;
@@ -111,10 +108,12 @@ impl TryFrom<&TunerConfig> for TunerHolderOptions {
     type Error = WorkerError;
     fn try_from(cfg: &TunerConfig) -> Result<Self, WorkerError> {
         let maybe_resource_opts = cfg.resource_based_tuner_options.as_ref().map(|rbt| {
-            ResourceBasedSlotsOptions::builder()
-                .target_mem_usage(rbt.target_memory_usage)
-                .target_cpu_usage(rbt.target_cpu_usage)
-                .build()
+            temporalio_sdk_core::ResourceBasedTunerConfig::Options(
+                ResourceBasedSlotsOptions::builder()
+                    .target_mem_usage(rbt.target_memory_usage)
+                    .target_cpu_usage(rbt.target_cpu_usage)
+                    .build(),
+            )
         });
 
         let suppliers = [
@@ -144,7 +143,7 @@ impl TryFrom<&TunerConfig> for TunerHolderOptions {
             .maybe_activity_slot_options(maybe_activity_slot_opts)
             .maybe_local_activity_slot_options(maybe_local_activity_slot_opts)
             .maybe_nexus_slot_options(maybe_nexus_slot_opts)
-            .maybe_resource_based_options(maybe_resource_opts)
+            .maybe_resource_based_config(maybe_resource_opts)
             .build()
             .map_err(|err| WorkerError {
                 code: WorkerErrorCode::InvalidWorkerConfig,
@@ -253,19 +252,19 @@ enum SerializedSlotInfo {
 }
 
 impl SerializedSlotInfo {
-    fn from_info(info: temporalio_common::worker::SlotInfo<'_>) -> Self {
+    fn from_info(info: SlotInfo<'_>) -> Self {
         match info {
-            temporalio_common::worker::SlotInfo::Workflow(i) => Self::Workflow {
+            SlotInfo::Workflow(i) => Self::Workflow {
                 workflow_type: i.workflow_type.clone(),
                 is_sticky: i.is_sticky,
             },
-            temporalio_common::worker::SlotInfo::Activity(i) => Self::Activity {
+            SlotInfo::Activity(i) => Self::Activity {
                 activity_type: i.activity_type.clone(),
             },
-            temporalio_common::worker::SlotInfo::LocalActivity(i) => Self::LocalActivity {
+            SlotInfo::LocalActivity(i) => Self::LocalActivity {
                 activity_type: i.activity_type.clone(),
             },
-            temporalio_common::worker::SlotInfo::Nexus(i) => Self::Nexus {
+            SlotInfo::Nexus(i) => Self::Nexus {
                 service: i.service.clone(),
                 operation: i.operation.clone(),
             },
@@ -735,15 +734,12 @@ pub unsafe extern "C" fn hs_temporal_drop_unit(unit: *mut CUnit) {
 fn new_worker(client: &client::ClientRef, config: WorkerConfig) -> Result<WorkerRef, WorkerError> {
     enter_sync!(&client.runtime);
     let config: temporalio_sdk_core::WorkerConfig = config.try_into()?;
-    let worker = temporalio_sdk_core::init_worker(
-        &client.runtime.core,
-        config,
-        client.retry_client.clone().into_inner(),
-    )
-    .map_err(|err| WorkerError {
-        code: WorkerErrorCode::InitWorkerFailed,
-        message: format!("Failed creating worker: {}", err),
-    })?;
+    let worker =
+        temporalio_sdk_core::init_worker(&client.runtime.core, config, client.retry_client.clone())
+            .map_err(|err| WorkerError {
+                code: WorkerErrorCode::InitWorkerFailed,
+                message: format!("Failed creating worker: {}", err),
+            })?;
     Ok(WorkerRef {
         worker: Some(Arc::new(worker)),
         runtime: client.runtime.clone(),
@@ -1029,6 +1025,7 @@ impl WorkerRef {
         // Finalization consumes the inner worker. Treat a repeated shutdown
         // request as complete instead of panicking across the C ABI boundary.
         if let Some(worker) = &self.worker {
+            enter_sync!(self.runtime);
             worker.initiate_shutdown();
         }
     }
@@ -1527,7 +1524,7 @@ mod tests {
     use super::*;
     use crate::runtime::test_support::{call_bridge, new_test_runtime};
     use serde_json::json;
-    use temporalio_common::worker::{
+    use temporalio_sdk_core::{
         ActivitySlotKind, LocalActivitySlotKind, NexusSlotKind, WorkflowSlotKind,
     };
 
@@ -1599,7 +1596,11 @@ mod tests {
     #[test]
     fn resource_based_tuner_uses_both_targets() {
         let opts = TunerHolderOptions::try_from(&tuner_config(full_tuner_config())).unwrap();
-        let resource = opts.resource_based_options.unwrap();
+        let temporalio_sdk_core::ResourceBasedTunerConfig::Options(resource) =
+            opts.resource_based_config.unwrap()
+        else {
+            panic!("resource-based tuner must use the configured options");
+        };
         assert_eq!(resource.target_mem_usage, 0.6);
         assert_eq!(resource.target_cpu_usage, 0.8);
     }
@@ -1713,15 +1714,15 @@ mod tests {
 
         assert_eq!(
             config.workflow_task_poller_behavior,
-            PollerBehavior::SimpleMaximum(3)
+            Some(PollerBehavior::SimpleMaximum(3))
         );
         assert_eq!(
             config.activity_task_poller_behavior,
-            PollerBehavior::SimpleMaximum(4)
+            Some(PollerBehavior::SimpleMaximum(4))
         );
         assert_eq!(
             config.nexus_task_poller_behavior,
-            PollerBehavior::SimpleMaximum(6)
+            Some(PollerBehavior::SimpleMaximum(6))
         );
         assert_eq!(config.nonsticky_to_sticky_poll_ratio, 0.5);
         assert_eq!(
@@ -1776,7 +1777,7 @@ mod tests {
         assert_eq!(config.client_identity_override, None);
         assert_eq!(
             config.nexus_task_poller_behavior,
-            PollerBehavior::SimpleMaximum(5)
+            Some(PollerBehavior::SimpleMaximum(5))
         );
         assert_eq!(config.max_task_queue_activities_per_second, None);
         assert_eq!(config.max_worker_activities_per_second, None);
@@ -1926,6 +1927,29 @@ mod tests {
 
         // Eviction has no error result; it must not panic.
         worker.request_workflow_eviction("run");
+    }
+
+    #[test]
+    fn initiate_shutdown_enters_runtime_from_foreign_thread() {
+        let mut runtime = new_test_runtime();
+        let config = byte_array(full_worker_config().to_string().into_bytes());
+        let (mut worker, pusher) = new_replay_worker_from(&mut runtime, &config).unwrap();
+        assert!(tokio::runtime::Handle::try_current().is_err());
+
+        unsafe { hs_temporal_worker_initiate_shutdown(&mut worker) };
+        drop(pusher);
+        let result: Result<CUnit, CWorkerError> =
+            call_bridge(|mvar, cap, error_slot, result_slot| {
+                worker.finalize_shutdown(HsCallback {
+                    cap,
+                    mvar,
+                    result_slot,
+                    error_slot,
+                })
+            });
+        assert!(result.is_ok());
+        // Repeated shutdown after finalization remains a no-op.
+        unsafe { hs_temporal_worker_initiate_shutdown(&mut worker) };
     }
 
     #[test]

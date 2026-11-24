@@ -31,8 +31,10 @@ import qualified Proto.Google.Protobuf.Duration
 import qualified Proto.Google.Protobuf.Empty
 import qualified Proto.Google.Protobuf.Timestamp
 import qualified Proto.Temporal.Api.Common.V1.Message
+import qualified Proto.Temporal.Api.Enums.V1.FailedCause
 import qualified Proto.Temporal.Api.Enums.V1.Workflow
 import qualified Proto.Temporal.Api.Failure.V1.Message
+import qualified Proto.Temporal.Api.Nexus.V1.Message
 import qualified Proto.Temporal.Api.Update.V1.Message
 import qualified Proto.Temporal.Sdk.Core.ActivityResult.ActivityResult
 import qualified Proto.Temporal.Sdk.Core.ChildWorkflow.ChildWorkflow
@@ -336,6 +338,14 @@ maybe'priority ::
    Data.ProtoLens.Field.HasField s "maybe'priority" a) =>
   Lens.Family2.LensLike' f s a
 maybe'priority = Data.ProtoLens.Field.field @"maybe'priority"
+maybe'propagatedNexusSerializationContext ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'propagatedNexusSerializationContext" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'propagatedNexusSerializationContext
+  = Data.ProtoLens.Field.field
+      @"maybe'propagatedNexusSerializationContext"
 maybe'queryWorkflow ::
   forall f s a.
   (Prelude.Functor f,
@@ -544,6 +554,20 @@ operationToken ::
    Data.ProtoLens.Field.HasField s "operationToken" a) =>
   Lens.Family2.LensLike' f s a
 operationToken = Data.ProtoLens.Field.field @"operationToken"
+originalExecutionRunId ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "originalExecutionRunId" a) =>
+  Lens.Family2.LensLike' f s a
+originalExecutionRunId
+  = Data.ProtoLens.Field.field @"originalExecutionRunId"
+originatingEventId ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "originatingEventId" a) =>
+  Lens.Family2.LensLike' f s a
+originatingEventId
+  = Data.ProtoLens.Field.field @"originatingEventId"
 parentWorkflowInfo ::
   forall f s a.
   (Prelude.Functor f,
@@ -562,6 +586,13 @@ priority ::
    Data.ProtoLens.Field.HasField s "priority" a) =>
   Lens.Family2.LensLike' f s a
 priority = Data.ProtoLens.Field.field @"priority"
+propagatedNexusSerializationContext ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "propagatedNexusSerializationContext" a) =>
+  Lens.Family2.LensLike' f s a
+propagatedNexusSerializationContext
+  = Data.ProtoLens.Field.field @"propagatedNexusSerializationContext"
 protocolInstanceId ::
   forall f s a.
   (Prelude.Functor f,
@@ -721,6 +752,21 @@ succeeded ::
    Data.ProtoLens.Field.HasField s "succeeded" a) =>
   Lens.Family2.LensLike' f s a
 succeeded = Data.ProtoLens.Field.field @"succeeded"
+suggestContinueAsNewReasons ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "suggestContinueAsNewReasons" a) =>
+  Lens.Family2.LensLike' f s a
+suggestContinueAsNewReasons
+  = Data.ProtoLens.Field.field @"suggestContinueAsNewReasons"
+targetWorkerDeploymentVersionChanged ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "targetWorkerDeploymentVersionChanged" a) =>
+  Lens.Family2.LensLike' f s a
+targetWorkerDeploymentVersionChanged
+  = Data.ProtoLens.Field.field
+      @"targetWorkerDeploymentVersionChanged"
 timestamp ::
   forall f s a.
   (Prelude.Functor f,
@@ -763,6 +809,13 @@ vec'jobs ::
    Data.ProtoLens.Field.HasField s "vec'jobs" a) =>
   Lens.Family2.LensLike' f s a
 vec'jobs = Data.ProtoLens.Field.field @"vec'jobs"
+vec'suggestContinueAsNewReasons ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "vec'suggestContinueAsNewReasons" a) =>
+  Lens.Family2.LensLike' f s a
+vec'suggestContinueAsNewReasons
+  = Data.ProtoLens.Field.field @"vec'suggestContinueAsNewReasons"
 workflowExecutionExpirationTime ::
   forall f s a.
   (Prelude.Functor f,

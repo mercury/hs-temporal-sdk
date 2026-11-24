@@ -28,6 +28,19 @@ import qualified Data.ProtoLens.Runtime.Data.Vector.Generic as Data.Vector.Gener
 import qualified Data.ProtoLens.Runtime.Data.Vector.Unboxed as Data.Vector.Unboxed
 import qualified Data.ProtoLens.Runtime.Text.Read as Text.Read
 import qualified Proto.Temporal.Api.History.V1.Message
+import qualified Proto.Temporal.Api.Workflowservice.V1.RequestResponse
+activities ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "activities" a) =>
+  Lens.Family2.LensLike' f s a
+activities = Data.ProtoLens.Field.field @"activities"
+activity ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "activity" a) =>
+  Lens.Family2.LensLike' f s a
+activity = Data.ProtoLens.Field.field @"activity"
 history ::
   forall f s a.
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "history" a) =>
@@ -38,15 +51,39 @@ items ::
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "items" a) =>
   Lens.Family2.LensLike' f s a
 items = Data.ProtoLens.Field.field @"items"
+maybe'activity ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'activity" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'activity = Data.ProtoLens.Field.field @"maybe'activity"
 maybe'history ::
   forall f s a.
   (Prelude.Functor f,
    Data.ProtoLens.Field.HasField s "maybe'history" a) =>
   Lens.Family2.LensLike' f s a
 maybe'history = Data.ProtoLens.Field.field @"maybe'history"
+vec'activities ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "vec'activities" a) =>
+  Lens.Family2.LensLike' f s a
+vec'activities = Data.ProtoLens.Field.field @"vec'activities"
 vec'items ::
   forall f s a.
   (Prelude.Functor f,
    Data.ProtoLens.Field.HasField s "vec'items" a) =>
   Lens.Family2.LensLike' f s a
 vec'items = Data.ProtoLens.Field.field @"vec'items"
+vec'workflows ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "vec'workflows" a) =>
+  Lens.Family2.LensLike' f s a
+vec'workflows = Data.ProtoLens.Field.field @"vec'workflows"
+workflows ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "workflows" a) =>
+  Lens.Family2.LensLike' f s a
+workflows = Data.ProtoLens.Field.field @"workflows"

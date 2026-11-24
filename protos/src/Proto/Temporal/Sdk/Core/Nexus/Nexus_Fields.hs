@@ -27,6 +27,7 @@ import qualified Data.ProtoLens.Runtime.Data.Vector as Data.Vector
 import qualified Data.ProtoLens.Runtime.Data.Vector.Generic as Data.Vector.Generic
 import qualified Data.ProtoLens.Runtime.Data.Vector.Unboxed as Data.Vector.Unboxed
 import qualified Data.ProtoLens.Runtime.Text.Read as Text.Read
+import qualified Proto.Google.Protobuf.Timestamp
 import qualified Proto.Temporal.Api.Common.V1.Message
 import qualified Proto.Temporal.Api.Failure.V1.Message
 import qualified Proto.Temporal.Api.Nexus.V1.Message
@@ -56,6 +57,12 @@ completed ::
    Data.ProtoLens.Field.HasField s "completed" a) =>
   Lens.Family2.LensLike' f s a
 completed = Data.ProtoLens.Field.field @"completed"
+endpoint ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "endpoint" a) =>
+  Lens.Family2.LensLike' f s a
+endpoint = Data.ProtoLens.Field.field @"endpoint"
 error ::
   forall f s a.
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "error" a) =>
@@ -66,6 +73,11 @@ failed ::
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "failed" a) =>
   Lens.Family2.LensLike' f s a
 failed = Data.ProtoLens.Field.field @"failed"
+failure ::
+  forall f s a.
+  (Prelude.Functor f, Data.ProtoLens.Field.HasField s "failure" a) =>
+  Lens.Family2.LensLike' f s a
+failure = Data.ProtoLens.Field.field @"failure"
 maybe'ackCancel ::
   forall f s a.
   (Prelude.Functor f,
@@ -102,6 +114,19 @@ maybe'failed ::
    Data.ProtoLens.Field.HasField s "maybe'failed" a) =>
   Lens.Family2.LensLike' f s a
 maybe'failed = Data.ProtoLens.Field.field @"maybe'failed"
+maybe'failure ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'failure" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'failure = Data.ProtoLens.Field.field @"maybe'failure"
+maybe'requestDeadline ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "maybe'requestDeadline" a) =>
+  Lens.Family2.LensLike' f s a
+maybe'requestDeadline
+  = Data.ProtoLens.Field.field @"maybe'requestDeadline"
 maybe'status ::
   forall f s a.
   (Prelude.Functor f,
@@ -131,6 +156,12 @@ reason ::
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "reason" a) =>
   Lens.Family2.LensLike' f s a
 reason = Data.ProtoLens.Field.field @"reason"
+requestDeadline ::
+  forall f s a.
+  (Prelude.Functor f,
+   Data.ProtoLens.Field.HasField s "requestDeadline" a) =>
+  Lens.Family2.LensLike' f s a
+requestDeadline = Data.ProtoLens.Field.field @"requestDeadline"
 task ::
   forall f s a.
   (Prelude.Functor f, Data.ProtoLens.Field.HasField s "task" a) =>

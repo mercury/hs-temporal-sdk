@@ -32,13 +32,17 @@ import qualified Data.ProtoLens.Runtime.Data.Vector as Data.Vector
 import qualified Data.ProtoLens.Runtime.Data.Vector.Generic as Data.Vector.Generic
 import qualified Data.ProtoLens.Runtime.Data.Vector.Unboxed as Data.Vector.Unboxed
 import qualified Data.ProtoLens.Runtime.Text.Read as Text.Read
+import qualified Proto.Google.Protobuf.Duration
 import qualified Proto.Google.Protobuf.Timestamp
 import qualified Proto.Temporal.Api.Enums.V1.Namespace
 {- | Fields :
      
-         * 'Proto.Temporal.Api.Replication.V1.Message_Fields.clusterName' @:: Lens' ClusterReplicationConfig Data.Text.Text@ -}
+         * 'Proto.Temporal.Api.Replication.V1.Message_Fields.clusterName' @:: Lens' ClusterReplicationConfig Data.Text.Text@
+         * 'Proto.Temporal.Api.Replication.V1.Message_Fields.replicationRampDuration' @:: Lens' ClusterReplicationConfig Proto.Google.Protobuf.Duration.Duration@
+         * 'Proto.Temporal.Api.Replication.V1.Message_Fields.maybe'replicationRampDuration' @:: Lens' ClusterReplicationConfig (Prelude.Maybe Proto.Google.Protobuf.Duration.Duration)@ -}
 data ClusterReplicationConfig
   = ClusterReplicationConfig'_constructor {_ClusterReplicationConfig'clusterName :: !Data.Text.Text,
+                                           _ClusterReplicationConfig'replicationRampDuration :: !(Prelude.Maybe Proto.Google.Protobuf.Duration.Duration),
                                            _ClusterReplicationConfig'_unknownFields :: !Data.ProtoLens.FieldSet}
   deriving stock (Prelude.Eq, Prelude.Ord)
 instance Prelude.Show ClusterReplicationConfig where
@@ -54,6 +58,22 @@ instance Data.ProtoLens.Field.HasField ClusterReplicationConfig "clusterName" Da
            _ClusterReplicationConfig'clusterName
            (\ x__ y__ -> x__ {_ClusterReplicationConfig'clusterName = y__}))
         Prelude.id
+instance Data.ProtoLens.Field.HasField ClusterReplicationConfig "replicationRampDuration" Proto.Google.Protobuf.Duration.Duration where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _ClusterReplicationConfig'replicationRampDuration
+           (\ x__ y__
+              -> x__ {_ClusterReplicationConfig'replicationRampDuration = y__}))
+        (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
+instance Data.ProtoLens.Field.HasField ClusterReplicationConfig "maybe'replicationRampDuration" (Prelude.Maybe Proto.Google.Protobuf.Duration.Duration) where
+  fieldOf _
+    = (Prelude..)
+        (Lens.Family2.Unchecked.lens
+           _ClusterReplicationConfig'replicationRampDuration
+           (\ x__ y__
+              -> x__ {_ClusterReplicationConfig'replicationRampDuration = y__}))
+        Prelude.id
 instance Data.ProtoLens.Message ClusterReplicationConfig where
   messageName _
     = Data.Text.pack
@@ -61,7 +81,8 @@ instance Data.ProtoLens.Message ClusterReplicationConfig where
   packedMessageDescriptor _
     = "\n\
       \\CANClusterReplicationConfig\DC2!\n\
-      \\fcluster_name\CAN\SOH \SOH(\tR\vclusterName"
+      \\fcluster_name\CAN\SOH \SOH(\tR\vclusterName\DC2U\n\
+      \\EMreplication_ramp_duration\CAN\STX \SOH(\v2\EM.google.protobuf.DurationR\ETBreplicationRampDuration"
   packedFileDescriptor _ = packedFileDescriptor
   fieldsByTag
     = let
@@ -74,9 +95,18 @@ instance Data.ProtoLens.Message ClusterReplicationConfig where
                  Data.ProtoLens.Optional
                  (Data.ProtoLens.Field.field @"clusterName")) ::
               Data.ProtoLens.FieldDescriptor ClusterReplicationConfig
+        replicationRampDuration__field_descriptor
+          = Data.ProtoLens.FieldDescriptor
+              "replication_ramp_duration"
+              (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                 Data.ProtoLens.FieldTypeDescriptor Proto.Google.Protobuf.Duration.Duration)
+              (Data.ProtoLens.OptionalField
+                 (Data.ProtoLens.Field.field @"maybe'replicationRampDuration")) ::
+              Data.ProtoLens.FieldDescriptor ClusterReplicationConfig
       in
         Data.Map.fromList
-          [(Data.ProtoLens.Tag 1, clusterName__field_descriptor)]
+          [(Data.ProtoLens.Tag 1, clusterName__field_descriptor),
+           (Data.ProtoLens.Tag 2, replicationRampDuration__field_descriptor)]
   unknownFields
     = Lens.Family2.Unchecked.lens
         _ClusterReplicationConfig'_unknownFields
@@ -84,6 +114,7 @@ instance Data.ProtoLens.Message ClusterReplicationConfig where
   defMessage
     = ClusterReplicationConfig'_constructor
         {_ClusterReplicationConfig'clusterName = Data.ProtoLens.fieldDefault,
+         _ClusterReplicationConfig'replicationRampDuration = Prelude.Nothing,
          _ClusterReplicationConfig'_unknownFields = []}
   parseMessage
     = let
@@ -116,6 +147,15 @@ instance Data.ProtoLens.Message ClusterReplicationConfig where
                                        "cluster_name"
                                 loop
                                   (Lens.Family2.set (Data.ProtoLens.Field.field @"clusterName") y x)
+                        18
+                          -> do y <- (Data.ProtoLens.Encoding.Bytes.<?>)
+                                       (do len <- Data.ProtoLens.Encoding.Bytes.getVarInt
+                                           Data.ProtoLens.Encoding.Bytes.isolate
+                                             (Prelude.fromIntegral len) Data.ProtoLens.parseMessage)
+                                       "replication_ramp_duration"
+                                loop
+                                  (Lens.Family2.set
+                                     (Data.ProtoLens.Field.field @"replicationRampDuration") y x)
                         wire
                           -> do !y <- Data.ProtoLens.Encoding.Wire.parseTaggedValueFromWire
                                         wire
@@ -144,15 +184,33 @@ instance Data.ProtoLens.Message ClusterReplicationConfig where
                                     (Prelude.fromIntegral (Data.ByteString.length bs)))
                                  (Data.ProtoLens.Encoding.Bytes.putBytes bs))
                          Data.Text.Encoding.encodeUtf8 _v))
-             (Data.ProtoLens.Encoding.Wire.buildFieldSet
-                (Lens.Family2.view Data.ProtoLens.unknownFields _x))
+             ((Data.Monoid.<>)
+                (case
+                     Lens.Family2.view
+                       (Data.ProtoLens.Field.field @"maybe'replicationRampDuration") _x
+                 of
+                   Prelude.Nothing -> Data.Monoid.mempty
+                   (Prelude.Just _v)
+                     -> (Data.Monoid.<>)
+                          (Data.ProtoLens.Encoding.Bytes.putVarInt 18)
+                          ((Prelude..)
+                             (\ bs
+                                -> (Data.Monoid.<>)
+                                     (Data.ProtoLens.Encoding.Bytes.putVarInt
+                                        (Prelude.fromIntegral (Data.ByteString.length bs)))
+                                     (Data.ProtoLens.Encoding.Bytes.putBytes bs))
+                             Data.ProtoLens.encodeMessage _v))
+                (Data.ProtoLens.Encoding.Wire.buildFieldSet
+                   (Lens.Family2.view Data.ProtoLens.unknownFields _x)))
 instance Control.DeepSeq.NFData ClusterReplicationConfig where
   rnf
     = \ x__
         -> Control.DeepSeq.deepseq
              (_ClusterReplicationConfig'_unknownFields x__)
              (Control.DeepSeq.deepseq
-                (_ClusterReplicationConfig'clusterName x__) ())
+                (_ClusterReplicationConfig'clusterName x__)
+                (Control.DeepSeq.deepseq
+                   (_ClusterReplicationConfig'replicationRampDuration x__) ()))
 {- | Fields :
      
          * 'Proto.Temporal.Api.Replication.V1.Message_Fields.failoverTime' @:: Lens' FailoverStatus Proto.Google.Protobuf.Timestamp.Timestamp@
@@ -562,9 +620,10 @@ instance Control.DeepSeq.NFData NamespaceReplicationConfig where
 packedFileDescriptor :: Data.ByteString.ByteString
 packedFileDescriptor
   = "\n\
-    \)temporal/api/replication/v1/message.proto\DC2\ESCtemporal.api.replication.v1\SUB\USgoogle/protobuf/timestamp.proto\SUB%temporal/api/enums/v1/namespace.proto\"=\n\
+    \)temporal/api/replication/v1/message.proto\DC2\ESCtemporal.api.replication.v1\SUB\RSgoogle/protobuf/duration.proto\SUB\USgoogle/protobuf/timestamp.proto\SUB%temporal/api/enums/v1/namespace.proto\"\148\SOH\n\
     \\CANClusterReplicationConfig\DC2!\n\
-    \\fcluster_name\CAN\SOH \SOH(\tR\vclusterName\"\222\SOH\n\
+    \\fcluster_name\CAN\SOH \SOH(\tR\vclusterName\DC2U\n\
+    \\EMreplication_ramp_duration\CAN\STX \SOH(\v2\EM.google.protobuf.DurationR\ETBreplicationRampDuration\"\222\SOH\n\
     \\SUBNamespaceReplicationConfig\DC2.\n\
     \\DC3active_cluster_name\CAN\SOH \SOH(\tR\DC1activeClusterName\DC2Q\n\
     \\bclusters\CAN\STX \ETX(\v25.temporal.api.replication.v1.ClusterReplicationConfigR\bclusters\DC2=\n\
@@ -572,8 +631,8 @@ packedFileDescriptor
     \\SOFailoverStatus\DC2?\n\
     \\rfailover_time\CAN\SOH \SOH(\v2\SUB.google.protobuf.TimestampR\ffailoverTime\DC2)\n\
     \\DLEfailover_version\CAN\STX \SOH(\ETXR\SIfailoverVersionB\162\SOH\n\
-    \\RSio.temporal.api.replication.v1B\fMessageProtoP\SOHZ-go.temporal.io/api/replication/v1;replication\170\STX\GSTemporalio.Api.Replication.V1\234\STX Temporalio::Api::Replication::V1J\214\ENQ\n\
-    \\ACK\DC2\EOT\NUL\NUL\RS\SOH\n\
+    \\RSio.temporal.api.replication.v1B\fMessageProtoP\SOHZ-go.temporal.io/api/replication/v1;replication\170\STX\GSTemporalio.Api.Replication.V1\234\STX Temporalio::Api::Replication::V1J\219\a\n\
+    \\ACK\DC2\EOT\NUL\NUL\"\SOH\n\
     \\b\n\
     \\SOH\f\DC2\ETX\NUL\NUL\DC2\n\
     \\b\n\
@@ -604,78 +663,90 @@ packedFileDescriptor
     \\t\n\
     \\STX\b%\DC2\ETX\t\NUL:\n\
     \\t\n\
-    \\STX\ETX\NUL\DC2\ETX\v\NUL)\n\
+    \\STX\ETX\NUL\DC2\ETX\v\NUL(\n\
     \\t\n\
-    \\STX\ETX\SOH\DC2\ETX\r\NUL/\n\
+    \\STX\ETX\SOH\DC2\ETX\f\NUL)\n\
+    \\t\n\
+    \\STX\ETX\STX\DC2\ETX\SO\NUL/\n\
     \\n\
     \\n\
-    \\STX\EOT\NUL\DC2\EOT\SI\NUL\DC1\SOH\n\
+    \\STX\EOT\NUL\DC2\EOT\DLE\NUL\NAK\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\NUL\SOH\DC2\ETX\SI\b \n\
+    \\ETX\EOT\NUL\SOH\DC2\ETX\DLE\b \n\
     \\v\n\
-    \\EOT\EOT\NUL\STX\NUL\DC2\ETX\DLE\EOT\FS\n\
+    \\EOT\EOT\NUL\STX\NUL\DC2\ETX\DC1\EOT\FS\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\NUL\ENQ\DC2\ETX\DLE\EOT\n\
+    \\ENQ\EOT\NUL\STX\NUL\ENQ\DC2\ETX\DC1\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\NUL\SOH\DC2\ETX\DLE\v\ETB\n\
+    \\ENQ\EOT\NUL\STX\NUL\SOH\DC2\ETX\DC1\v\ETB\n\
     \\f\n\
-    \\ENQ\EOT\NUL\STX\NUL\ETX\DC2\ETX\DLE\SUB\ESC\n\
+    \\ENQ\EOT\NUL\STX\NUL\ETX\DC2\ETX\DC1\SUB\ESC\n\
+    \\205\SOH\n\
+    \\EOT\EOT\NUL\STX\SOH\DC2\ETX\DC4\EOT;\SUB\191\SOH Ramp duration when this cluster is added as passive by UpdateNamespace; unset or non-positive disables gradual connect.\n\
+    \ This field is not persisted and is omitted from namespace responses.\n\
+    \\n\
+    \\f\n\
+    \\ENQ\EOT\NUL\STX\SOH\ACK\DC2\ETX\DC4\EOT\FS\n\
+    \\f\n\
+    \\ENQ\EOT\NUL\STX\SOH\SOH\DC2\ETX\DC4\GS6\n\
+    \\f\n\
+    \\ENQ\EOT\NUL\STX\SOH\ETX\DC2\ETX\DC49:\n\
     \\n\
     \\n\
-    \\STX\EOT\SOH\DC2\EOT\DC3\NUL\ETB\SOH\n\
+    \\STX\EOT\SOH\DC2\EOT\ETB\NUL\ESC\SOH\n\
     \\n\
     \\n\
-    \\ETX\EOT\SOH\SOH\DC2\ETX\DC3\b\"\n\
+    \\ETX\EOT\SOH\SOH\DC2\ETX\ETB\b\"\n\
     \\v\n\
-    \\EOT\EOT\SOH\STX\NUL\DC2\ETX\DC4\EOT#\n\
+    \\EOT\EOT\SOH\STX\NUL\DC2\ETX\CAN\EOT#\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\NUL\ENQ\DC2\ETX\DC4\EOT\n\
+    \\ENQ\EOT\SOH\STX\NUL\ENQ\DC2\ETX\CAN\EOT\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\NUL\SOH\DC2\ETX\DC4\v\RS\n\
+    \\ENQ\EOT\SOH\STX\NUL\SOH\DC2\ETX\CAN\v\RS\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\NUL\ETX\DC2\ETX\DC4!\"\n\
+    \\ENQ\EOT\SOH\STX\NUL\ETX\DC2\ETX\CAN!\"\n\
     \\v\n\
-    \\EOT\EOT\SOH\STX\SOH\DC2\ETX\NAK\EOT3\n\
+    \\EOT\EOT\SOH\STX\SOH\DC2\ETX\EM\EOT3\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\SOH\EOT\DC2\ETX\NAK\EOT\f\n\
+    \\ENQ\EOT\SOH\STX\SOH\EOT\DC2\ETX\EM\EOT\f\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\SOH\ACK\DC2\ETX\NAK\r%\n\
+    \\ENQ\EOT\SOH\STX\SOH\ACK\DC2\ETX\EM\r%\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\SOH\SOH\DC2\ETX\NAK&.\n\
+    \\ENQ\EOT\SOH\STX\SOH\SOH\DC2\ETX\EM&.\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\SOH\ETX\DC2\ETX\NAK12\n\
+    \\ENQ\EOT\SOH\STX\SOH\ETX\DC2\ETX\EM12\n\
     \\v\n\
-    \\EOT\EOT\SOH\STX\STX\DC2\ETX\SYN\EOT5\n\
+    \\EOT\EOT\SOH\STX\STX\DC2\ETX\SUB\EOT5\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\STX\ACK\DC2\ETX\SYN\EOT*\n\
+    \\ENQ\EOT\SOH\STX\STX\ACK\DC2\ETX\SUB\EOT*\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\STX\SOH\DC2\ETX\SYN+0\n\
+    \\ENQ\EOT\SOH\STX\STX\SOH\DC2\ETX\SUB+0\n\
     \\f\n\
-    \\ENQ\EOT\SOH\STX\STX\ETX\DC2\ETX\SYN34\n\
+    \\ENQ\EOT\SOH\STX\STX\ETX\DC2\ETX\SUB34\n\
     \G\n\
-    \\STX\EOT\STX\DC2\EOT\SUB\NUL\RS\SOH\SUB; Represents a historical replication status of a Namespace\n\
+    \\STX\EOT\STX\DC2\EOT\RS\NUL\"\SOH\SUB; Represents a historical replication status of a Namespace\n\
     \\n\
     \\n\
     \\n\
-    \\ETX\EOT\STX\SOH\DC2\ETX\SUB\b\SYN\n\
+    \\ETX\EOT\STX\SOH\DC2\ETX\RS\b\SYN\n\
     \T\n\
-    \\EOT\EOT\STX\STX\NUL\DC2\ETX\FS\EOT0\SUBG Timestamp when the Cluster switched to the following failover_version\n\
+    \\EOT\EOT\STX\STX\NUL\DC2\ETX \EOT0\SUBG Timestamp when the Cluster switched to the following failover_version\n\
     \\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\NUL\ACK\DC2\ETX\FS\EOT\GS\n\
+    \\ENQ\EOT\STX\STX\NUL\ACK\DC2\ETX \EOT\GS\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\NUL\SOH\DC2\ETX\FS\RS+\n\
+    \\ENQ\EOT\STX\STX\NUL\SOH\DC2\ETX \RS+\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\NUL\ETX\DC2\ETX\FS./\n\
+    \\ENQ\EOT\STX\STX\NUL\ETX\DC2\ETX ./\n\
     \\v\n\
-    \\EOT\EOT\STX\STX\SOH\DC2\ETX\GS\EOT\US\n\
+    \\EOT\EOT\STX\STX\SOH\DC2\ETX!\EOT\US\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\SOH\ENQ\DC2\ETX\GS\EOT\t\n\
+    \\ENQ\EOT\STX\STX\SOH\ENQ\DC2\ETX!\EOT\t\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\SOH\SOH\DC2\ETX\GS\n\
+    \\ENQ\EOT\STX\STX\SOH\SOH\DC2\ETX!\n\
     \\SUB\n\
     \\f\n\
-    \\ENQ\EOT\STX\STX\SOH\ETX\DC2\ETX\GS\GS\RSb\ACKproto3"
+    \\ENQ\EOT\STX\STX\SOH\ETX\DC2\ETX!\GS\RSb\ACKproto3"
