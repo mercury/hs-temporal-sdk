@@ -30,6 +30,8 @@ import UnliftIO hiding (race)
 data WorkerConfig activityEnv = WorkerConfig
   { deadlockTimeout :: Maybe Int
   -- ^ Workflow execution budget, in microseconds.
+  , concurrentWorkflowSemigroupEnabled :: Bool
+  -- ^ Allow new uses of concurrent 'Semigroup' composition on supported servers.
   , wfDefs :: HashMap Text WorkflowDefinition
   , actEnv :: activityEnv
   , actDefs :: HashMap Text (ActivityDefinition activityEnv)

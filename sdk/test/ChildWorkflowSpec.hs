@@ -7,6 +7,8 @@ module ChildWorkflowSpec where
 
 import Control.Exception (SomeException)
 import qualified Control.Monad.Catch as Catch
+import Data.Foldable (fold)
+import Data.Maybe (isJust, isNothing)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Lens.Family2
@@ -196,6 +198,71 @@ tests = describe "Child Workflows" $ do
             Just attrs <- pure (ev ^. History.maybe'startChildWorkflowExecutionInitiatedEventAttributes)
             pure (attrs ^. History.priority . Common.priorityKey)
       initiatedPriorityKeys `shouldBe` [1]
+
+  specify "replicateConcurrently_ starts every child in the same workflow task" $ \TestEnv {..} -> do
+    let child :: W.Workflow ()
+        child = pure ()
+        childWf = W.provideWorkflow defaultCodec "replicatedChild" child
+        parent :: MyWorkflow ()
+        parent = W.replicateConcurrently_ 3 $ W.executeChildWorkflow childWf.reference W.defaultChildWorkflowOptions
+        parentWf = W.provideWorkflow defaultCodec "replicatedChildParent" parent
+        conf = configure () (childWf, parentWf) $ do
+          baseConf
+          setConcurrentWorkflowSemigroupEnabled True
+    withWorker conf $ do
+      wfId <- uuidText
+      let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
+      hist <- useClient $ do
+        h <- C.start parentWf.reference (W.WorkflowId wfId) opts
+        C.waitWorkflowResult h
+        C.fetchHistory h
+      let startTaskIds = do
+            ev <- hist ^. History.events
+            Just attrs <- pure (ev ^. History.maybe'startChildWorkflowExecutionInitiatedEventAttributes)
+            pure (attrs ^. History.workflowTaskCompletedEventId)
+      case startTaskIds of
+        first : _ -> startTaskIds `shouldBe` replicate 3 first
+        [] -> expectationFailure "parent started no child workflows"
+
+  specify "replicateConcurrently_ preserves a sequential parent when the SDK flag is enabled" $ \TestEnv {..} -> do
+    let child :: W.Workflow ()
+        child = provideCallStack $ W.waitCondition (pure False)
+        childWf = W.provideWorkflow defaultCodec "neverEndingChild" child
+        copy = provideCallStack $ W.executeChildWorkflow childWf.reference W.defaultChildWorkflowOptions
+        sequentialParent = W.provideWorkflow defaultCodec "upgradedParent" (fold (replicate 2 copy) :: W.Workflow ())
+        concurrentParent = W.provideWorkflow defaultCodec "upgradedParent" (W.replicateConcurrently_ 2 copy)
+        childStarts hist = length $ do
+          ev <- hist ^. History.events
+          Just _ <- pure (ev ^. History.maybe'childWorkflowExecutionStartedEventAttributes)
+          pure ()
+        settled hist = case reverse (hist ^. History.events) of
+          ev : _ -> isJust (ev ^. History.maybe'workflowTaskCompletedEventAttributes)
+          [] -> False
+        completedAfterSignal hist =
+          any (isJust . (^. History.maybe'workflowTaskCompletedEventAttributes)) $
+            dropWhile (isNothing . (^. History.maybe'workflowExecutionSignaledEventAttributes)) (hist ^. History.events)
+        -- Bound the history queries so a stalled task fails the assertion.
+        awaitHistory p h = go (1000 :: Int)
+          where
+            go n = do
+              hist <- C.fetchHistory h
+              if p hist || n == 0 then pure hist else go (n - 1)
+    wfId <- uuidText
+    (h, recorded) <- withWorker (configure () (childWf, sequentialParent) baseConf) $ useClient $ do
+      h <- C.start sequentialParent.reference (W.WorkflowId wfId) (defaultStartOptsWithTimeout taskQueue (seconds 30))
+      recorded <- awaitHistory (\hist -> childStarts hist == 1 && settled hist) h
+      pure (h, recorded)
+    childStarts recorded `shouldBe` 1
+    let upgradedConf = configure () (childWf, concurrentParent) $ do
+          baseConf
+          setConcurrentWorkflowSemigroupEnabled True
+    upgraded <- withWorker upgradedConf $ useClient $ do
+      C.signal h (W.KnownSignal @'[] "wake" defaultCodec) C.defaultSignalOptions
+      awaitHistory completedAfterSignal h
+    completedAfterSignal upgraded `shouldBe` True
+    -- The parent records initiations before it receives child-start acknowledgements.
+    let initiated = filter (isJust . (^. History.maybe'startChildWorkflowExecutionInitiatedEventAttributes)) (upgraded ^. History.events)
+    length initiated `shouldBe` 1
 
   specify "executeChildWorkflow convenience" $ \TestEnv {..} -> do
     let child :: W.Workflow Int

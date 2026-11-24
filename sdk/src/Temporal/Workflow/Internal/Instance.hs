@@ -22,9 +22,10 @@ module Temporal.Workflow.Internal.Instance (
 
 import Control.Monad.Reader
 import Data.Atomics (atomicModifyIORefCAS)
-import Data.Traversable (for)
 import Data.ProtoLens
+import qualified Data.Set as Set
 import qualified Data.Text as T
+import Data.Traversable (for)
 import GHC.Stack
 import Lens.Family2
 import qualified Proto.Temporal.Sdk.Core.WorkflowCompletion.WorkflowCompletion as Core
@@ -58,9 +59,13 @@ prepareCompletion = do
     currentCmds <- readTVar inst.workflowCommands
     writeTVar inst.workflowCommands $ Reversed []
     pure currentCmds
-  encoded <- liftIO $ for (fromReversed cmds) (encodeCommand inst.payloadProcessor) 
+  encoded <- liftIO $ for (fromReversed cmds) (encodeCommand inst.payloadProcessor)
+  usedFlags <- readIORef inst.workflowKnownSdkFlags
   let completionSuccessful :: Core.Success
-      completionSuccessful = defMessage & Completion.commands .~ encoded
+      completionSuccessful =
+        defMessage
+          & Completion.commands .~ encoded
+          & Completion.usedInternalFlags .~ map sdkFlagId (Set.toAscList usedFlags)
       completionMessage :: Core.WorkflowActivationCompletion
       completionMessage =
         defMessage

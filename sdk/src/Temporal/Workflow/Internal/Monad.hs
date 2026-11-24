@@ -84,6 +84,37 @@ ilift :: RequireCallStack => InstanceM a -> Workflow a
 ilift m = Workflow $ \_ -> Done <$> m
 
 
+-- Wire IDs are one-based constructor positions. Only append new flags.
+data SdkFlag
+  = RaceLoserCancellation -- Reserved for #401.
+  | ConcurrentWorkflowSemigroup
+  deriving stock (Eq, Ord, Enum, Bounded)
+
+
+sdkFlagId :: SdkFlag -> Word32
+sdkFlagId flag = fromIntegral (fromEnum flag + 1)
+
+
+sdkFlagFromId :: Word32 -> Maybe SdkFlag
+sdkFlagFromId flagId
+  | flagId < sdkFlagId minBound || flagId > sdkFlagId maxBound = Nothing
+  | otherwise = Just (toEnum (fromIntegral flagId - 1))
+
+
+tryUseSdkFlag :: SdkFlag -> Workflow Bool
+tryUseSdkFlag flag = Workflow $ \_ -> do
+  inst <- ask
+  replaying <- readIORef inst.workflowIsReplaying
+  let mayRecord = not replaying && Set.member flag inst.workflowEnabledSdkFlags
+  Done <$> atomicModifyIORef' inst.workflowKnownSdkFlags (\known ->
+    if Set.member flag known
+      then (known, True)
+      else if mayRecord
+        then (Set.insert flag known, True)
+        else (known, False)
+    )
+
+
 askInstance :: Workflow WorkflowInstance
 askInstance = Workflow $ \_ -> asks Done
 
@@ -773,6 +804,8 @@ data WorkflowInstance = WorkflowInstance
   , workflowSequences :: {-# UNPACK #-} !(IORef Sequences)
   , workflowTime :: {-# UNPACK #-} !(IORef SystemTime)
   , workflowIsReplaying :: {-# UNPACK #-} !(IORef Bool)
+  , workflowEnabledSdkFlags :: !(Set SdkFlag)
+  , workflowKnownSdkFlags :: {-# UNPACK #-} !(IORef (Set SdkFlag))
   , workflowCommands :: {-# UNPACK #-} !(TVar (Reversed WorkflowCommand))
   , workflowSequenceMaps :: {-# UNPACK #-} !(TVar SequenceMaps)
   , workflowSignalHandlers :: {-# UNPACK #-} !(IORef (HashMap (Maybe Text) (Vector Payload -> Workflow ())))

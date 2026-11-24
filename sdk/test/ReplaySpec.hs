@@ -3,13 +3,19 @@ module ReplaySpec where
 import Control.Concurrent (ThreadId, myThreadId, threadDelay, yield)
 import qualified Control.Concurrent.Async as Async
 import Control.Exception (IOException, bracket, catch, fromException, try)
-import Control.Monad (unless, void, when)
+import Control.Monad (forM_, unless, void, when)
 import Data.Either (isLeft, isRight)
+import Data.Foldable (fold)
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
+import Data.List (nub)
+import Data.Maybe (isJust)
 import Data.ProtoLens.Encoding (encodeMessage)
 import qualified Data.Text as Text
 import qualified GHC.Conc.Sync as Conc
+import Lens.Family2
 import qualified Network.Socket as N
+import qualified Proto.Temporal.Api.History.V1.Message_Fields as History
+import qualified Proto.Temporal.Api.Sdk.V1.TaskCompleteMetadata_Fields as Metadata
 import RequireCallStack (provideCallStack)
 import System.Directory (findExecutable, getTemporaryDirectory, removeFile)
 import System.IO.Unsafe (unsafePerformIO)
@@ -241,6 +247,28 @@ replayActivity = pure 1
 
 replayActivityDef :: ProvidedActivity () (Activity () Int)
 replayActivityDef = provideActivity JSON "replayAct" replayActivity
+
+
+replayCopyActivity :: W.Workflow ()
+replayCopyActivity = provideCallStack $ void $ W.executeActivity replayActivityDef.reference (W.defaultStartActivityOptions $ W.StartToClose $ seconds 3)
+
+
+{- | Record @copies@ runs of @copy@ one after another by 'fold' on plain
+'W.Workflow', then replay that history against 'W.replicateConcurrently_'.
+-}
+replaySequentialCopies :: TestEnv -> Text.Text -> Int -> W.Workflow () -> IO (Either ReplayHistoryFailure ())
+replaySequentialCopies TestEnv {baseConf, taskQueue, withWorker, useClient} label copies copy = do
+  let name = "replay-replicate-" <> label <> "-" <> Text.pack (show copies)
+      sequentialWorkflow = W.provideWorkflow JSON name $ fold (replicate copies copy)
+      concurrentWorkflow = W.provideWorkflow JSON name $ W.replicateConcurrently_ copies copy
+  history <- withWorker (configure () (replayActivityDef, sequentialWorkflow) baseConf) $ do
+    uuid <- uuidText
+    let opts = defaultStartOptsWithTimeout taskQueue (seconds 10)
+    useClient $ do
+      wfHandle <- C.start sequentialWorkflow (W.WorkflowId uuid) opts
+      C.waitWorkflowResult wfHandle
+      C.fetchHistory wfHandle
+  runReplayHistory globalRuntime (configure () (replayActivityDef, concurrentWorkflow) baseConf) history
 
 
 tests :: SpecWith TestEnv
@@ -476,6 +504,62 @@ tests = describe "Workflow Replay" $ do
     case result of
       Left err -> err.message `shouldSatisfy` (not . Text.null)
       Right () -> expectationFailure "Expected replay failure"
+
+  describe "replicateConcurrently_ replaying copies that ran one after another" $ do
+    specify "one copy replays" $ \env -> do
+      result <- replaySequentialCopies env "activity" 1 replayCopyActivity
+      result `shouldSatisfy` isRight
+
+    specify "two copies of an activity replay" $ \env -> do
+      result <- replaySequentialCopies env "activity" 2 replayCopyActivity
+      result `shouldSatisfy` isRight
+
+    specify "two copies of an activity then a timer replay" $ \env -> do
+      result <- replaySequentialCopies env "activity-timer" 2 $ replayCopyActivity *> provideCallStack (W.sleep (milliseconds 10))
+      result `shouldSatisfy` isRight
+
+  describe "replicateConcurrently_ SDK flag" $ do
+    forM_ [(False, "runs sequentially by default"), (True, "runs concurrently and records the flag when enabled")] $ \(enabled, label) ->
+      specify (label <> " and replays with recording disabled") $ \TestEnv {..} -> do
+        let workflow =
+              W.provideWorkflow JSON "replay-concurrent-flag" $
+                W.replicateConcurrently_ 2 (replayCopyActivity *> provideCallStack (W.sleep (milliseconds 10)))
+            defs = (replayActivityDef, workflow)
+            liveConf = configure () defs $ do
+              baseConf
+              when enabled $ setConcurrentWorkflowSemigroupEnabled True
+            replayConf = configure () defs baseConf
+        history <- withWorker liveConf $ do
+          uuid <- uuidText
+          useClient $ do
+            handle <- C.start workflow (W.WorkflowId uuid) (defaultStartOptsWithTimeout taskQueue (seconds 10))
+            C.waitWorkflowResult handle
+            C.fetchHistory handle
+        let taskFlags = do
+              event <- history ^. History.events
+              Just completed <- pure (event ^. History.maybe'workflowTaskCompletedEventAttributes)
+              pure (completed ^. History.sdkMetadata . Metadata.langUsedFlags)
+            activityTasks = do
+              event <- history ^. History.events
+              Just scheduled <- pure (event ^. History.maybe'activityTaskScheduledEventAttributes)
+              pure (scheduled ^. History.workflowTaskCompletedEventId)
+        length activityTasks `shouldBe` 2
+        length (nub activityTasks) `shouldBe` if enabled then 1 else 2
+        case taskFlags of
+          first : rest -> do
+            first `shouldBe` if enabled then [2] else []
+            concat rest `shouldBe` []
+          [] -> expectationFailure "history contains no completed workflow task"
+        runReplayHistory globalRuntime replayConf history `shouldReturn` Right ()
+
+        -- A workflow that recorded only #401's flag must still run sequentially.
+        unless enabled $
+          case break (isJust . (^. History.maybe'workflowTaskCompletedEventAttributes)) (history ^. History.events) of
+            (prefix, first : rest) -> do
+              let withRaceLoserFlag = first & History.workflowTaskCompletedEventAttributes . History.sdkMetadata . Metadata.langUsedFlags .~ [1]
+                  raceLoserHistory = history & History.events .~ (prefix <> (withRaceLoserFlag : rest))
+              runReplayHistory globalRuntime replayConf raceLoserHistory `shouldReturn` Right ()
+            (_, []) -> expectationFailure "history contains no completed workflow task"
 
   describe "Replay from raw protobuf bytes" $ do
     specify "replays a simple workflow" $ \TestEnv {..} -> do
