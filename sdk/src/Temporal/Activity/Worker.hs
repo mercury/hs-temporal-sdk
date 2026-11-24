@@ -6,6 +6,7 @@
 module Temporal.Activity.Worker where
 
 import Control.Exception.Annotated
+import qualified Control.Exception.Annotated as Annotated
 import Control.Monad
 import Control.Monad.Logger
 import Control.Monad.Reader
@@ -220,74 +221,74 @@ applyActivityTaskStart _tsk tt msg = do
                   runReaderT (unActivity $ activityRun input') (actEnv env')
             )
               `finally` atomically (writeTVar finished True *> StmMap.delete tt w.runningActivities)
-        completionMsg <- case ef >>= first (toException . ValueError) of
-          Left err@(SomeException _wrappedErr) -> do
-            Logging.logDebug (T.pack (show err))
-            let appFailure = mkApplicationFailure err w.activityErrorConverters
-                enrichedApplicationFailure = applicationFailureToFailureProto appFailure
-            pure $
-              defMessage
-                & C.taskToken .~ rawTaskToken tt
-                & C.result .~ case fromException err of
-                  Just (_cancelled :: ActivityCancelReason) ->
-                    defMessage
-                      & AR.cancelled
-                        .~ ( defMessage
-                              & AR.failure
-                                .~ ( defMessage
-                                      & F.message .~ "Activity cancelled"
-                                      & F.canceledFailureInfo
-                                        .~ ( defMessage
-                                              -- FIXME: provide some details if we have them
-                                              & F.details .~ defMessage
-                                           )
-                                   )
-                           )
-                  Nothing ->
-                    defMessage
-                      & AR.failed
-                        .~ (defMessage & AR.failure .~ enrichedApplicationFailure)
-          Right ok -> do
-            Logging.logDebug "Got activity result"
-            ok' <- liftIO $ payloadProcessorEncode w.payloadProcessor ok
-            pure $
-              defMessage
-                & C.taskToken .~ rawTaskToken tt
-                & C.result
-                  .~ ( defMessage
-                        & AR.completed
-                          .~ (defMessage & AR.result .~ convertToProtoPayload ok')
-                     )
-        Logging.logDebug ("Activity completion message: " <> T.pack (show completionMsg))
-        Logging.logInfo $
-          T.concat
-            [ "Completed activity: "
-            , "namespace="
-            , Core.namespace c
-            , " "
-            , "taskQueue="
-            , Core.taskQueue c
-            , " "
-            , "workflowType="
-            , rawWorkflowType info.workflowType
-            , " "
-            , "workflowId="
-            , rawWorkflowId info.workflowId
-            , " "
-            , "activityType="
-            , info.activityType
-            , " "
-            , "activityId="
-            , rawActivityId info.activityId
-            , " "
-            , "status="
-            , statusFromCompletion completionMsg
-            ]
-        completionResult <- liftIO $ Core.completeActivityTask w.workerCore completionMsg
-        case completionResult of
-          Left err -> throwIO err
-          Right _ -> pure ()
-
+        handleLateActivityCancellation tt $ do
+          completionMsg <- case ef >>= first (toException . ValueError) of
+            Left err@(SomeException _wrappedErr) -> do
+              Logging.logDebug (T.pack (show err))
+              let appFailure = mkApplicationFailure err w.activityErrorConverters
+                  enrichedApplicationFailure = applicationFailureToFailureProto appFailure
+              pure $
+                defMessage
+                  & C.taskToken .~ rawTaskToken tt
+                  & C.result .~ case fromException err of
+                    Just (_cancelled :: ActivityCancelReason) ->
+                      defMessage
+                        & AR.cancelled
+                          .~ ( defMessage
+                                & AR.failure
+                                  .~ ( defMessage
+                                        & F.message .~ "Activity cancelled"
+                                        & F.canceledFailureInfo
+                                          .~ ( defMessage
+                                                -- FIXME: provide some details if we have them
+                                                & F.details .~ defMessage
+                                             )
+                                     )
+                             )
+                    Nothing ->
+                      defMessage
+                        & AR.failed
+                          .~ (defMessage & AR.failure .~ enrichedApplicationFailure)
+            Right ok -> do
+              Logging.logDebug "Got activity result"
+              ok' <- liftIO $ payloadProcessorEncode w.payloadProcessor ok
+              pure $
+                defMessage
+                  & C.taskToken .~ rawTaskToken tt
+                  & C.result
+                    .~ ( defMessage
+                          & AR.completed
+                            .~ (defMessage & AR.result .~ convertToProtoPayload ok')
+                       )
+          Logging.logDebug ("Activity completion message: " <> T.pack (show completionMsg))
+          Logging.logInfo $
+            T.concat
+              [ "Completed activity: "
+              , "namespace="
+              , Core.namespace c
+              , " "
+              , "taskQueue="
+              , Core.taskQueue c
+              , " "
+              , "workflowType="
+              , rawWorkflowType info.workflowType
+              , " "
+              , "workflowId="
+              , rawWorkflowId info.workflowId
+              , " "
+              , "activityType="
+              , info.activityType
+              , " "
+              , "activityId="
+              , rawActivityId info.activityId
+              , " "
+              , "status="
+              , statusFromCompletion completionMsg
+              ]
+          completionResult <- liftIO $ Core.completeActivityTask w.workerCore completionMsg
+          case completionResult of
+            Left err -> throwIO err
+            Right _ -> pure ()
       -- Register the running activity /unless/ it finished asynchronously &
       -- deregistered itself before we even got here.
       atomically $ do
@@ -310,6 +311,19 @@ applyActivityTaskStart _tsk tt msg = do
           AR.ActivityExecutionResult'WillCompleteAsync _ -> "will-complete-async"
         Nothing -> "unknown"
       Nothing -> "unknown"
+
+
+handleLateActivityCancellation :: (MonadUnliftIO m, MonadLogger m) => TaskToken -> m () -> m ()
+handleLateActivityCancellation tt action = withRunInIO $ \runInIO ->
+  runInIO action `Annotated.catch` \(cancelReason :: ActivityCancelReason) ->
+    runInIO $
+      Logging.logDebug $
+        T.concat
+          [ "Activity cancelled after execution: taskToken="
+          , T.pack (show tt)
+          , " reason="
+          , T.pack (show cancelReason)
+          ]
 
 
 applyActivityTaskCancel :: (MonadUnliftIO m, MonadLogger m) => TaskToken -> AT.Cancel -> ActivityWorkerM actEnv m ()
