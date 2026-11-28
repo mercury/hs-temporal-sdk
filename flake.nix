@@ -7,10 +7,6 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     devenv.url = "github:cachix/devenv/v1.11.2";
-    rust-overlay = {
-      url = "github:oxalica/rust-overlay";
-      inputs.nixpkgs.follows = "devenv/nixpkgs";
-    };
   };
 
   outputs =

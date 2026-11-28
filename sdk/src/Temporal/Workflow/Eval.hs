@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE RankNTypes #-}
@@ -150,10 +149,10 @@ runWorkflow wf = provideCallStack $ do
                   then -- comparing IORefs of different types is safe, it's
                   -- pointer-equality on the MutVar#.
 
-                  -- TODO, I don't know if there are any cases where we need
-                  -- to worry about discarding unfinished computations, but
-                  -- I think exiting at the conclusion of a workflow is the
-                  -- right thing to do.
+                    -- TODO, I don't know if there are any cases where we need
+                    -- to worry about discarding unfinished computations, but
+                    -- I think exiting at the conclusion of a workflow is the
+                    -- right thing to do.
                     pure ()
                   else -- We have a result, but don't discard unfinished
                   -- computations in the run queue.

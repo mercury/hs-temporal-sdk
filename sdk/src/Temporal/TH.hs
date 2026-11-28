@@ -422,7 +422,6 @@ registerActivityWithOptionsAndType n conf fnType = do
   actDefs <-
     if isDefaultCodec
       then -- Use default (no type family instance needed)
-
         [d|
           instance Temporal.TH.Classes.ActivityFn $dataName where
             activityConfig _ = conf
@@ -471,7 +470,6 @@ registerWorkflowWithOptionsAndType n conf fnType = do
   additionalDecls <-
     if isDefaultCodec
       then -- Use default (no type family instance needed)
-
         [d|
           instance Temporal.TH.Classes.WorkflowFn $dataName where
             workflowConfig _ = conf

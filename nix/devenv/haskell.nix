@@ -13,8 +13,11 @@ in
   languages.haskell = {
     languageServer = pkgs.haskell.packages.${ghcVersion}.haskell-language-server;
     enable = true;
-    package = pkgs.haskell.packages.${ghcVersion}.ghc.withHoogle (
+    package = pkgs.haskell.packages.${ghcVersion}.ghc.withPackages (
       hpkgs: builtins.attrValues (haskellUtils.localDevPackageDepsAttrSet hpkgs)
     );
+    stack.enable = false;
   };
+
+  git-hooks.hooks.fourmolu.package = pkgs.haskell.packages.${ghcVersion}.fourmolu;
 }
