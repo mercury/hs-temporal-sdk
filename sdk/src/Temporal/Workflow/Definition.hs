@@ -77,9 +77,9 @@ instance WorkflowRef (KnownWorkflow args result) where
 {- | A 'KnownWorkflow' is a handle that contains all the information needed to start a
 Workflow either as a child workflow or as a top-level workflow via a 'Client'.
 -}
-data KnownWorkflow (args :: [Type]) (result :: Type) = forall codec.
-  ( FunctionSupportsCodec codec args result
-  ) =>
+data KnownWorkflow (args :: [Type]) (result :: Type)
+  = forall codec.
+  (FunctionSupportsCodec codec args result) =>
   KnownWorkflow
   { knownWorkflowCodec :: codec
   , knownWorkflowName :: Text
@@ -239,7 +239,8 @@ data WorkflowSignalDefinition
 -- , workflowSignalHandler :: [Payload] -> IO ()
 -- }
 
-data WorkflowUpdateDefinition = forall codec f.
+data WorkflowUpdateDefinition
+  = forall codec f.
   (FunctionSupportsCodec codec (ArgsOf f) (ResultOf Workflow f)) =>
   WorkflowUpdateDefinition
   { updateName :: Text -- name

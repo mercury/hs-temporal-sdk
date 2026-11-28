@@ -1,19 +1,32 @@
 { pkgs, ... }:
+let
+  rustToolchain = pkgs.temporal-bridge-rust-toolchain.withComponents [
+    "cargo"
+    "rustc"
+    "rust-std"
+    "clippy"
+    "rustfmt"
+    "rust-src"
+    "rust-analyzer"
+  ];
+in
 {
   packages =
     [
       pkgs.crate2nix
       pkgs.protobuf
       pkgs.rust-cbindgen
+      rustToolchain
       pkgs.yq
     ]
     ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
       pkgs.apple-sdk
+      pkgs.libiconv
     ];
 
-  languages.rust = {
-    enable = true;
-    channel = "stable";
+  env = {
+    PROTOC = "${pkgs.protobuf}/bin/protoc";
+    RUST_SRC_PATH = "${pkgs.temporal-bridge-rust-toolchain.rust-src}/lib/rustlib/src/rust/library";
   };
 
   git-hooks.hooks = {

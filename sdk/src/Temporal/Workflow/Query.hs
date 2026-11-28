@@ -21,7 +21,8 @@ This means, for example, that Query handling logic cannot schedule Activity Exec
 
 Sending Queries to completed Workflow Executions is supported, though Query reject conditions can be configured per Query
 -}
-data KnownQuery (args :: [Type]) (result :: Type) = forall codec.
+data KnownQuery (args :: [Type]) (result :: Type)
+  = forall codec.
   (Codec codec result, ApplyPayloads codec args, GatherArgs codec args) =>
   KnownQuery
   { queryName :: Text

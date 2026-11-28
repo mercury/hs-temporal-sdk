@@ -7,7 +7,8 @@ import Data.Text (Text)
 import Temporal.Payload
 
 
-data KnownSignal (args :: [Type]) = forall codec.
+data KnownSignal (args :: [Type])
+  = forall codec.
   (ApplyPayloads codec args, GatherArgs codec args) =>
   KnownSignal
   { signalName :: Text

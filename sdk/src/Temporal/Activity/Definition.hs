@@ -68,9 +68,9 @@ instance ActivityDef (ProvidedActivity env f) where
   activityDefinition (ProvidedActivity def _) = def
 
 
-data KnownActivity (args :: [Type]) (result :: Type) = forall codec.
-  ( FunctionSupportsCodec codec args result
-  ) =>
+data KnownActivity (args :: [Type]) (result :: Type)
+  = forall codec.
+  (FunctionSupportsCodec codec args result) =>
   KnownActivity
   { knownActivityCodec :: codec
   , knownActivityName :: Text

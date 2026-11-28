@@ -133,8 +133,7 @@ class (Fn f, Typeable (FnActivityEnv (FnType f))) => ActivityFn f where
 
 
   activityImpl
-    :: ( RequireCallStack
-       )
+    :: (RequireCallStack)
     => f
     -> ProvidedActivity (FnActivityEnv (FnType f)) (FnType f)
   default activityImpl

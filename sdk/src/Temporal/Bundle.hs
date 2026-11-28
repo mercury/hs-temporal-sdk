@@ -336,8 +336,7 @@ via the Temporal client or within Temporal workflows.
 -}
 refs
   :: forall r codec
-   . ( CanUseAsRefs r codec
-     )
+   . (CanUseAsRefs r codec)
   => codec
   -> Refs r
 refs codec = result
@@ -371,8 +370,7 @@ type CanUseAsDefs f codec env =
 -- | Produce a record of definitions from a record of implementations, using the supplied codec.
 defs
   :: forall f codec env
-   . ( CanUseAsDefs f codec env
-     )
+   . (CanUseAsDefs f codec env)
   => codec
   -> Impl f
   -> Defs env f
